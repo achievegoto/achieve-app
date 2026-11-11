@@ -117,6 +117,13 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 .badge { position: absolute; top: 6px; margin-left: 4px; background: var(--bad); color: #fff; font-size: 10px; border-radius: 99px; padding: 0 6px; font-weight: 700; }
 #toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
 .login { max-width: 420px; margin: 24px auto; }
+.rank { display: inline-block; vertical-align: middle; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; letter-spacing: .02em; }
+.rk0 { background: #eceaf2; color: #5d5a6b; } .rk1 { background: #e4eefa; color: #1d5fa8; } .rk2 { background: #e3f2ea; color: #1f6b4a; }
+.rk3 { background: #fbf0d9; color: #8a5a00; } .rk4 { background: #f6e3ef; color: #9a2f6c; } .rk5 { background: #54347e; color: #fff; }
+.hero .rank { font-size: 12px; background: #fff; color: #54347e; }
+.rk-t { font-size: 10px; opacity: .75; margin-left: 2px; }
+table.mx .rank { font-size: 10px; padding: 0 6px; }
+
 .sec-t { font-size: 12px; letter-spacing: .06em; color: var(--muted); font-weight: 500; }
 .crit { list-style: none; padding: 0; margin: -6px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .crit li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
@@ -277,11 +284,29 @@ function staffPicker() {
   const groups = STORES.map(([id, l]) => [l, activeStaff().filter(s => s.store === id)]).concat([['店舗未設定', activeStaff().filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
   return `<section class="card"><h3>あなたの名前を選んでください</h3>
     <div class="sub">この端末では次から自動で選ばれます。</div>
-    ${groups.map(([l, arr]) => `<div class="group"><h2>${esc(l)}</h2><div class="chips">${arr.map(s => `<button type="button" class="chip" id="me-${s.id}" data-act="setMe" data-id="${s.id}" aria-pressed="${S.me === s.id}">${esc(s.name)}</button>`).join('')}</div></div>`).join('')}
+    ${groups.map(([l, arr]) => `<div class="group"><h2>${esc(l)}</h2><div class="chips">${arr.map(s => `<button type="button" class="chip" id="me-${s.id}" data-act="setMe" data-id="${s.id}" aria-pressed="${S.me === s.id}">${esc(s.name)} <small class="rk-t">${rankOf(s.id).name}</small></button>`).join('')}</div></div>`).join('')}
     ${S.me ? `<button type="button" class="btn small" data-act="cancelPick">閉じる</button>` : ''}
   </section>`;
 }
 const CAT_SHORT = { '基礎スキル': '基礎', 'HAIR SET , MAKE': 'SET・MAKE', '縮毛矯正': '縮毛矯正', 'KITSUKE': '着付け' };
+const RANKS = [
+  { name: '新人', next: 'アシスタント', need: it => it.title === 'シャンプー', label: 'シャンプー合格' },
+  { name: 'アシスタント', next: 'ケアリスト', need: it => /^ヘアケアソムリエ/.test(it.title), label: 'ヘアケアソムリエ合格' },
+  { name: 'ケアリスト', next: 'カラーリスト', need: it => it.title === 'カラーリストOD', label: 'カラーリストOD合格' },
+  { name: 'カラーリスト', next: 'Jrスタイリスト', need: it => it.cat === 'MODEL' && /OD$/.test(it.title), any: true, label: 'MODEL ODを1つ合格' },
+  { name: 'Jrスタイリスト', next: 'スタイリスト', need: it => it.cat === 'MODEL' && /OD$/.test(it.title), label: 'MODEL ODを全部合格' },
+  { name: 'スタイリスト' },
+];
+function rankOf(sid) {
+  for (let i = 0; i < RANKS.length - 1; i++) {
+    const r = RANKS[i], list = S.items.filter(r.need);
+    const done = list.filter(it => pOf(sid, it.id).state === 'passed');
+    const ok = list.length && (r.any ? done.length >= 1 : done.length === list.length);
+    if (!ok) return { i, name: r.name, next: r.next, label: r.label, left: list.filter(it => pOf(sid, it.id).state !== 'passed'), done: done.length, of: r.any ? 1 : list.length };
+  }
+  return { i: RANKS.length - 1, name: 'スタイリスト' };
+}
+const rankTag = sid => { const r = rankOf(sid); return `<span class="rank rk${r.i}">${r.name}</span>`; };
 function ring(pct) {
   const r = 34, c = 2 * Math.PI * r, d = c * pct / 100;
   return `<svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" class="ring-bg"/><circle cx="40" cy="40" r="${r}" class="ring-fg" stroke-dasharray="${d.toFixed(1)} ${c.toFixed(1)}"/></svg>`;
@@ -300,11 +325,12 @@ function progressCard(sid) {
   return `<section class="hero">
     <div class="hero-top">
       <div class="ring-box">${ring(pct)}<div class="ring-num"><b>${pct}</b><small>%</small></div></div>
-      <div class="hero-txt"><div class="hero-name">${esc(st.name)}</div>
+      <div class="hero-txt"><div class="hero-name">${esc(st.name)} ${rankTag(sid)}</div>
         <div class="sub">${[store, yearNow(st) ? yearNow(st) + '年目' : ''].filter(Boolean).map(esc).join(' ・ ') || '店舗・入社日 未設定'}</div>
         <div class="stats"><span><b>${all.passed}</b>合格</span><span><b>${all.requested}</b>申請中</span><span><b>${all.going}</b>練習中</span><span><b>${all.total - all.passed - all.requested - all.going}</b>未着手</span></div>
       </div>
     </div>
+    ${(r => r.next ? `<div class="next"><div class="next-h">${esc(r.next)}まで：${esc(r.label)}${r.of > 1 ? `（${r.done}/${r.of}）` : ''}</div>${r.left.slice(0, 4).map(it => `<button type="button" class="next-it" data-act="open" data-sid="${sid}" data-id="${it.id}"><span class="dot d-${pOf(sid, it.id).state}"></span><span class="next-t">${esc(it.title)}</span><span class="next-s">${STATE[pOf(sid, it.id).state]}</span></button>`).join('')}</div>` : '')(rankOf(sid))}
     ${nx.length ? `<div class="next"><div class="next-h">次の目標</div>${nx.map(it => { const p = pOf(sid, it.id); return `<button type="button" class="next-it" data-act="open" data-sid="${sid}" data-id="${it.id}"><span class="dot d-${p.state}"></span><span class="next-t">${esc(it.title)}</span><span class="next-s">${esc(CAT_SHORT[it.cat] || it.cat)}・${esc(yl(it))}</span></button>`; }).join('')}</div>` : '<div class="next"><div class="next-h">全項目合格です 🎉</div></div>'}
   </section>`;
 }
@@ -348,7 +374,7 @@ function teacherView() {
   if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 一覧に戻る</button>` + progressCard(S.viewStaff) + catGrid(S.viewStaff) + itemList(S.viewStaff);
   const reqs = requests();
   const reqCard = `<section class="card"><div class="card-head"><h3>チェック申請</h3><span class="sub">${reqs.length}件</span></div>
-    ${reqs.length ? `<div class="list">${reqs.map(p => { const it = itemOf(p.itemId), st = staffOf(p.staffId); return `<button type="button" class="row" data-act="open" data-sid="${st.id}" data-id="${it.id}"><div><div class="name">${esc(st.name)}：${esc(it.title)}</div>
+    ${reqs.length ? `<div class="list">${reqs.map(p => { const it = itemOf(p.itemId), st = staffOf(p.staffId); return `<button type="button" class="row" data-act="open" data-sid="${st.id}" data-id="${it.id}"><div><div class="name">${esc(st.name)} ${rankTag(st.id)}：${esc(it.title)}</div>
       <div class="sub"><span class="pill p-std">${esc(it.std)}</span><span>${esc(it.cat)}</span><span>練習 ${(p.practice || []).length}回</span><span>${ymd(p.requestedAt)} 申請</span></div></div><span class="pill p-requested">見る</span></button>`; }).join('')}</div>` : '<div class="empty" style="padding:12px">申請はありません</div>'}
   </section>`;
   const needImp = S.items.some(i => !i.criteria);
@@ -361,7 +387,7 @@ function matrixCard(clickable) {
   const rows = STORES.map(([sid, l]) => [l, activeStaff().filter(s => s.store === sid)]).concat([['店舗未設定', activeStaff().filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
   return `<section class="card"><h3>全員の進み具合</h3><div class="tbl-wrap"><table class="mx">
     <thead><tr><th>名前</th><th>合計</th>${cats.map(c => `<th>${esc(short(c))}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
+    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)} ${rankTag(s.id)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
   </table></div>${clickable ? '<div class="sub">名前を押すと、その人の項目を開けます。</div>' : ''}</section>`;
 }
 function allView() { return matrixCard(false); }
@@ -375,7 +401,7 @@ function staffAdmin() {
       ${e.id ? `<button type="button" class="btn danger" data-act="hideStaff">${e.hidden ? '表示に戻す' : '一覧から外す（卒業など）'}</button>` : ''}</div></div>` : '';
   return `<section class="card"><div class="card-head"><h3>スタッフ</h3><button type="button" class="btn small" data-act="newStaff">＋ 追加</button></div>
     ${form}
-    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer;padding:4px 0">スタッフ一覧（${S.staff.length}名）を開く・店舗と入社日の設定</summary><div class="list" style="margin-top:8px">${S.staff.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc((STORES.find(x => x[0] === s.store) || [, '店舗未設定'])[1])}</span>${s.start ? `<span>入社 ${ymd(s.start)}</span>` : '<span>入社日未設定</span>'}</div></div><span class="sub">編集</span></button>`).join('')}</div></details>
+    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer;padding:4px 0">スタッフ一覧（${S.staff.length}名）を開く・店舗と入社日の設定</summary><div class="list" style="margin-top:8px">${S.staff.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)} ${rankTag(s.id)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc((STORES.find(x => x[0] === s.store) || [, '店舗未設定'])[1])}</span>${s.start ? `<span>入社 ${ymd(s.start)}</span>` : '<span>入社日未設定</span>'}</div></div><span class="sub">編集</span></button>`).join('')}</div></details>
   </section>`;
 }
 function renderSheet() {
