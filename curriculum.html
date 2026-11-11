@@ -117,6 +117,21 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 .badge { position: absolute; top: 6px; margin-left: 4px; background: var(--bad); color: #fff; font-size: 10px; border-radius: 99px; padding: 0 6px; font-weight: 700; }
 #toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
 .login { max-width: 420px; margin: 24px auto; }
+.sec-t { font-size: 12px; letter-spacing: .06em; color: var(--muted); font-weight: 500; }
+.crit { list-style: none; padding: 0; margin: -6px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.crit li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.crit .cn { font-family: var(--font-num); color: var(--accent); font-weight: 500; min-width: 1em; }
+.crit label { display: flex; gap: 10px; align-items: flex-start; width: 100%; cursor: pointer; }
+.crit input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--good); flex: none; margin: 1px 0 0; }
+.guide { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.guide summary { cursor: pointer; font-weight: 500; font-size: 14px; color: var(--accent); }
+.g-body { white-space: pre-wrap; font-size: 13px; margin-top: 8px; overflow-wrap: anywhere; }
+.links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -6px; }
+.links .btn { text-decoration: none; color: var(--accent); }
+.hist { display: flex; flex-direction: column; gap: 6px; margin-top: -6px; }
+.h-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.h-note { width: 100%; color: var(--ink); font-size: 13px; }
+
 .hero { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1a6e8e)); color: #fff; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .hero-top { display: flex; align-items: center; gap: 16px; }
 .ring-box { position: relative; width: 88px; height: 88px; flex: none; }
@@ -184,19 +199,12 @@ table.mx td.full { background: var(--good); color: var(--surface); }
 <script src="config.js"></script>
 <script>
 const STORES = [['hair', 'hair design'], ['liss', 'Liss'], ['till', 'till']];
-const CATS = ['基礎スキル', 'SP.SPA', 'COLOR', '縮毛矯正', 'HAIR SET , MAKE', 'CUT', 'KITSUKE', 'ソムリエ'];
+const CATS = ['基礎スキル', 'SP.SPA', 'COLOR', '縮毛矯正', 'HAIR SET , MAKE', 'CUT', 'MODEL', 'KITSUKE', 'ソムリエ'];
 const STATE = { none: '未着手', lectured: 'レクチャー済', requested: '申請中', redo: '再挑戦', passed: '合格' };
 const STD_WORD = { 'チェック': 'チェック', 'オーディション': 'オーディション', '講義': '講義' };
-const SEED_ITEMS = [
-  ['基礎スキル', [['各種メニュー準備','チェック',1],['ドライ','チェック',1],['お会計','チェック',1],['お出迎え','チェック',1],['パーマターバン','チェック',1],['パーマ薬剤塗布','チェック',1],['カラーオフ,乳化','チェック',1],['マニキュアオフ','チェック',1],['ストレート２液','チェック',1]]],
-  ['SP.SPA', [['お流し','チェック',1],['シャンプー','オーディション',1],['トリートメントマッサージ','オーディション',1],['頭皮ケアメニュー説明','チェック',1],['システムトリートメント','チェック',1],['ハニーパック','オーディション',1],['頭皮クレンジング','オーディション',1],['頭浸浴','チェック',1],['SPA','オーディション',1]]],
-  ['COLOR', [['ハケの使い方','講義',1],['放置作業','講義',1],['カラーチェック','講義',1],['トナー','講義',1],['ファッションリタッチ','オーディション',1],['グレイリタッチ','オーディション',1],['ワンタッチ(毛先塗布)','チェック',1],['マニキュア,ゼロ塗布','オーディション',1],['ウィービング','オーディション',1],['カラーモデル','オーディション',1],['カラーリストOD','オーディション',1]]],
-  ['縮毛矯正', [['ストレート理論','講義',1],['縮毛矯正薬剤塗布','チェック',1],['軟化チェック、流し','講義',1],['アイロンワーク','チェック',1],['モデルアイロンワーク','チェック',1]]],
-  ['HAIR SET , MAKE', [['シニヨン','オーディション',1],['編みおろし','オーディション',1],['フィニッシュワーク','チェック',1],['MAKE','チェック',1],['眉カット','チェック',1]]],
-  ['CUT', [['ミディアムレイヤー','オーディション',1],['鎖骨下〜ロングOD','オーディション',1],['セイムレイヤー','オーディション',1],['ワンレングス','オーディション',1],['ボブOD','オーディション',1],['ラウンドグラデーション','オーディション',2],['ウィッグスタイルカット','チェック',2],['ショートOD','オーディション',2],['レディースパーマMODEL','チェック',2],['メンズ刈り上げ','オーディション',2],['メンズOD','オーディション',2],['メンズパーマMODEL','チェック',2]]],
-  ['KITSUKE', [['３歳被布','オーディション',1],['５歳袴','オーディション',1],['７歳七五三','オーディション',1],['浴衣','オーディション',1],['振袖','オーディション',2],['訪問着','オーディション',3],['留袖','オーディション',3],['婚礼','オーディション',4]]],
-  ['ソムリエ', [['ヘアケアソムリエ知識','講義',1],['ヘアケアソムリエ技術','講義',1],['ヘアケアソムリエカウンセリング','講義',1],['カラーソムリエ知識','講義',1],['カラーソムリエ技術','講義',2],['カラーソムリエカウンセリング','講義',2],['デザインロジック知識','講義',2],['デザインロジックカウンセリング','講義',2],['コスメソムリエ知識','講義',2],['コスメソムリエ技術','講義',2],['コスメソムリエカウンセリング','講義',2],['MCM','講義',4],['ビューティソムリエ','講義',4]]],
-];
+const SEED_ITEMS = [{"cat": "基礎スキル", "title": "各種メニュー準備", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["各メニューに必要な道具・薬剤を指示なしで揃えられる", "準備が施術開始に間に合う", "使用後の片付け・補充までできる"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "ドライ", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["根元から乾かし、毛先のオーバードライがない", "風・熱の当て方でお客様に不快感を与えない", "ツヤ・まとまりのある仕上がり", "ミディアム目安10分以内"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "お会計", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["メニュー・金額を正確に確認できる", "現金・カード操作にミスがない", "次回予約・店販の声かけができる", "お見送りまで丁寧な所作"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "お出迎え", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["笑顔と明るい挨拶ができる", "荷物・上着を丁寧にお預かりできる", "席へのご案内と待ち時間の声かけができる"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "パーマターバン", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["薬剤が顔・首に垂れない", "締め付け具合の声かけができる", "見た目がきれいに整っている"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "パーマ薬剤塗布", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["塗布ムラ・塗り漏れがない", "地肌・顔周りに薬剤をつけない", "規定時間内に塗布できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "カラーオフ,乳化", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["乳化が十分で色残り・薬剤残りがない", "生え際・襟足の洗い残しがない", "お湯加減・力加減の声かけができる"], "guide": "", "links": [{"t": "カラーオフ、乳化", "u": "https://education.milbon.co.jp/home/movies/2000568/2000380/details.html"}], "src": "draft"}, {"cat": "基礎スキル", "title": "マニキュアオフ", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["肌・生え際についた色を落とせる", "洗い残しがない", "お湯加減の声かけができる"], "guide": "", "links": [], "src": "draft"}, {"cat": "基礎スキル", "title": "ストレート２液", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["塗布ムラがない", "規定の放置時間を守れる", "流し残しがない"], "guide": "", "links": [], "src": "draft"}, {"cat": "SP.SPA", "title": "お流し", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["洗い残しがない", "お湯加減の声かけができる", "顔・耳に水がかからない"], "guide": "", "links": [], "src": "draft"}, {"cat": "SP.SPA", "title": "シャンプー", "std": "オーディション", "yearLabel": "1年目", "time": 10, "criteria": ["規定TIME 10分以内（オイル塗布開始〜お湯を止めるまで）", "声かけを決められたタイミングで全てできる", "洗い残し・すすぎ残しがない", "顔・首への水はねがない"], "guide": "【シャンプーテスト　10分】\n・セット面からスタート\n・シャンプー台へ移動して自己紹介\n・オイルをつけ始めたらタイムスタート\n・シャンプー\n・流し終わってお湯を止めたらタイムストップ\n\n【声かけのタイミング】\nご案内：「〇〇様、シャンプー台へご案内いたします」（お待たせした場合は最初に「お待たせしました」）\nシャンプー台までお客様のペースに合わせて案内し、どの台か口頭で伝える\n自己紹介：「本日シャンプー担当させていただく〇〇と申します。よろしくお願いいたします」\n「失礼します。クロスしていきます。お首苦しくないですか？」\n「椅子を倒していきます」\n位置を直す時：「少し足元の方に下がれますか？」「少し上にあがっていただいてよろしいですか？」→「ありがとうございます」\n「お首の位置大丈夫ですか？」\n「頭皮を保湿してくれるオイルをつけていきます」\nタオルターバン後：「オイルを浸透させていくために少し温かめなお湯をかけていきます」\nお湯5回→センター→左側に移る時：「お湯加減いかがですか？」\nシャンプー2線目：「力加減いかがですか？」\n椅子を起こす時：「お疲れ様でした。椅子起こします」\n席へ：「お席へご案内いたします。こちらどうぞ」", "links": [], "src": "notion"}, {"cat": "SP.SPA", "title": "トリートメントマッサージ", "std": "オーディション", "yearLabel": "1年目", "time": 17, "criteria": ["規定TIME 17分以内（オイル塗布開始〜椅子を起こすまで）", "セット面で自己紹介と頭皮ケアの説明ができる", "マッサージの圧・リズムが一定", "タオルドライ・タオルターバンまで丁寧"], "guide": "【トリートメントマッサージテスト　17分】\n・セット面で自己紹介、頭皮ケアの説明\n・シャンプー台へ移動\n・オイルをつけ始めたらタイムスタート\n・シャンプー\n・トリートメントマッサージ\n・タオルドライ、タオルターバン\n・席を起こした時点でタイムストップ", "links": [], "src": "notion"}, {"cat": "SP.SPA", "title": "頭皮ケアメニュー説明", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["ハニーパック・頭皮クレンジング・スペシャルシャンプー・頭浸浴の違いを説明できる", "季節に合わせた提案ができる", "最後に「本日はどうされますか？」と選んでもらえる"], "guide": "失礼します！（メニュー表を見せながら）\n当店はシャンプーメニューを選ぶことができます。通常はシャンプーをしてトリートメントマッサージをしていきます。\n\n⭐️ハニーパック：50%以上がはちみつ成分の頭皮用保湿パック。頭皮の乾燥やかゆみが気になる方におすすめ。\n⭐️頭皮クレンジング：人の皮脂に近い“ホホバオイル”でオイルマッサージ。毛穴の奥の汚れを落とし、保湿もできる。マッサージが10分ほど長くなるのでリラックスしたい方におすすめ。\n⭐️スペシャルシャンプー：ハニーパックと頭皮クレンジングの両方ができるコース。\n⭐️頭浸浴：上からお湯が出る機械に5分ほど頭を浸す。炭酸の効果で毛穴の汚れを取り、髪と頭皮をリセット。カラーやトリートメントの入りも良くなる。\n\n「本日はどうされますか？」\n\n季節の提案\n春：花粉や黄砂で頭皮が炎症しやすい時期なので〇〇でケア\n夏：紫外線が強い時期。〇〇で頭皮ケア、皮脂による毛穴詰まりを〇〇で除去\n秋：夏の紫外線の影響で抜け毛が気になる方が多い。〇〇でケア\n冬：乾燥が気になる方が多いので〇〇で保湿", "links": [], "src": "notion"}, {"cat": "SP.SPA", "title": "システムトリートメント", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["4ステップ・5ステップの手順を正確にできる", "塗布量・放置時間を守れる", "セット面・シャンプー台どちらでもできる"], "guide": "", "links": [{"t": "4ステップ セット面", "u": "https://education.milbon.co.jp/home/movies/2001266/2001267/details.html"}, {"t": "4ステップ シャンプー台", "u": "https://education.milbon.co.jp/home/movies/2001266/2001268/details.html"}, {"t": "5ステップ セット面", "u": "https://education.milbon.co.jp/home/movies/2001266/2001269/details.html"}, {"t": "5ステップ シャンプー台", "u": "https://education.milbon.co.jp/home/movies/2001266/2001270/details.html"}], "src": "draft"}, {"cat": "SP.SPA", "title": "ハニーパック", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["効果を説明できる", "塗布ムラがない", "流し残しがない"], "guide": "", "links": [], "src": "draft"}, {"cat": "SP.SPA", "title": "頭皮クレンジング", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["マッサージを手順どおりにできる", "圧・リズムが一定", "オイルの流し残しがない"], "guide": "", "links": [], "src": "draft"}, {"cat": "SP.SPA", "title": "頭浸浴", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["機械の準備・操作ができる", "5分の時間管理ができる", "効果を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "SP.SPA", "title": "SPA", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["一連の流れを規定時間内にできる", "接客・声かけが自然", "仕上がりに洗い残し・オイル残りがない"], "guide": "", "links": [], "src": "draft"}, {"cat": "COLOR", "title": "ハケの使い方", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [{"t": "ハケの使い方", "u": "https://education.milbon.co.jp/home/movies/2000568/2000371/details.html"}], "src": "draft"}, {"cat": "COLOR", "title": "放置作業", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [{"t": "カラー放置", "u": "https://education.milbon.co.jp/home/movies/2000568/2000378/details.html"}], "src": "draft"}, {"cat": "COLOR", "title": "カラーチェック", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [{"t": "カラーチェック", "u": "https://education.milbon.co.jp/home/movies/2000568/2000379/details.html"}], "src": "draft"}, {"cat": "COLOR", "title": "トナー", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [{"t": "トナー", "u": "https://education.milbon.co.jp/home/movies/2000568/2000381/details.html"}], "src": "draft"}, {"cat": "COLOR", "title": "ファッションリタッチ", "std": "オーディション", "yearLabel": "1年目", "time": 15, "criteria": ["規定TIME 15分以内", "適切な塗布量", "均一さ", "スピード", "姿勢", "仕事の綺麗さ", "仕上がりムラがない", "最根本の明度", "既染部とのつながり"], "guide": "セミゼロ塗布。ファッションカラーリタッチODチェック表の項目で採点。", "links": [{"t": "セミゼロ塗布", "u": "https://education.milbon.co.jp/home/movies/2000568/2000374/details.html"}], "src": "notion"}, {"cat": "COLOR", "title": "グレイリタッチ", "std": "オーディション", "yearLabel": "1年目", "time": 15, "criteria": ["規定TIME 15分以内", "根元ギリギリまで塗れている", "白髪の染め残しがない", "既染部に薬剤を重ねていない", "肌への付着がない"], "guide": "ベタ塗り", "links": [{"t": "ベタ塗り", "u": "https://education.milbon.co.jp/home/movies/2000568/2000373/details.html"}], "src": "notion"}, {"cat": "COLOR", "title": "ワンタッチ(毛先塗布)", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["中間〜毛先に均一に塗布できる", "適切な塗布量", "肌・衣服に付着させない"], "guide": "", "links": [{"t": "中間毛先塗布", "u": "https://education.milbon.co.jp/home/movies/2000568/2000376/details.html"}], "src": "draft"}, {"cat": "COLOR", "title": "マニキュア,ゼロ塗布", "std": "オーディション", "yearLabel": "1年目", "time": 25, "criteria": ["規定TIME 25分以内", "地肌につけずに塗布できる（ゼロテク）", "塗布ムラがない", "肌についた色をすぐ拭き取れる"], "guide": "", "links": [{"t": "マニキュア塗布", "u": "https://education.milbon.co.jp/home/movies/2000568/2000377/details.html"}], "src": "notion"}, {"cat": "COLOR", "title": "ウィービング", "std": "オーディション", "yearLabel": "1年目", "time": 30, "criteria": ["規定TIME 30分以内", "取る毛束の幅・厚さが均一", "ホイルのズレ・薬剤漏れがない", "仕上がりのデザインが指定どおり"], "guide": "", "links": [], "src": "notion"}, {"cat": "COLOR", "title": "カラーモデル", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["ヘアカラーモデルカルテを記入できる", "カウンセリングでオーダーを確認できる", "仕上がりがオーダーどおり", "施術時間が適正"], "guide": "ヘアカラーモデルカルテ原本（Notion）を使用", "links": [], "src": "draft"}, {"cat": "COLOR", "title": "カラーリストOD", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["COLORのチェック・オーディションを全て合格済み", "モデル施術でカウンセリング〜仕上げまで一人でできる", "仕上がりの明度・色味がオーダーどおり"], "guide": "", "links": [], "src": "draft"}, {"cat": "縮毛矯正", "title": "ストレート理論", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["理論・薬剤の違い・酸化剤と還元剤・薬剤選定の動画を受講した", "薬剤選定の考え方を説明できる", "講師の口頭確認に答えられる"], "guide": "テキスト：ストレートパーマ理論技術_動画連動テキスト.pdf（Notion）", "links": [{"t": "理論", "u": "https://education.milbon.co.jp/home/movies/2001527/2001537/details.html"}, {"t": "薬剤の違い", "u": "https://education.milbon.co.jp/home/movies/2001527/2001536/details.html"}, {"t": "酸化剤、還元剤", "u": "https://education.milbon.co.jp/home/movies/2001527/2001535/details.html"}, {"t": "薬剤選定", "u": "https://education.milbon.co.jp/home/movies/2001527/2001534/details.html"}], "src": "draft"}, {"cat": "縮毛矯正", "title": "縮毛矯正薬剤塗布", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["根元ギリギリまで塗布できる", "既矯正部に薬剤を重ねない", "塗布ムラがない", "規定時間内"], "guide": "", "links": [{"t": "薬剤塗布", "u": "https://education.milbon.co.jp/home/movies/2001527/2001533/details.html"}], "src": "draft"}, {"cat": "縮毛矯正", "title": "軟化チェック、流し", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["軟化の見極め方を説明できる", "流し残しなく流せる", "講師の口頭確認に答えられる"], "guide": "", "links": [{"t": "軟化チェック", "u": "https://education.milbon.co.jp/home/movies/2001527/2001532/details.html"}, {"t": "お流し", "u": "https://education.milbon.co.jp/home/movies/2001527/2001531/details.html"}], "src": "draft"}, {"cat": "縮毛矯正", "title": "アイロンワーク", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["適切な温度設定ができる", "パネルの厚さ・テンションが一定", "アイロン跡・折れがない", "規定時間内"], "guide": "", "links": [{"t": "アイロン操作", "u": "https://education.milbon.co.jp/home/movies/2001527/2001530/details.html"}], "src": "draft"}, {"cat": "縮毛矯正", "title": "モデルアイロンワーク", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["モデルで根元〜毛先まで自然なストレートに仕上がる", "アイロン跡・折れがない", "施術時間が適正"], "guide": "", "links": [], "src": "draft"}, {"cat": "HAIR SET , MAKE", "title": "シニヨン", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に仕上げられる", "左右のバランス・高さが整っている", "ピンが見えず崩れない", "後れ毛・面がきれい"], "guide": "", "links": [], "src": "draft"}, {"cat": "HAIR SET , MAKE", "title": "編みおろし", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に仕上げられる", "編み目が均一", "崩れにくい", "全体のバランスが整っている"], "guide": "", "links": [], "src": "draft"}, {"cat": "HAIR SET , MAKE", "title": "フィニッシュワーク", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["スタイリング剤を適量・適切に使える", "顔周りの毛流れが整っている", "お客様に再現方法を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "HAIR SET , MAKE", "title": "MAKE", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["ベースメイクのムラがない", "左右のバランスが整っている", "シーン・オーダーに合ったメイク"], "guide": "", "links": [], "src": "draft"}, {"cat": "HAIR SET , MAKE", "title": "眉カット", "std": "チェック", "yearLabel": "1年目", "time": null, "criteria": ["左右対称に整えられる", "骨格に合った形を提案できる", "肌を傷つけない"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "ミディアムレイヤー", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["ウィッグで指定時間内に切れる", "ガイド・ラインが正確", "左右差がない", "ベース・セクションの理解を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "鎖骨下〜ロングOD", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["カウンセリングでオーダーを確認できる", "モデルで指定時間内に仕上げられる", "仕上がりがオーダーどおりで左右差がない", "ドライ・スタイリングまで仕上げられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "セイムレイヤー", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["ウィッグで指定時間内に切れる", "ガイド・ラインが正確", "左右差がない", "ベース・セクションの理解を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "ワンレングス", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["ウィッグで指定時間内に切れる", "ガイド・ラインが正確", "左右差がない", "ベース・セクションの理解を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "ボブOD", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["カウンセリングでオーダーを確認できる", "モデルで指定時間内に仕上げられる", "仕上がりがオーダーどおりで左右差がない", "ドライ・スタイリングまで仕上げられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "ラウンドグラデーション", "std": "オーディション", "yearLabel": "2年目", "time": null, "criteria": ["ウィッグで指定時間内に切れる", "ガイド・ラインが正確", "左右差がない", "ベース・セクションの理解を説明できる"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "ウィッグスタイルカット", "std": "チェック", "yearLabel": "2年目", "time": null, "criteria": ["写真のスタイルをウィッグで再現できる", "ベースとデザインの切り分けを説明できる", "指定時間内"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "ショートOD", "std": "オーディション", "yearLabel": "2年目", "time": null, "criteria": ["カウンセリングでオーダーを確認できる", "モデルで指定時間内に仕上げられる", "仕上がりがオーダーどおりで左右差がない", "ドライ・スタイリングまで仕上げられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "レディースパーマMODEL", "std": "チェック", "yearLabel": "2年目", "time": null, "criteria": ["ロッド選定・巻き方を説明できる", "モデルでオーダーどおりのウェーブ", "施術時間が適正"], "guide": "", "links": [], "src": "draft"}, {"cat": "CUT", "title": "メンズ刈り上げ", "std": "オーディション", "yearLabel": "2年目", "time": null, "criteria": ["バリカン・刈り上げのつながりにムラがない", "左右差がない", "指定時間内"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "メンズOD", "std": "オーディション", "yearLabel": "2年目", "time": null, "criteria": ["カウンセリングでオーダーを確認できる", "モデルで指定時間内に仕上げられる", "仕上がりがオーダーどおりで左右差がない", "ドライ・スタイリングまで仕上げられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "MODEL", "title": "メンズパーマMODEL", "std": "チェック", "yearLabel": "2年目", "time": null, "criteria": ["ロッド選定・巻き方を説明できる", "モデルでオーダーどおりのウェーブ", "施術時間が適正"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "３歳被布", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "５歳袴", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "７歳七五三", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "浴衣", "std": "オーディション", "yearLabel": "1年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "振袖", "std": "オーディション", "yearLabel": "2年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "訪問着", "std": "オーディション", "yearLabel": "3年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "留袖", "std": "オーディション", "yearLabel": "3年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "KITSUKE", "title": "婚礼", "std": "オーディション", "yearLabel": "4〜5年目", "time": null, "criteria": ["指定時間内に着付けられる", "衿合わせ・裾線が整っている", "着崩れしない", "お客様に苦しさを与えない"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "ヘアケアソムリエ知識", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "ヘアケアソムリエ技術", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "ヘアケアソムリエカウンセリング", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "カラーソムリエ知識", "std": "講義", "yearLabel": "1年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "カラーソムリエ技術", "std": "講義", "yearLabel": "2年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "カラーソムリエカウンセリング", "std": "講義", "yearLabel": "2年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "デザインロジック知識", "std": "講義", "yearLabel": "2〜3年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "デザインロジックカウンセリング", "std": "講義", "yearLabel": "2〜3年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "コスメソムリエ知識", "std": "講義", "yearLabel": "2〜3年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "コスメソムリエ技術", "std": "講義", "yearLabel": "2〜3年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "コスメソムリエカウンセリング", "std": "講義", "yearLabel": "2〜3年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "MCM", "std": "講義", "yearLabel": "4〜5年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}, {"cat": "ソムリエ", "title": "ビューティソムリエ", "std": "講義", "yearLabel": "4〜5年目", "time": null, "criteria": ["講義・動画を受講した", "要点を自分の言葉で説明できる", "講師の口頭確認に答えられる"], "guide": "", "links": [], "src": "draft"}];
+const yNum = l => Number(String(l || 1).match(/\d+/)?.[0] || 1);
+const yl = it => it.yearLabel || ((it.year || 1) + '年目');
 const SEED_STAFF = ['サラ', 'みく', 'koharu', 'りおな', 'rinka', 'あみ', 'みりあ', 'カレン', 'ゆり', 'タイセイ', 'nodoka', 'ミチル'];
 
 const $ = id => document.getElementById(id);
@@ -218,7 +226,7 @@ const staffOf = id => S.staff.find(s => s.id === id);
 const itemOf = id => S.items.find(i => i.id === id);
 const activeStaff = () => S.staff.filter(s => !s.hidden);
 function yearNow(st) { if (!st || !st.start) return 0; return Math.floor((Date.now() - new Date(st.start).getTime()) / (365.25 * 864e5)) + 1; }
-const isLate = (st, it, p) => p.state !== 'passed' && yearNow(st) > 0 && yearNow(st) > Number(it.year || 1);
+const isLate = (st, it, p) => p.state !== 'passed' && yearNow(st) > 0 && yearNow(st) > yNum(it.yearLabel || it.year);
 function tally(sid, cat) {
   const list = S.items.filter(i => !cat || i.cat === cat);
   const t = { total: list.length, passed: 0, requested: 0, going: 0 };
@@ -261,7 +269,7 @@ function loginView() {
 }
 function setupView() {
   return `<section class="card"><h3>カリキュラムの初期設定</h3>
-    <div class="sub">Notionの「カリキュラム技術規定マニュアル一覧表」の${SEED_ITEMS.reduce((a, c) => a + c[1].length, 0)}項目と、アシスタント${SEED_STAFF.length}名を登録します。講師のPINが必要です。</div>
+    <div class="sub">Notionの「カリキュラム技術規定マニュアル一覧表」の${SEED_ITEMS.length}項目と、アシスタント${SEED_STAFF.length}名を登録します。講師のPINが必要です。</div>
     <input class="field" id="seed-pin" type="password" inputmode="numeric" placeholder="PIN" aria-label="PIN">
     <button type="button" class="btn primary" id="seed-go" data-act="seed">登録する</button></section>`;
 }
@@ -281,7 +289,7 @@ function ring(pct) {
 function nextUp(sid) {
   return S.items.filter(i => pOf(sid, i.id).state !== 'passed').sort((a, b) => {
     const rank = x => ({ requested: 3, redo: 0, lectured: 1, none: 2 }[pOf(sid, x.id).state] ?? 2);
-    return Number(a.year || 1) - Number(b.year || 1) || rank(a) - rank(b) || (a.order || 0) - (b.order || 0);
+    return yNum(a.yearLabel || a.year) - yNum(b.yearLabel || b.year) || rank(a) - rank(b) || (a.order || 0) - (b.order || 0);
   }).slice(0, 3);
 }
 function progressCard(sid) {
@@ -297,7 +305,7 @@ function progressCard(sid) {
         <div class="stats"><span><b>${all.passed}</b>合格</span><span><b>${all.requested}</b>申請中</span><span><b>${all.going}</b>練習中</span><span><b>${all.total - all.passed - all.requested - all.going}</b>未着手</span></div>
       </div>
     </div>
-    ${nx.length ? `<div class="next"><div class="next-h">次の目標</div>${nx.map(it => { const p = pOf(sid, it.id); return `<button type="button" class="next-it" data-act="open" data-sid="${sid}" data-id="${it.id}"><span class="dot d-${p.state}"></span><span class="next-t">${esc(it.title)}</span><span class="next-s">${esc(CAT_SHORT[it.cat] || it.cat)}・${it.year}年目</span></button>`; }).join('')}</div>` : '<div class="next"><div class="next-h">全項目合格です 🎉</div></div>'}
+    ${nx.length ? `<div class="next"><div class="next-h">次の目標</div>${nx.map(it => { const p = pOf(sid, it.id); return `<button type="button" class="next-it" data-act="open" data-sid="${sid}" data-id="${it.id}"><span class="dot d-${p.state}"></span><span class="next-t">${esc(it.title)}</span><span class="next-s">${esc(CAT_SHORT[it.cat] || it.cat)}・${esc(yl(it))}</span></button>`; }).join('')}</div>` : '<div class="next"><div class="next-h">全項目合格です 🎉</div></div>'}
   </section>`;
 }
 function catGrid(sid) {
@@ -321,7 +329,7 @@ function itemList(sid) {
       return `<button type="button" class="row item s-${p.state}" id="it-${it.id}" data-act="open" data-sid="${sid}" data-id="${it.id}">
         <span class="ico i-${p.state}" aria-hidden="true">${p.state === 'passed' ? '✓' : p.state === 'requested' ? '!' : ''}</span>
         <div class="it-body"><div class="name">${esc(it.title)}</div>
-        <div class="sub"><span>${esc(it.std)}</span><span>・${it.year}年目</span>${n ? `<span>・練習 ${n}回</span>` : ''}${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div></div>
+        <div class="sub"><span>${esc(it.std)}</span><span>・${esc(yl(it))}</span>${n ? `<span>・練習 ${n}回</span>` : ''}${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div></div>
         <span class="st t-${p.state}">${STATE[p.state]}</span></button>`;
     }).join('')}</div></div>`;
   }).join('');
@@ -343,7 +351,9 @@ function teacherView() {
     ${reqs.length ? `<div class="list">${reqs.map(p => { const it = itemOf(p.itemId), st = staffOf(p.staffId); return `<button type="button" class="row" data-act="open" data-sid="${st.id}" data-id="${it.id}"><div><div class="name">${esc(st.name)}：${esc(it.title)}</div>
       <div class="sub"><span class="pill p-std">${esc(it.std)}</span><span>${esc(it.cat)}</span><span>練習 ${(p.practice || []).length}回</span><span>${ymd(p.requestedAt)} 申請</span></div></div><span class="pill p-requested">見る</span></button>`; }).join('')}</div>` : '<div class="empty" style="padding:12px">申請はありません</div>'}
   </section>`;
-  return reqCard + matrixCard(true) + staffAdmin() + `<button type="button" class="btn small" data-act="lock" style="align-self:flex-start">講師モードを終わる</button>`;
+  const needImp = S.items.some(i => !i.criteria);
+  const imp = needImp ? `<section class="card"><h3>合格基準・動画の取り込み</h3><div class="sub">各項目に合格基準・規定TIME・手順・ミルボン教育動画のリンクを入れます（記録は消えません）。</div><button type="button" class="btn primary" data-act="importV2">取り込む</button></section>` : '';
+  return imp + reqCard + matrixCard(true) + staffAdmin() + `<button type="button" class="btn small" data-act="lock" style="align-self:flex-start">講師モードを終わる</button>`;
 }
 function matrixCard(clickable) {
   const cats = CATS.filter(c => S.items.some(i => i.cat === c));
@@ -380,24 +390,52 @@ function renderSheet() {
   box.innerHTML = `<div class="sheet-bg" data-act="close"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(it.title)}" data-stop="1">
     <button type="button" class="btn small x" data-act="close" aria-label="閉じる">✕</button>
     <div><div class="sub">${esc(st.name)} ・ ${esc(it.cat)}</div><h3>${esc(it.title)}</h3></div>
-    <div class="sub">${pill(p.state)}<span class="pill p-std">${esc(it.std)}</span><span>目安 ${it.year}年目</span>${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div>
+    <div class="sub">${pill(p.state)}<span class="pill p-std">${esc(it.std)}</span><span>目安 ${esc(yl(it))}</span>${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div>
     <dl class="kv">
       <dt>レクチャー日</dt><dd>${p.lectureAt ? `${ymd(p.lectureAt)}（${days(p.lectureAt)}日経過）` : '—'}</dd>
       <dt>練習</dt><dd>${pr.length ? `${pr.length}回（最後 ${ymd(pr[pr.length - 1])}）` : '—'}</dd>
       ${p.requestedAt && p.state === 'requested' ? `<dt>申請日</dt><dd>${ymd(p.requestedAt)}</dd>` : ''}
       ${p.passedAt ? `<dt>合格日</dt><dd>${ymd(p.passedAt)}</dd>` : ''}
-      ${it.url ? `<dt>マニュアル</dt><dd><a href="${esc(it.url)}" target="_blank" rel="noopener">開く</a></dd>` : ''}
+      ${it.time ? `<dt>規定TIME</dt><dd>${it.time}分以内</dd>` : ''}
+      ${p.timeMin ? `<dt>前回タイム</dt><dd>${p.timeMin}分</dd>` : ''}
     </dl>
+    ${o.edit && t ? itemEditor(it) : itemInfo(it, p, t && p.state !== 'passed')}
     ${(self || t) && p.state !== 'passed' ? `<div class="prac"><button type="button" class="btn" data-act="pracMinus" ${pr.length ? '' : 'disabled'} aria-label="練習を1回取り消す">−</button><span class="big">${pr.length}</span><button type="button" class="btn primary" data-act="pracPlus">＋ 練習1回</button></div>` : ''}
     ${self ? `<label class="lbl">自分のふり返り（講師も見られます）<textarea class="field" id="note-staff">${esc(p.staffNote || '')}</textarea></label>` : (p.staffNote ? `<dl class="kv"><dt>本人のふり返り</dt><dd>${esc(p.staffNote)}</dd></dl>` : '')}
     ${t ? `<label class="lbl">講師コメント<textarea class="field" id="note-teacher">${esc(p.teacherNote || '')}</textarea></label>` : (p.teacherNote ? `<dl class="kv"><dt>講師コメント</dt><dd>${esc(p.teacherNote)}</dd></dl>` : '')}
     <div class="actions">${actionsFor(p, self, t)}</div>
+    ${(p.history || []).length ? `<div class="sec-t">判定の記録</div><div class="hist">${p.history.slice().reverse().map(h => `<div class="h-row"><span class="pill p-${h.ok ? 'passed' : 'redo'}">${h.ok ? '合格' : 'やり直し'}</span><span>${ymd(h.t)}</span><span>基準 ${h.n}/${h.of}</span>${h.time ? `<span>${h.time}分</span>` : ''}${h.note ? `<div class="h-note">${esc(h.note)}</div>` : ''}</div>`).join('')}</div>` : ''}
     ${(p.log || []).length ? `<div class="log">${p.log.slice(-8).reverse().map(l => `<span>${ymd(l.t)} ${esc(l.a)}</span>`).join('')}</div>` : ''}
   </div></div>`;
   if (keep.s != null && $('note-staff')) $('note-staff').value = keep.s;
   if (keep.t != null && $('note-teacher')) $('note-teacher').value = keep.t;
   document.body.style.overflow = 'hidden';
   if (ws && $(ws)) $(ws).focus();
+}
+function itemInfo(it, p, judging) {
+  const crit = it.criteria || [];
+  if (judging && (!S.open.checks || S.open.checks.length !== crit.length)) S.open.checks = crit.map((_, k) => !!(p.checks && p.checks[k]));
+  const ck = S.open.checks || [];
+  const critHtml = crit.length ? `<div class="sec-t">合格基準${judging ? `<span class="sub" id="jhint">　${ck.filter(Boolean).length}/${crit.length} 達成</span>` : ''}</div><ul class="crit">${crit.map((c, k) => judging
+    ? `<li><label><input type="checkbox" data-chg="chk" data-k="${k}" ${ck[k] ? 'checked' : ''}><span>${esc(c)}</span></label></li>`
+    : `<li><span class="cn">${k + 1}</span><span>${esc(c)}</span></li>`).join('')}</ul>` : '';
+  const timeIn = judging ? `<label class="lbl">今回のタイム（分）<input class="field" id="judge-time" type="number" inputmode="decimal" min="0" step="0.5" placeholder="${it.time ? '規定 ' + it.time + '分' : '任意'}"></label>` : '';
+  const guide = it.guide ? `<details class="guide"><summary>手順・ポイントを見る</summary><div class="g-body">${esc(it.guide)}</div></details>` : '';
+  const links = (it.links || []).length ? `<div class="sec-t">動画・資料</div><div class="links">${it.links.map(l => `<a class="btn small" href="${esc(l.u)}" target="_blank" rel="noopener">▶ ${esc(l.t)}</a>`).join('')}</div>` : '';
+  return critHtml + timeIn + guide + links;
+}
+function itemEditor(it) {
+  return `<div class="card" style="background:var(--bg)"><div class="sec-t">項目を編集</div>
+    <label class="lbl">項目名<input class="field" id="ie-title" value="${esc(it.title)}"></label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <label class="lbl">種類<select class="field" id="ie-std">${['チェック', 'オーディション', '講義'].map(x => `<option ${it.std === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+      <label class="lbl">目安<input class="field" id="ie-year" value="${esc(yl(it))}"></label>
+      <label class="lbl">規定TIME(分)<input class="field" id="ie-time" type="number" inputmode="numeric" value="${it.time ?? ''}"></label>
+    </div>
+    <label class="lbl">合格基準（1行に1つ）<textarea class="field" id="ie-crit" style="min-height:140px">${esc((it.criteria || []).join('\n'))}</textarea></label>
+    <label class="lbl">手順・ポイント<textarea class="field" id="ie-guide" style="min-height:120px">${esc(it.guide || '')}</textarea></label>
+    <label class="lbl">動画・資料（「タイトル|URL」を1行ずつ）<textarea class="field" id="ie-links">${esc((it.links || []).map(l => l.t + '|' + l.u).join('\n'))}</textarea></label>
+    <div class="actions"><button type="button" class="btn primary" data-act="saveItem">保存</button><button type="button" class="btn" data-act="editItem">やめる</button></div></div>`;
 }
 function actionsFor(p, self, t) {
   const b = [];
@@ -409,6 +447,7 @@ function actionsFor(p, self, t) {
       if (!p.lectureAt) b.push('<button type="button" class="btn" data-act="lecture">今日レクチャーした</button>');
     }
     b.push('<button type="button" class="btn" data-act="saveNote">コメントを保存</button>');
+    b.push(`<button type="button" class="btn" data-act="editItem">${S.open.edit ? '編集をやめる' : '項目を編集'}</button>`);
   } else if (self) {
     if (p.state === 'none' || (!p.lectureAt && p.state !== 'passed')) b.push('<button type="button" class="btn" data-act="lecture">レクチャーを受けた</button>');
     if (p.state === 'requested') b.push('<button type="button" class="btn" data-act="unrequest">申請を取り消す</button>');
@@ -437,7 +476,7 @@ async function checkPin(v) {
 async function seed(pin) {
   if (!(await checkPin(pin))) { toast('PINが違います'); return; }
   const b = db.batch(); let n = 0, ord = 0;
-  SEED_ITEMS.forEach(([cat, arr]) => arr.forEach(([title, std, year]) => { ord++; b.set(db.collection('cur_items').doc('i' + String(ord).padStart(3, '0')), { cat, title, std, year, order: ord }); n++; }));
+  SEED_ITEMS.forEach(d => { ord++; b.set(db.collection('cur_items').doc('i' + String(ord).padStart(3, '0')), Object.assign({}, d, { year: yNum(d.yearLabel), order: ord })); n++; });
   SEED_STAFF.forEach((name, i) => b.set(db.collection('cur_staff').doc('s' + String(i + 1).padStart(2, '0')), { name, store: '', start: '', order: i + 1, hidden: false }));
   await b.commit(); toast(`${n}項目と${SEED_STAFF.length}名を登録しました`);
 }
@@ -468,8 +507,35 @@ document.addEventListener('click', async ev => {
     case 'lecture': await upd(o.sid, o.iid, { lectureAt: Date.now(), state: pOf(o.sid, o.iid).state === 'none' ? 'lectured' : pOf(o.sid, o.iid).state }, 'レクチャー'); toast('レクチャー日を記録しました'); break;
     case 'request': await upd(o.sid, o.iid, { state: 'requested', requestedAt: Date.now(), staffNote: noteVal('note-staff') }, 'チェック申請'); toast('講師に申請しました'); break;
     case 'unrequest': await upd(o.sid, o.iid, { state: pOf(o.sid, o.iid).lectureAt || (pOf(o.sid, o.iid).practice || []).length ? 'lectured' : 'none' }, '申請を取り消し'); break;
-    case 'pass': await upd(o.sid, o.iid, { state: 'passed', passedAt: Date.now(), teacherNote: noteVal('note-teacher') }, '合格'); toast('合格にしました'); S.open = null; renderSheet(); break;
-    case 'redo': await upd(o.sid, o.iid, { state: 'redo', teacherNote: noteVal('note-teacher') }, 'やり直し'); toast('やり直しにしました'); break;
+    case 'pass': case 'redo': {
+      const ok = a === 'pass', it = itemOf(o.iid), p = pOf(o.sid, o.iid), ck = (o.checks || []).slice(), tm = $('judge-time') ? parseFloat($('judge-time').value) : NaN, note = noteVal('note-teacher');
+      const n = ck.filter(Boolean).length, of = (it.criteria || []).length;
+      const h = { t: Date.now(), ok, n, of, time: isNaN(tm) ? null : tm, note };
+      const patch = { state: ok ? 'passed' : 'redo', teacherNote: note, checks: ck, history: (p.history || []).concat([h]).slice(-20) };
+      if (!isNaN(tm)) patch.timeMin = tm;
+      if (ok) patch.passedAt = Date.now();
+      await upd(o.sid, o.iid, patch, ok ? '合格' : 'やり直し'); toast(ok ? '合格にしました' : 'やり直しにしました');
+      if (ok) { S.open = null; renderSheet(); }
+      break;
+    }
+    case 'editItem': o.edit = !o.edit; renderSheet(); break;
+    case 'saveItem': {
+      const links = $('ie-links').value.split('\n').map(x => x.trim()).filter(Boolean).map(x => { const k = x.lastIndexOf('|'); return k < 0 ? { t: x, u: x } : { t: x.slice(0, k).trim(), u: x.slice(k + 1).trim() }; });
+      const tm = parseFloat($('ie-time').value), yLabel = $('ie-year').value.trim();
+      const data = { title: $('ie-title').value.trim() || itemOf(o.iid).title, std: $('ie-std').value, yearLabel: yLabel, year: yNum(yLabel), time: isNaN(tm) ? null : tm,
+        criteria: $('ie-crit').value.split('\n').map(x => x.trim()).filter(Boolean), guide: $('ie-guide').value, links, src: 'edited' };
+      try { await db.doc('cur_items/' + o.iid).update(data); o.edit = false; o.checks = null; toast('保存しました'); } catch (e) { toast(e.message); }
+      renderSheet(); break;
+    }
+    case 'importV2': {
+      el.disabled = true;
+      try {
+        const b = db.batch(); let n = 0;
+        S.items.forEach(it => { const k = Number(String(it.id).slice(1)) - 1, d = SEED_ITEMS[k]; if (!d || d.title !== it.title || it.criteria) return; b.update(db.doc('cur_items/' + it.id), { cat: d.cat, yearLabel: d.yearLabel, year: yNum(d.yearLabel), time: d.time, criteria: d.criteria, guide: d.guide, links: d.links, src: d.src }); n++; });
+        await b.commit(); toast(n + '項目に合格基準・動画を取り込みました');
+      } catch (e) { toast(e.message); }
+      el.disabled = false; break;
+    }
     case 'unpass': await upd(o.sid, o.iid, { state: 'redo', passedAt: null }, '合格を取り消し'); break;
     case 'saveNote': { const patch = {}; if ($('note-staff')) patch.staffNote = noteVal('note-staff'); if ($('note-teacher')) patch.teacherNote = noteVal('note-teacher'); await upd(o.sid, o.iid, patch, ''); toast('保存しました'); break; }
     case 'newStaff': S.editStaff = { name: '', store: '', start: '' }; render(); break;
@@ -489,6 +555,10 @@ document.addEventListener('click', async ev => {
   }
 });
 const noteVal = id => ($(id) ? $(id).value.trim() : (pOf(S.open.sid, S.open.iid)[id === 'note-staff' ? 'staffNote' : 'teacherNote'] || ''));
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (el.dataset.chg === 'chk' && S.open) { S.open.checks[Number(el.dataset.k)] = el.checked; const h = $('jhint'); if (h) h.textContent = `　${S.open.checks.filter(Boolean).length}/${S.open.checks.length} 達成`; }
+});
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) { S.open = null; renderSheet(); } });
 document.addEventListener('submit', async ev => {
   if (ev.target.id !== 'login-form') return;
