@@ -730,7 +730,7 @@ function addPicker() {
     }).join('')}</div>${hits.length > shown.length ? `<div class="sub">ほか ${hits.length - shown.length} 件。名前で絞り込んでください。</div>` : ''}` : '<div class="empty">条件に合う商品はありません。</div>';
   }
   return `<section class="card">
-    <div class="card-head"><h3>＋ 商品を追加（イレギュラー）</h3></div>
+    <div class="card-head"><h3>＋ 商品を追加</h3></div>
     <div class="sub">カテゴリを選ぶか名前で探して、発注に追加します。</div>
     <input class="field" id="add-q" type="search" placeholder="商品名で探す" aria-label="追加する商品を探す" value="${esc(S.addQ || '')}">
     ${catChips(false)}
