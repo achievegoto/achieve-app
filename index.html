@@ -675,11 +675,7 @@ function viewOrder() {
   const ids = S.dealers.map(d => d.id).filter(did => linesFor(did).length);
   const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
   const st = storeOf(S.store);
-  const addable = S.dealers.filter(d => !ids.includes(d.id) && S.items.some(i => i.dealerId === d.id));
-  const extra = addable.length ? `<div class="tools"><label>他のディーラーへ商品を追加
-    <select class="field" id="add-other" data-chg="addOther"><option value="">商品を選ぶ</option>
-    ${addable.map(d => `<optgroup label="${esc(d.name)}">${S.items.filter(i => i.dealerId === d.id).map(i => `<option value="${d.id}|${i.id}">${esc(i.name)}</option>`).join('')}</optgroup>`).join('')}
-    </select></label></div>` : '';
+  const extra = S.readOnly ? '' : addPicker();
   let body = '';
   if (unassigned.length) body += `<div class="note">ディーラーが未設定の商品が ${unassigned.length} 点あります。「商品」タブで設定すると発注文に入ります。</div>`;
   if (!ids.length) body += `<div class="card"><div class="empty">${esc(st.full)}に発注が必要な商品はありません。</div></div>`;
@@ -700,7 +696,7 @@ function orderCard(did) {
         <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
         <button type="button" id="op-${r.it.id}" data-act="oinc" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1増やす" ${S.unlocked ? '' : 'disabled'}>＋</button>
       </div></div>`).join('')}</div>
-    ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${others.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>` : ''}
+    ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${catGroups(others, i => `<option value="${i.id}">${esc(i.name)}</option>`)}</select>` : ''}
     ${d.url ? `<div class="sub">${esc(storeOf(S.store).full)}の発注です。サイトのログイン店舗を確認して、上の数量を注文してください。</div>
     <div class="actions">
       <a class="btn primary" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
@@ -710,6 +706,36 @@ function orderCard(did) {
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${active.length ? '' : 'disabled'}>発注文をコピー</button>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>LINEで送ったので発注済みにする</button>
     </div>`}</section>`;
+}
+
+function catGroups(list, fn) {
+  const g = {};
+  list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
+  return Object.entries(g).map(([c, arr]) => `<optgroup label="${esc(c)}">${arr.map(fn).join('')}</optgroup>`).join('');
+}
+function addPicker() {
+  const q = (S.addQ || '').trim().toLowerCase();
+  const active = q || S.cat || S.big;
+  let list = '';
+  if (active) {
+    const hits = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+    const shown = hits.slice(0, 60);
+    list = hits.length ? `<div class="list">${shown.map(it => {
+      const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
+      const inDraft = did && draftValue(did, it.id) > 0;
+      return `<div class="row"><div><div class="name">${esc(it.name)}</div>
+        <div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 ${qtyOf(S.store, it.id)}${esc(it.unit)}</span></div></div>
+        ${!did ? '<span class="pill sample">追加不可</span>' : inDraft ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small primary" id="pick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 追加</button>`}
+      </div>`;
+    }).join('')}</div>${hits.length > shown.length ? `<div class="sub">ほか ${hits.length - shown.length} 件。名前で絞り込んでください。</div>` : ''}` : '<div class="empty">条件に合う商品はありません。</div>';
+  }
+  return `<section class="card">
+    <div class="card-head"><h3>＋ 商品を追加（イレギュラー）</h3></div>
+    <div class="sub">カテゴリを選ぶか名前で探して、発注に追加します。</div>
+    <input class="field" id="add-q" type="search" placeholder="商品名で探す" aria-label="追加する商品を探す" value="${esc(S.addQ || '')}">
+    ${catChips(false)}
+    <div id="add-list">${list}</div>
+  </section>`;
 }
 
 const GROUPS = [['カラー', ['アディクシー','オルディーブ','クリスタル','エノグ','プレトワ','ヴィラロドラ','カラー関連']], ['パーマ全般', ['パーマ']], ['Aujua店販', ['Aujua SP','Aujua TR','Aujua シャンプー','Aujua トリートメント','サッシェ','アウトバス']], ['Aujua業務', ['AujuaサロンTR']], ['インプレア', ['インプレア']], ['スタイリング剤', ['スタイリング剤']], ['美容器具', ['美容器具', 'Refa', 'その他器具']], ['その他業務', ['その他業務']], ['その他消耗品', ['その他消耗品', 'その他ドリンク類']]];
@@ -927,6 +953,7 @@ document.addEventListener('click', async ev => {
   const { act, id, did } = b.dataset;
   switch (act) {
     case 'store': S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
+    case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
     case 'tab': S.tab = id; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
@@ -986,6 +1013,7 @@ document.addEventListener('change', ev => {
   if (c === 'dealerName') { const v = el.value.trim(); if (v) S.db.doc('dealers/' + id).update({ name: v }).catch(fail); }
 });
 document.addEventListener('input', ev => {
+  if (ev.target.id === 'add-q') { S.addQ = ev.target.value; $('add-list').innerHTML = addPicker().match(/<div id="add-list">([\s\S]*)<\/div>\s*<\/section>$/)[1]; }
   if (ev.target.id === 'search') { S.q = ev.target.value; $('stock-list').innerHTML = stockList(); }
   if (ev.target.id === 'isearch') { S.q = ev.target.value; $('item-list').innerHTML = itemList(); }
 });
