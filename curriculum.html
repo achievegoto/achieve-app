@@ -117,6 +117,56 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 .badge { position: absolute; top: 6px; margin-left: 4px; background: var(--bad); color: #fff; font-size: 10px; border-radius: 99px; padding: 0 6px; font-weight: 700; }
 #toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
 .login { max-width: 420px; margin: 24px auto; }
+.hero { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1a6e8e)); color: #fff; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.hero-top { display: flex; align-items: center; gap: 16px; }
+.ring-box { position: relative; width: 88px; height: 88px; flex: none; }
+.ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 8; }
+.ring-bg { stroke: rgba(255,255,255,.22); }
+.ring-fg { stroke: #fff; }
+.ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-num); }
+.ring-num b { font-size: 28px; font-weight: 500; } .ring-num small { font-size: 12px; margin-left: 1px; opacity: .8; }
+.hero-txt { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hero-name { font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+.hero .sub { color: rgba(255,255,255,.8); }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: rgba(255,255,255,.85); }
+.stats b { font-family: var(--font-num); font-size: 18px; font-weight: 500; color: #fff; margin-right: 3px; }
+.next { background: rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.next-h { font-size: 11px; letter-spacing: .1em; opacity: .85; }
+.next-it { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 8px; align-items: center; background: none; border: 0; color: #fff; padding: 5px 0; text-align: left; }
+.next-t { font-weight: 500; overflow-wrap: anywhere; } .next-s { font-size: 11px; opacity: .8; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.5); }
+.dot.d-lectured, .dot.d-redo { background: #9cc8ff; } .dot.d-requested { background: #ffd27a; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { display: flex; flex-direction: column; gap: 8px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.tile-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.tile-h { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.tile-n { font-family: var(--font-num); font-size: 13px; color: var(--muted); } .tile-n b { font-size: 20px; color: var(--ink); font-weight: 500; margin-right: 2px; }
+.tile.done .tile-n b { color: var(--good); }
+.list-head { display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 80px; }
+.list-head .btn { align-self: flex-start; }
+.seg2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; background: var(--surface); border: 1px solid var(--line); padding: 3px; border-radius: 10px; }
+.seg2 button { border: 0; background: transparent; padding: 7px 2px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+.seg2 button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.row.item { grid-template-columns: auto minmax(0, 1fr) auto; }
+.it-body { min-width: 0; }
+.ico { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none; }
+.ico.i-lectured, .ico.i-redo { border-color: var(--info); background: linear-gradient(90deg, var(--info) 50%, transparent 50%); }
+.ico.i-requested { border-color: var(--warn); background: var(--warn); color: var(--surface); }
+.ico.i-passed { border-color: var(--good); background: var(--good); color: var(--surface); }
+.st { font-size: 11px; font-weight: 700; white-space: nowrap; color: var(--muted); }
+.st.t-passed { color: var(--good); } .st.t-requested { color: var(--warn); } .st.t-lectured, .st.t-redo { color: var(--info); }
+.row.item.s-passed .name { color: var(--muted); }
+.group h2 { position: sticky; top: calc(57px + env(safe-area-inset-top, 0px)); background: var(--bg); padding-block: 6px; z-index: 2; }
+table.mx td.cell { position: relative; }
+table.mx td.h0 { color: var(--muted); }
+table.mx td.h1 { background: color-mix(in srgb, var(--good) 12%, transparent); }
+table.mx td.h2 { background: color-mix(in srgb, var(--good) 26%, transparent); }
+table.mx td.h3 { background: color-mix(in srgb, var(--good) 42%, transparent); }
+table.mx td.full { background: var(--good); color: var(--surface); }
+
 </style>
 </head>
 <body>
@@ -223,34 +273,63 @@ function staffPicker() {
     ${S.me ? `<button type="button" class="btn small" data-act="cancelPick">閉じる</button>` : ''}
   </section>`;
 }
+const CAT_SHORT = { '基礎スキル': '基礎', 'HAIR SET , MAKE': 'SET・MAKE', '縮毛矯正': '縮毛矯正', 'KITSUKE': '着付け' };
+function ring(pct) {
+  const r = 34, c = 2 * Math.PI * r, d = c * pct / 100;
+  return `<svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" class="ring-bg"/><circle cx="40" cy="40" r="${r}" class="ring-fg" stroke-dasharray="${d.toFixed(1)} ${c.toFixed(1)}"/></svg>`;
+}
+function nextUp(sid) {
+  return S.items.filter(i => pOf(sid, i.id).state !== 'passed').sort((a, b) => {
+    const rank = x => ({ requested: 3, redo: 0, lectured: 1, none: 2 }[pOf(sid, x.id).state] ?? 2);
+    return Number(a.year || 1) - Number(b.year || 1) || rank(a) - rank(b) || (a.order || 0) - (b.order || 0);
+  }).slice(0, 3);
+}
 function progressCard(sid) {
   const all = tally(sid), st = staffOf(sid);
   const pct = all.total ? Math.round(all.passed / all.total * 100) : 0;
-  return `<section class="card">
-    <div class="card-head"><h3>${esc(st.name)}${yearNow(st) ? ` <span class="sub" style="display:inline">${yearNow(st)}年目</span>` : ''}</h3><span class="big">${pct}<small>%</small></span></div>
-    <div class="sub"><span>合格 ${all.passed} / ${all.total}</span>${all.requested ? `<span>申請中 ${all.requested}</span>` : ''}${all.going ? `<span>練習中 ${all.going}</span>` : ''}</div>
-    <div class="bars">${CATS.filter(c => S.items.some(i => i.cat === c)).map(c => { const t = tally(sid, c); return `<button type="button" class="bar-row" data-act="cat" data-id="${esc(c)}"><span>${esc(c)}</span>${bar(t)}<span class="num">${t.passed}/${t.total}</span></button>`; }).join('')}</div>
-    <div class="legend"><span class="lg">合格</span><span class="lw">申請中</span><span class="lb">レクチャー済・練習中</span></div>
+  const store = (STORES.find(x => x[0] === st.store) || [, ''])[1];
+  const nx = nextUp(sid);
+  return `<section class="hero">
+    <div class="hero-top">
+      <div class="ring-box">${ring(pct)}<div class="ring-num"><b>${pct}</b><small>%</small></div></div>
+      <div class="hero-txt"><div class="hero-name">${esc(st.name)}</div>
+        <div class="sub">${[store, yearNow(st) ? yearNow(st) + '年目' : ''].filter(Boolean).map(esc).join(' ・ ') || '店舗・入社日 未設定'}</div>
+        <div class="stats"><span><b>${all.passed}</b>合格</span><span><b>${all.requested}</b>申請中</span><span><b>${all.going}</b>練習中</span><span><b>${all.total - all.passed - all.requested - all.going}</b>未着手</span></div>
+      </div>
+    </div>
+    ${nx.length ? `<div class="next"><div class="next-h">次の目標</div>${nx.map(it => { const p = pOf(sid, it.id); return `<button type="button" class="next-it" data-act="open" data-sid="${sid}" data-id="${it.id}"><span class="dot d-${p.state}"></span><span class="next-t">${esc(it.title)}</span><span class="next-s">${esc(CAT_SHORT[it.cat] || it.cat)}・${it.year}年目</span></button>`; }).join('')}</div>` : '<div class="next"><div class="next-h">全項目合格です 🎉</div></div>'}
   </section>`;
 }
+function catGrid(sid) {
+  const cats = CATS.filter(c => S.items.some(i => i.cat === c));
+  return `<div class="tiles">${cats.map(c => { const t = tally(sid, c); const done = t.passed === t.total;
+    return `<button type="button" class="tile${done ? ' done' : ''}" data-act="cat" data-id="${esc(c)}" aria-pressed="${S.cat === c}">
+      <span class="tile-top"><span class="tile-h">${esc(CAT_SHORT[c] || c)}</span><span class="tile-n"><b>${t.passed}</b>/${t.total}</span></span>${bar(t)}</button>`; }).join('')}</div>`;
+}
+const SF = [['', 'すべて'], ['open', '未合格'], ['requested', '申請中'], ['passed', '合格']];
 function itemList(sid) {
   const st = staffOf(sid);
   const cats = CATS.filter(c => S.items.some(i => i.cat === c));
-  const chips = `<div class="chips"><button type="button" class="chip" data-act="cat" data-id="" aria-pressed="${!S.cat}">すべて</button>${cats.map(c => `<button type="button" class="chip" data-act="cat" data-id="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}</div>`;
+  const sfOk = p => !S.sf || (S.sf === 'open' ? p.state !== 'passed' : p.state === S.sf);
+  const filt = `<div class="seg2">${SF.map(([id, l]) => `<button type="button" data-act="sf" data-id="${id}" aria-pressed="${(S.sf || '') === id}">${l}</button>`).join('')}</div>`;
   const groups = (S.cat ? [S.cat] : cats).map(c => {
-    const arr = S.items.filter(i => i.cat === c);
+    const arr = S.items.filter(i => i.cat === c && sfOk(pOf(sid, i.id)));
+    if (!arr.length) return '';
     const t = tally(sid, c);
-    return `<div class="group"><h2><span>${esc(c)}</span><span>${t.passed}/${t.total}</span></h2><div class="list">${arr.map(it => {
+    return `<div class="group"><h2><span>${esc(c)}</span><span>${t.passed} / ${t.total} 合格</span></h2><div class="list">${arr.map(it => {
       const p = pOf(sid, it.id), n = (p.practice || []).length;
-      return `<button type="button" class="row" id="it-${it.id}" data-act="open" data-sid="${sid}" data-id="${it.id}"><div><div class="name">${esc(it.title)}</div>
-        <div class="sub"><span class="pill p-std">${esc(it.std)}</span><span>目安 ${it.year}年目</span>${n ? `<span>練習 ${n}回</span>` : ''}${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div></div>${pill(p.state)}</button>`;
+      return `<button type="button" class="row item s-${p.state}" id="it-${it.id}" data-act="open" data-sid="${sid}" data-id="${it.id}">
+        <span class="ico i-${p.state}" aria-hidden="true">${p.state === 'passed' ? '✓' : p.state === 'requested' ? '!' : ''}</span>
+        <div class="it-body"><div class="name">${esc(it.title)}</div>
+        <div class="sub"><span>${esc(it.std)}</span><span>・${it.year}年目</span>${n ? `<span>・練習 ${n}回</span>` : ''}${isLate(st, it, p) ? '<span class="pill p-late">目安超え</span>' : ''}</div></div>
+        <span class="st t-${p.state}">${STATE[p.state]}</span></button>`;
     }).join('')}</div></div>`;
   }).join('');
-  return chips + groups;
+  return `<div class="list-head">${S.cat ? `<button type="button" class="btn small" data-act="cat" data-id="${esc(S.cat)}">‹ すべてのカテゴリ</button>` : ''}${filt}</div>` + (groups || '<div class="empty">該当する項目はありません</div>');
 }
 function meView() {
   if (!S.me || !staffOf(S.me) || S.pickingMe) return staffPicker();
-  return progressCard(S.me) + itemList(S.me);
+  return progressCard(S.me) + catGrid(S.me) + itemList(S.me);
 }
 function teacherView() {
   if (!S.teacher) return `<section class="card"><h3>講師モード</h3>
@@ -258,7 +337,7 @@ function teacherView() {
     <input class="field" id="t-pin" type="password" inputmode="numeric" placeholder="PIN" aria-label="PIN">
     <div class="err" id="t-err"></div>
     <button type="button" class="btn primary" id="t-go" data-act="unlock">講師モードにする</button></section>`;
-  if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 一覧に戻る</button>` + progressCard(S.viewStaff) + itemList(S.viewStaff);
+  if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 一覧に戻る</button>` + progressCard(S.viewStaff) + catGrid(S.viewStaff) + itemList(S.viewStaff);
   const reqs = requests();
   const reqCard = `<section class="card"><div class="card-head"><h3>チェック申請</h3><span class="sub">${reqs.length}件</span></div>
     ${reqs.length ? `<div class="list">${reqs.map(p => { const it = itemOf(p.itemId), st = staffOf(p.staffId); return `<button type="button" class="row" data-act="open" data-sid="${st.id}" data-id="${it.id}"><div><div class="name">${esc(st.name)}：${esc(it.title)}</div>
@@ -272,7 +351,7 @@ function matrixCard(clickable) {
   const rows = STORES.map(([sid, l]) => [l, activeStaff().filter(s => s.store === sid)]).concat([['店舗未設定', activeStaff().filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
   return `<section class="card"><h3>全員の進み具合</h3><div class="tbl-wrap"><table class="mx">
     <thead><tr><th>名前</th><th>合計</th>${cats.map(c => `<th>${esc(short(c))}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); return `<td class="cell ${t.passed === t.total ? 'full' : ''}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
+    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
   </table></div>${clickable ? '<div class="sub">名前を押すと、その人の項目を開けます。</div>' : ''}</section>`;
 }
 function allView() { return matrixCard(false); }
@@ -286,7 +365,7 @@ function staffAdmin() {
       ${e.id ? `<button type="button" class="btn danger" data-act="hideStaff">${e.hidden ? '表示に戻す' : '一覧から外す（卒業など）'}</button>` : ''}</div></div>` : '';
   return `<section class="card"><div class="card-head"><h3>スタッフ</h3><button type="button" class="btn small" data-act="newStaff">＋ 追加</button></div>
     ${form}
-    <div class="list">${S.staff.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc((STORES.find(x => x[0] === s.store) || [, '店舗未設定'])[1])}</span>${s.start ? `<span>入社 ${ymd(s.start)}</span>` : '<span>入社日未設定</span>'}</div></div><span class="sub">編集</span></button>`).join('')}</div>
+    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer;padding:4px 0">スタッフ一覧（${S.staff.length}名）を開く・店舗と入社日の設定</summary><div class="list" style="margin-top:8px">${S.staff.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc((STORES.find(x => x[0] === s.store) || [, '店舗未設定'])[1])}</span>${s.start ? `<span>入社 ${ymd(s.start)}</span>` : '<span>入社日未設定</span>'}</div></div><span class="sub">編集</span></button>`).join('')}</div></details>
   </section>`;
 }
 function renderSheet() {
@@ -371,11 +450,12 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act, id = el.dataset.id;
   const o = S.open;
   switch (a) {
-    case 'tab': S.tab = id; S.open = null; S.viewStaff = ''; S.cat = ''; render(); window.scrollTo(0, 0); break;
+    case 'tab': S.tab = id; S.open = null; S.viewStaff = ''; S.cat = ''; S.sf = ''; render(); window.scrollTo(0, 0); break;
     case 'pickMe': S.pickingMe = true; S.tab = 'me'; render(); break;
     case 'cancelPick': S.pickingMe = false; render(); break;
     case 'setMe': S.me = id; S.pickingMe = false; lsSet('cur.me', id); render(); window.scrollTo(0, 0); break;
-    case 'cat': S.cat = S.cat === id ? '' : id; render(); if (id) { const g = document.querySelector('.group'); if (g) g.scrollIntoView({ block: 'start', behavior: 'smooth' }); } break;
+    case 'cat': S.cat = S.cat === id ? '' : id; render(); { const g = document.querySelector('.list-head'); if (g && S.cat) g.scrollIntoView({ block: 'start', behavior: 'smooth' }); } break;
+    case 'sf': S.sf = id; render(); break;
     case 'open': S.open = { sid: el.dataset.sid, iid: id }; renderSheet(); break;
     case 'close': S.open = null; renderSheet(); break;
     case 'viewStaff': S.viewStaff = id; S.cat = ''; render(); window.scrollTo(0, 0); break;
