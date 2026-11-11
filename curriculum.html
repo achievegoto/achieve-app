@@ -390,7 +390,15 @@ function matrixCard(clickable) {
     <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)} ${rankTag(s.id)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
   </table></div>${clickable ? '<div class="sub">名前を押すと、その人の項目を開けます。</div>' : ''}</section>`;
 }
-function allView() { return matrixCard(false); }
+function allView() {
+  if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 全員の一覧に戻る</button><div class="note" style="background:var(--accent-soft);color:var(--accent)">確認用の表示です。記録の変更はできません。</div>` + progressCard(S.viewStaff) + catGrid(S.viewStaff) + itemList(S.viewStaff);
+  return matrixCard(true) + reqSummary();
+}
+function reqSummary() {
+  const reqs = requests();
+  if (!reqs.length) return '';
+  return `<section class="card"><div class="card-head"><h3>チェック待ち</h3><span class="sub">${reqs.length}件</span></div><div class="list">${reqs.map(p => { const it = itemOf(p.itemId), st = staffOf(p.staffId); return `<button type="button" class="row" data-act="open" data-sid="${st.id}" data-id="${it.id}"><div><div class="name">${esc(st.name)} ${rankTag(st.id)}：${esc(it.title)}</div><div class="sub"><span>${esc(it.std)}</span><span>練習 ${(p.practice || []).length}回</span><span>${ymd(p.requestedAt)} 申請</span></div></div><span class="sub">見る</span></button>`; }).join('')}</div><div class="sub">判定は「講師」タブから行います。</div></section>`;
+}
 function staffAdmin() {
   const e = S.editStaff;
   const form = e ? `<div class="card" style="background:var(--bg)">
