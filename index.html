@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4b2a7b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="achieve在庫">
+<title>achieve Group 在庫発注</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=Jost:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow operating column, store switch pinned on top, four tabs pinned at the thumb. */
+:root {
+  --bg: #f4f4f7; --surface: #ffffff; --line: #e2e1e9; --ink: #1d1b26; --muted: #6a6778;
+  --accent: #54347e; --accent-ink: #ffffff; --accent-soft: #eee8f6;
+  --bad: #b3261e; --bad-soft: #fbe9e7; --warn: #8a5a00; --warn-soft: #fbf0d9; --good: #1f6b4a; --good-soft: #e3f2ea;
+  --font-body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-num: "Jost", "IBM Plex Sans JP", "Hiragino Sans", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15141b; --surface: #1f1d28; --line: #33303f; --ink: #efedf5; --muted: #a29eb2;
+  --accent: #c4a6ea; --accent-ink: #1d1529; --accent-soft: #2f2740;
+  --bad: #ff9b90; --bad-soft: #3f2220; --warn: #eec26e; --warn-soft: #3a2e16; --good: #7fd3ab; --good-soft: #1b3429;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15141b; --surface: #1f1d28; --line: #33303f; --ink: #efedf5; --muted: #a29eb2;
+  --accent: #c4a6ea; --accent-ink: #1d1529; --accent-soft: #2f2740;
+  --bad: #ff9b90; --bad-soft: #3f2220; --warn: #eec26e; --warn-soft: #3a2e16; --good: #7fd3ab; --good-soft: #1b3429;
+  color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 760px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+.head { display: flex; flex-direction: column; gap: 10px; padding-block: 12px; }
+.brand { font-family: var(--font-num); font-size: 20px; letter-spacing: .08em; display: flex; align-items: baseline; gap: 10px; }
+.brand small { font-family: var(--font-body); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; background: var(--bg); padding: 3px; border-radius: 10px; }
+.seg button { border: 0; background: transparent; padding: 8px 2px; border-radius: 8px; font-family: var(--font-num); font-size: 13px; line-height: 1.25; color: var(--muted); min-width: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--muted); }
+.summary b { font-family: var(--font-num); font-size: 22px; font-weight: 500; color: var(--ink); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.summary b.alert { color: var(--bad); }
+.tools { display: flex; flex-direction: column; gap: 8px; }
+.field, select.field, textarea.field { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips.sub { padding: 8px; border-radius: 10px; background: var(--accent-soft); }
+.chip .caret { margin-left: 4px; font-size: 10px; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 99px; font-size: 13px; color: var(--muted); }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group h2 { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 0; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 11px 14px; }
+.row + .row { border-top: 1px solid var(--line); }
+.scan-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.scan-row { grid-template-columns: minmax(0, 1fr) 84px; }
+.scan-row select.field { margin-top: 4px; }
+.scan-row .qty { text-align: center; }
+.jan-line { display: flex; gap: 8px; align-items: center; }
+.jan-line .field { flex: 1; min-width: 0; }
+.jan-line .btn { flex: none; white-space: nowrap; }
+.scan-busy { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.scan-busy::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.row.has-grip { grid-template-columns: auto minmax(0, 1fr) auto; }
+.grip { touch-action: none; cursor: grab; border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 8px 4px; margin: -8px 0 -8px -6px; letter-spacing: -3px; }
+.row.dragging { opacity: .45; }
+.row.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+.row.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+body.is-dragging { user-select: none; -webkit-user-select: none; }
+.name { font-weight: 500; overflow-wrap: anywhere; }
+.sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.pill.short { background: var(--bad-soft); color: var(--bad); }
+.pill.ordering { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--good-soft); color: var(--good); }
+.pill.sample { background: var(--accent-soft); color: var(--accent); }
+.stepper { display: flex; align-items: center; gap: 2px; }
+.lockbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; text-align: left; }
+.lockbar b { font-size: 14px; color: var(--ink); }
+.lockbar .sw { flex: none; padding: 5px 12px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 12px; }
+.lockbar.open { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.lockbar.open b { color: var(--warn); }
+.lockbar.open .sw { background: var(--warn); color: var(--surface); }
+.pinbar { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; }
+.pinbar b { color: var(--ink); font-size: 14px; }
+.pinbar .field { width: 8.5em; flex: none; }
+.pinbar.open { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.pinbar.open b { color: var(--warn); }
+.stepper.locked button { opacity: .3; }
+.stepper.locked input { color: var(--ink); opacity: 1; -webkit-text-fill-color: var(--ink); }
+.stepper button { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; font-size: 19px; line-height: 1; }
+.stepper input { width: 52px; height: 40px; text-align: center; border: 0; background: transparent; font-family: var(--font-num); font-size: 20px; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.amount { font-family: var(--font-num); font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lines .row { padding-inline: 0; }
+.msg { font-size: 13px; line-height: 1.7; min-height: 180px; resize: vertical; background: var(--bg); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 8px; font-weight: 500; }
+a.btn { display: inline-block; text-decoration: none; color: var(--ink); text-align: center; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+.note { padding: 10px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 84px; gap: 10px; align-items: center; font-size: 13px; }
+.bar-row span:first-child { font-family: var(--font-num); font-size: 14px; }
+.bar-track { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); }
+.bar-row .amt { text-align: right; font-family: var(--font-num); font-size: 15px; font-variant-numeric: tabular-nums; }
+.month-nav { display: flex; align-items: center; gap: 8px; }
+.sum-wrap { overflow-x: auto; }
+.sum { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sum th, .sum td { padding: 7px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+.sum th:first-child { text-align: left; }
+.sum tr:first-child th { font-size: 12px; color: var(--muted); font-weight: 500; }
+.sum .tot, .sum .foot td, .sum .foot th { font-weight: 700; }
+.sum .foot td, .sum .foot th { border-bottom: 0; }
+form { display: flex; flex-direction: column; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+label .field { font-size: 15px; color: var(--ink); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.levels { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
+.levels .lv-h { font-size: 12px; color: var(--muted); }
+.levels .lv-s { font-family: var(--font-num); font-size: 15px; }
+.err { color: var(--bad); font-size: 13px; }
+.dealer-row { display: flex; gap: 8px; align-items: center; padding: 8px 14px; }
+.dealer-row + .dealer-row { border-top: 1px solid var(--line); }
+.dealer-row .field { flex: 1; }
+nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabs button { position: relative; border: 0; background: transparent; padding: 15px 0; font-size: 14px; color: var(--muted); }
+.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; box-shadow: inset 0 2px 0 var(--accent); }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: var(--bad); color: var(--bg); font-family: var(--font-num); font-size: 12px; line-height: 18px; font-weight: 500; }
+#toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100vw - 32px); }
+@media (prefers-reduced-motion: no-preference) { .bar-fill { transition: width .25s ease; } }
+#live { position: fixed; left: 0; right: 0; top: 0; height: 36vh; background: #000; z-index: 60; }
+#live video { width: 100%; height: 100%; object-fit: cover; display: block; }
+#live .live-guide { position: absolute; left: 10%; right: 10%; top: 36%; height: 28%; border: 3px solid rgba(255,255,255,.85); border-radius: 10px; pointer-events: none; transition: border-color .15s; }
+#live.hit .live-guide { border-color: #4ade80; }
+#live .live-msg { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 12px; background: linear-gradient(transparent, rgba(0,0,0,.75)); color: #fff; font-size: 14px; }
+#live .live-close { position: absolute; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); }
+body.is-live { padding-top: 36vh; }
+.login { max-width: 420px; margin: 24px auto; display: grid; gap: 12px; }
+</style>
+
+<header><div class="wrap head">
+  <div class="brand">achieve Group <small>在庫・発注</small></div>
+  <div class="seg" id="stores" role="group" aria-label="店舗"></div>
+</div></header>
+<main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
+<nav><div class="wrap tabs" id="tabs"></div></nav>
+<div id="toast" role="status" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+const STORES = [
+  { id: 'hair', short: 'hair design', full: 'achieve hair design' },
+  { id: 'liss', short: 'Liss', full: 'achieve Liss' },
+  { id: 'till', short: 'till', full: 'achieve till Smart Salon' },
+  { id: 'tonari', short: 'TONARI在庫', full: 'TONARI在庫' },
+];
+const TABS = [['stock', '在庫'], ['order', '発注'], ['history', '履歴'], ['items', '商品']];
+const S = {
+  db: null, items: [], dealers: [], stock: {}, orders: [], ready: new Set(), readOnly: false, slow: false, failed: '',
+  store: 'hair', tab: 'stock', q: '', cat: '', onlyShort: false,
+  draft: {}, editing: null, formErr: '', confirm: '', dirty: false,
+};
+try { const v = localStorage.getItem('achieve-store'); if (STORES.some(s => s.id === v)) S.store = v; } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const yenS = n => n ? Math.round(n).toLocaleString('ja-JP') : '-';
+const num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : d; };
+const storeOf = id => STORES.find(s => s.id === id) || { id, short: id, full: id };
+const dealerOf = id => S.dealers.find(d => d.id === id);
+const dateStr = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+let toastT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---- 計算 ---- */
+const qtyOf = (store, id) => S.stock[store + '_' + id] ?? 0;
+const stockValue = store => S.items.reduce((a, it) => a + qtyOf(store, it.id) * num(it.price), 0);
+function onOrder(store, id) {
+  let n = 0;
+  for (const o of S.orders) if (o.store === store && o.status === 'ordered')
+    for (const l of o.lines || []) if (l.itemId === id) n += l.qty;
+  return n;
+}
+const isUnset = (it, store) => it.min?.[store] === undefined && it.par?.[store] === undefined;
+const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 || num(it.par?.[store]) > 0;
+function statusOf(it, store) {
+  if (isUnset(it, store)) return 'unset';
+  const q = qtyOf(store, it.id), oo = onOrder(store, it.id), min = num(it.min?.[store]);
+  if (q + oo <= min) return 'short';
+  if (q <= min && oo > 0) return 'ordering';
+  return 'ok';
+}
+function needOf(it, store) {
+  if (!carried(it, store) || statusOf(it, store) !== 'short') return 0;
+  return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - onOrder(store, it.id), 1);
+}
+const shortItems = store => S.items.filter(it => carried(it, store) && needOf(it, store) > 0);
+function monthTotal(store) {
+  const n = new Date();
+  return S.orders.filter(o => { const d = new Date(o.orderedAt); return (!store || o.store === store) && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth(); })
+    .reduce((a, o) => a + num(o.total), 0);
+}
+const draftKey = did => S.store + ':' + did;
+function linesFor(did) {
+  const draft = S.draft[draftKey(did)] || {};
+  const rows = [];
+  for (const it of S.items) {
+    if ((it.dealerId || '') !== did) continue;
+    const need = needOf(it, S.store);
+    const has = Object.prototype.hasOwnProperty.call(draft, it.id);
+    if (need > 0 || has) rows.push({ it, qty: has ? num(draft[it.id]) : need });
+  }
+  return rows;
+}
+const isGoto = d => !!d && !d.url && (d.id === 'other-goto' || /後藤/.test(d.name));
+const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).filter(did => linesFor(did).some(r => r.qty > 0));
+function gotoText() {
+  const st = storeOf(S.store);
+  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${r.it.unit || ''}`).join('\n'));
+  return `後藤さん\n発注お願いします。\n${st.full}\n\n${parts.join('\n\n')}`;
+}
+function gotoCard() {
+  const g = gotoIds(); if (g.length < 2) return '';
+  const total = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).reduce((b, r) => b + r.qty * num(r.it.price), 0), 0);
+  return `<section class="card">
+    <div class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="amount">${yen(total)}</span></div>
+    <div class="sub">${g.map(did => esc(dealerOf(did).name)).join('・')} の ${g.length} 件を1つの文章にしています。下のカードで数量を変えると、ここにも反映されます。</div>
+    <textarea class="field msg" id="msg-__goto" readonly aria-label="後藤さん宛てのまとめた発注文">${esc(gotoText())}</textarea>
+    <div class="actions">
+      <button type="button" class="btn primary" id="copy-__goto" data-act="copy" data-did="__goto">まとめてコピー</button>
+      <button type="button" class="btn" id="done-__goto" data-act="placedGoto" ${S.readOnly ? 'disabled' : ''}>LINEで送ったので全部発注済みにする</button>
+    </div></section>`;
+}
+function lineText(did) {
+  const d = dealerOf(did), st = storeOf(S.store);
+  const body = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${r.it.unit || ''}`).join('\n');
+  if (d && (d.id === 'other-goto' || /後藤/.test(d.name))) return `後藤さん\n発注お願いします。\n${st.full}\n\n${body}`;
+  return `${d ? d.name : ''} ご担当者様\nいつもお世話になっております。\n${st.full}です。\n下記の発注をお願いいたします。\n\n${body}\n\n納品先：${st.full}\n納期が分かりましたらご連絡ください。\nよろしくお願いいたします。`;
+}
+
+/* ---- 保存 ---- */
+function fail(e) {
+  if (e && e.code === 'invalid_argument') { S.readOnly = true; render(); toast('この画面では変更を保存できません'); return; }
+  if (e && e.code === 'quota_exceeded') { toast('保存容量がいっぱいです。古いデータを削除してください'); return; }
+  toast('保存できませんでした。通信を確認してもう一度操作してください');
+}
+const pending = new Map();
+function setQty(store, id, qty) {
+  if (S.readOnly || !S.db) return;
+  const key = store + '_' + id;
+  S.stock[key] = Math.max(0, Math.round(qty));
+  const p = pending.get(key) || { chain: Promise.resolve() };
+  clearTimeout(p.timer);
+  p.timer = setTimeout(() => {
+    p.timer = null;
+    const value = S.stock[key];
+    p.chain = p.chain.then(() => S.db.doc('stock/' + key).set({ store, itemId: id, qty: value, at: Date.now() })).catch(fail);
+  }, 450);
+  pending.set(key, p);
+}
+
+/* ---- 描画 ---- */
+const BIG = [['SP・TR類', ['Aujua SP', 'Aujua TR', 'サッシェSP', 'サッシェTR', 'アウトバス', 'AujuaサロンTR', 'その他SP・TR', 'サッシェ']], ['カラー', ['アディクシー', 'オルディーブ', 'エノグ、マニキュア', 'プレトワ', 'ヴィラロドラ', 'クリスタル', 'カラー関連']], ['コスメ', ['インプレア', 'その他化粧品', 'レフィル']], ['美容器具', ['Refa', 'その他器具']], ['その他', ['その他業務', 'その他消耗品', 'その他ドリンク類']]];
+let lockT;
+let pinT = 0;
+function armPin() { clearTimeout(pinT); if (S.pin) pinT = setTimeout(() => { S.pin = ''; S.editing = null; if (S.tab === 'items') scheduleRender(); }, 600000); }
+const canEdit = () => !S.readOnly && !!S.pin;
+const pinBar = () => S.readOnly ? '' : S.pin
+  ? `<div class="pinbar open"><span style="flex:1;min-width:0"><b>商品を編集できます</b><br>10分操作がないと自動でロックします</span><button type="button" class="btn small" id="pin-lock" data-act="pinLock">ロックする</button></div>`
+  : `<form class="pinbar" id="pin-form" novalidate><span style="flex:1 1 12em;min-width:0"><b>商品の編集はロック中</b><br>編集する人は暗証番号を入れてください</span><input class="field" id="pin-in" type="password" inputmode="numeric" autocomplete="off" placeholder="暗証番号" aria-label="暗証番号"><button type="submit" class="btn small primary" id="pin-go">解除</button>${S.pinErr ? `<span class="err" style="flex-basis:100%">${esc(S.pinErr)}</span>` : ''}</form>`;
+async function tryPin() {
+  const v = ($('pin-in')?.value || '').trim();
+  if (!v) return;
+  try {
+    const ok = S.db && S.db.checkPin ? await S.db.checkPin(v) : true;
+    if (ok === true) { S.pin = v; S.pinErr = ''; armPin(); toast('編集できるようにしました'); }
+    else S.pinErr = typeof ok === 'string' ? ok : '暗証番号が違います';
+  } catch (e) { S.pinErr = '確認できませんでした。通信を確認してください'; }
+  render();
+}
+function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
+const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
+function shell() {
+  $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${s.id === S.store}">${esc(s.short)}</button>`).join('');
+  const n = S.ready.size === 4 ? shortItems(S.store).length : 0;
+  $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
+}
+function notes() {
+  let h = '';
+  if (S.readOnly) h += '<div class="note">閲覧のみのアクセス権です。在庫の変更には編集権限が必要です。</div>';
+  if (S.slow) h += '<div class="note">データにまだ接続できていません。表示が古い可能性があります。</div>';
+  return h;
+}
+function render() {
+  if (typeof liveWatch === "function") liveWatch();
+  shell();
+  const m = $('main');
+  if (S.login) { m.innerHTML = loginView(); return; }
+  if (S.needImport) { m.innerHTML = importView(); return; }
+  if (S.failed) { m.innerHTML = `<div class="empty">${esc(S.failed)}</div>`; return; }
+  if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
+  const a = document.activeElement, fid = a && a.id;
+  m.innerHTML = notes() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
+  if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
+  if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
+  S.dirty = false;
+}
+function scheduleRender() {
+  const a = document.activeElement;
+  const typing = a && $('main').contains(a) && a.matches('input:not([readonly]),select,textarea:not([readonly])');
+  if (typing || S.editing || S.drag) { S.dirty = true; shell(); return; }
+  render();
+}
+document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !S.editing) scheduleRender(); }, 0));
+
+function catChips(withShort) {
+  const cats = [...new Set(S.items.map(i => i.category).filter(Boolean))];
+  const bigs = BIG.map(([n, ms]) => [n, ms.filter(c => cats.includes(c))]).filter(b => b[1].length);
+  const solo = cats.filter(c => !bigs.some(b => b[1].includes(c)));
+  const rank = t => t.big ? ({ 'カラー': 0, 'SP・TR類': 2, 'コスメ': 3, '美容器具': 4.5, 'その他': 6 }[t.big[0]] ?? 2.5) : (t.cat.includes('パーマ') ? 1 : 4);
+  const top = [...bigs.map(b => ({ big: b })), ...solo.map(c => ({ cat: c }))].map((t, i) => [t, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]);
+  const openBig = bigs.find(b => b[0] === S.big);
+  return `    <div class="chips">
+      ${top.map(t => t.big ? ((b, i) => `<button type="button" class="chip big" id="big-${i}" data-act="big" data-id="${esc(b[0])}" aria-pressed="${S.big === b[0]}">${esc(b[0])}<span class="caret">${S.big === b[0] ? '▴' : '▾'}</span></button>`)(t.big, bigs.indexOf(t.big)) : ((c, i) => `<button type="button" class="chip" id="cat-${i}" data-act="cat" data-id="${esc(c)}" aria-pressed="${!S.big && S.cat === c}">${esc(c)}</button>`)(t.cat, solo.indexOf(t.cat))).join('')}
+      ${withShort ? `<button type="button" class="chip" id="f-short" data-act="onlyShort" aria-pressed="${S.onlyShort}">要発注のみ</button>` : ''}
+    </div>
+    ${openBig ? `<div class="chips sub">
+      ${openBig[1].map((c, i) => `<button type="button" class="chip" id="sub-${i}" data-act="cat" data-big="${esc(openBig[0])}" data-id="${esc(c)}" aria-pressed="${S.cat === c}">${esc(openBig[0] === 'その他' ? c.replace(/^その他/, '') : c)}</button>`).join('')}
+    </div>` : ''}`;
+}
+const catMatch = it => S.cat ? it.category === S.cat : !S.big || (BIG.find(b => b[0] === S.big) || [, []])[1].includes(it.category);
+/* ---- 写真で読み取り ---- */
+let scanOpts = '', scanOptsN = -1;
+function scanOptions() {
+  if (scanOptsN === S.items.length) return scanOpts;
+  const g = {};
+  S.items.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
+  scanOpts = '<option value="">（入れない）</option>' + Object.entries(g).map(([c, arr]) => `<optgroup label="${esc(c)}">${arr.map(it => `<option value="${it.id}">${esc(it.name)}</option>`).join('')}</optgroup>`).join('');
+  scanOptsN = S.items.length; return scanOpts;
+}
+function scanCard() {
+  const sc = S.scan; if (!sc) return '';
+  if (sc.kind === 'bar') return barCard();
+  const title = sc.mode === 'count' ? '棚の写真から数える' : '納品書から入荷';
+  const st = storeOf(S.store).short;
+  if (sc.busy) return `<section class="card"><h3>${title}</h3><div class="scan-busy">写真を読み取っています（10〜30秒ほど）</div></section>`;
+  const rows = sc.rows.map((r, i) => `<div class="row scan-row"><div style="min-width:0"><div class="sub">読み取り：${esc(r.text || '（手で追加）')}</div>
+      <select class="field" id="sc-it-${i}" data-chg="scanItem" data-id="${i}" aria-label="商品を選ぶ">${scanOptions()}</select>
+      ${sc.mode === 'count' && r.id ? `<div class="sub">今の在庫 ${qtyOf(S.store, r.id)} → ${num(r.qty)}</div>` : ''}</div>
+    <input class="field qty" id="sc-q-${i}" type="number" min="0" inputmode="numeric" value="${num(r.qty)}" data-chg="scanQty" data-id="${i}" aria-label="個数"></div>`).join('');
+  const n = sc.rows.filter(r => r.id && (sc.mode === 'count' || num(r.qty) > 0)).length;
+  return `<section class="card">
+    <div class="card-head"><h3>${title}</h3><span class="sub">${esc(st)}</span></div>
+    ${sc.err ? `<div class="err">${esc(sc.err)}</div>` : `<div class="sub">${sc.mode === 'count' ? '数えた数で在庫を上書きします。' : '個数を在庫に足します。'}商品と個数を確認して、違うところは直してください。</div>`}
+    <div class="lines">${rows || '<div class="empty">読み取れた商品がありません。</div>'}</div>
+    <div class="actions">
+      <button type="button" class="btn primary" id="scan-apply" data-act="scanApply" ${n ? '' : 'disabled'}>${n} 件を在庫に反映</button>
+      <button type="button" class="btn" id="scan-add" data-act="scanAdd">＋ 行を追加</button>
+      <button type="button" class="btn" id="scan-again" data-act="scanStart" data-id="${sc.mode}">撮り直す</button>
+      <button type="button" class="btn" id="scan-cancel" data-act="scanCancel">やめる</button>
+    </div></section>`;
+}
+function fillScan() { if (S.scan && S.scan.rows) S.scan.rows.forEach((r, i) => { const el = $('sc-it-' + i); if (el) el.value = r.id || ''; }); }
+function imageToJpeg(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像を開けませんでした')); };
+    img.src = url;
+  });
+}
+async function runScan(file) {
+  const mode = S.scanMode || 'receive';
+  S.scan = { mode, busy: true, rows: [] }; render(); window.scrollTo(0, 0);
+  try {
+    const b64 = await imageToJpeg(file);
+    const rows = S.db && S.db.scanPhoto ? await S.db.scanPhoto(mode, S.store, b64, 'image/jpeg') : [];
+    S.scan = { mode, rows: rows || [], err: '' };
+  } catch (e) { S.scan = { mode, rows: [], err: (e && e.message) || '読み取りに失敗しました' }; }
+  render();
+}
+async function applyScanNow() {
+  const sc = S.scan; if (!sc) return;
+  const link = sc.mode === 'link';
+  const lines = sc.rows.filter(r => r.id).map(r => ({ id: r.id, qty: num(r.qty), jan: r.jan && !r.known ? r.jan : '' })).filter(l => link ? l.jan : sc.mode === 'count' || l.qty > 0);
+  const by = new Map();
+  for (const l of lines) { const m = by.get(l.id); if (m) { m.qty += l.qty; if (l.jan) m.jan = m.jan ? m.jan + ',' + l.jan : l.jan; } else by.set(l.id, { ...l }); }
+  lines.splice(0, lines.length, ...by.values());
+  if (!lines.length) return;
+  try {
+    await S.db.applyScan(S.store, sc.mode, lines);
+    if (link) { sc.rows = []; sc.last = ''; sc.err = ''; toast(lines.length + '件のバーコードを登録しました。続けて撮れます'); }
+    else { S.scan = null; toast(lines.length + '件を在庫に反映しました'); }
+    render();
+  }
+  catch (e) { fail(e); }
+}
+document.addEventListener('change', ev => {
+  const tid = ev.target.id;
+  if (tid !== 'scan-file' && tid !== 'bar-file' && tid !== 'jan-file') return;
+  const f = ev.target.files && ev.target.files[0]; ev.target.value = '';
+  if (f) tid === 'bar-file' ? runBar(f) : tid === 'jan-file' ? janFromPhoto(f) : runScan(f);
+});
+/* ---- バーコード（JAN）で入荷・棚卸し ---- */
+const janKey = j => String(j || '').replace(/\D/g, '').replace(/^0+/, '');
+function itemByJan(jan) {
+  const k = janKey(jan); if (!k) return null;
+  return S.items.find(it => String(it.jan || '').split(',').some(x => janKey(x) === k)) || null;
+}
+function addJan(jan, n, guessId) {
+  const sc = S.scan, it = itemByJan(jan), k = janKey(jan);
+  let r = sc.rows.find(x => (it && x.id === it.id) || janKey(x.jan) === k);
+  if (r) r.qty = num(r.qty) + n;
+  else { r = { jan, id: it ? it.id : (guessId || ''), qty: n, known: !!it, guessed: !it && !!guessId }; sc.rows.unshift(r); }
+  return r;
+}
+function barCard() {
+  const sc = S.scan, st = storeOf(S.store).short, cnt = sc.mode === 'count', link = sc.mode === 'link';
+  const rows = sc.rows.map((r, i) => {
+    const it = r.id && S.items.find(x => x.id === r.id);
+    const head = r.known && it ? `<div class="name">${esc(it.name)}</div>` : `<div class="sub">${r.guessed && r.id ? '新しいバーコード：写真から商品を推測しました。合っていればそのままでOK' : '未登録のバーコード：どの商品か選んでください'}（${esc(r.jan)}）</div>
+      <select class="field" id="sc-it-${i}" data-chg="scanItem" data-id="${i}" aria-label="どの商品か選ぶ">${scanOptions().replace('（入れない）', 'どの商品？（次から自動で分かります）')}</select>`;
+    const right = link
+      ? (r.known ? '<span class="pill">登録済み</span>' : '')
+      : `<input class="field qty" id="sc-q-${i}" type="number" min="0" inputmode="numeric" value="${num(r.qty)}" data-chg="scanQty" data-id="${i}" aria-label="個数">`;
+    return `<div class="row scan-row"><div style="min-width:0">${head}
+      ${cnt && r.id ? `<div class="sub">今の在庫 ${qtyOf(S.store, r.id)} → ${num(r.qty)}</div>` : ''}</div>${right}</div>`;
+  }).join('');
+  const n = link ? sc.rows.filter(r => r.id && !r.known).length : sc.rows.filter(r => r.id && (cnt || num(r.qty) > 0)).length;
+  const noJan = S.items.filter(it => !String(it.jan || '').trim()).length;
+  const title = link ? 'バーコードを登録' : cnt ? 'バーコードで棚卸し' : 'バーコードで入荷';
+  const help = link ? `在庫の数は変わりません。商品のバーコードを撮って、どの商品か確認したら「登録」を押します。続けて何個でも登録できます。（まだ登録していない商品：${noJan}件）`
+    : cnt ? '1個ずつ撮ると1ずつ増えます。同じ商品がたくさんあるときは1回撮って個数を直してもOK。最後に反映すると、その数で在庫を上書きします。'
+    : '届いた商品を撮るたびに1ずつ足されます。最後にまとめて在庫に足します。';
+  const chip = (m, label) => `<button type="button" class="chip" id="bar-${m}" data-act="barMode" data-id="${m}" aria-pressed="${sc.mode === m}">${label}</button>`;
+  const busy = sc.guessing ? '新しいバーコードの商品名を確認しています' : 'バーコードを読んでいます';
+  return `<section class="card">
+    <div class="card-head"><h3>${title}</h3><span class="sub">${link ? '' : esc(st)}</span></div>
+    <div class="chips">${chip('receive', '入荷（足す）')}${chip('count', '棚卸し（上書き）')}${chip('link', '登録だけ')}</div>
+    <div class="sub">${help}</div>
+    <button type="button" class="btn primary" id="bar-live" data-act="liveStart" style="width:100%" ${live ? 'hidden' : ''}>📷 カメラをかざして連続で読む</button>
+    <div class="scan-btns"><button type="button" class="btn" id="bar-one" data-act="barShot" data-id="one" ${sc.reading ? 'disabled' : ''}>📷 1個ずつ撮る</button><button type="button" class="btn" id="bar-many" data-act="barShot" data-id="many" ${sc.reading ? 'disabled' : ''}>📷 まとめて撮る</button></div>
+    ${sc.reading ? '<div class="scan-busy">' + busy + '</div>' : ''}
+    ${sc.err ? `<div class="err">${esc(sc.err)}</div>` : sc.last ? `<div class="sub">✓ ${esc(sc.last)}</div>` : ''}
+    <div class="lines">${rows || '<div class="empty">まだ何も読んでいません。商品のバーコードを撮ってください。</div>'}</div>
+    <div class="actions">
+      <button type="button" class="btn primary" id="scan-apply" data-act="scanApply" ${n ? '' : 'disabled'}>${link ? n + ' 件のバーコードを登録' : n + ' 件を在庫に反映'}</button>
+      <button type="button" class="btn" id="scan-cancel" data-act="scanCancel">${link ? '終わる' : 'やめる'}</button>
+    </div></section>`;
+}
+let zxingP = null;
+function loadZxing() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  return zxingP ||= new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    const at = String.fromCharCode(64);
+    sc.src = ['https:', '', 'cdn.jsdelivr.net', 'npm', at + 'zxing', 'library' + at + '0.21.3', 'umd', 'index.min.js'].join('/');
+    sc.onload = () => window.ZXing ? res(window.ZXing) : rej(new Error('no zxing'));
+    sc.onerror = () => { zxingP = null; rej(new Error('zxing load')); };
+    document.head.appendChild(sc);
+  });
+}
+function fileToCanvas(file, max) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像を開けませんでした')); };
+    img.src = url;
+  });
+}
+let barDiag = '';
+function variants(src) {
+  /* 元の写真から、縮小・中央の切り出し・90度回転の画像を作って順に試す */
+  const out = [], W = src.width, H = src.height;
+  const make = (sx, sy, sw, sh, max, rot) => {
+    const k = Math.min(1, max / Math.max(sw, sh)), w = Math.round(sw * k), h = Math.round(sh * k);
+    const c = document.createElement('canvas'), g = c.getContext('2d');
+    if (rot) { c.width = h; c.height = w; g.translate(h, 0); g.rotate(Math.PI / 2); } else { c.width = w; c.height = h; }
+    g.drawImage(src, sx, sy, sw, sh, 0, 0, w, h); return c;
+  };
+  out.push(make(0, 0, W, H, 1600, false));
+  out.push(make(W * 0.2, H * 0.2, W * 0.6, H * 0.6, 1400, false));
+  out.push(make(0, 0, W, H, 900, false));
+  out.push(make(0, 0, W, H, 1600, true));
+  out.push(make(W * 0.2, H * 0.2, W * 0.6, H * 0.6, 1400, true));
+  return out;
+}
+async function decodeLocal(file) {
+  const notes = [];
+  let src;
+  try { src = await fileToCanvas(file, 3000); } catch (e) { barDiag = '画像を開けませんでした'; return []; }
+  const list = variants(src);
+  if ('BarcodeDetector' in window) {
+    try {
+      const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      for (const c of list) {
+        const found = await det.detect(c);
+        const codes = found.map(f => f.rawValue).filter(Boolean);
+        if (codes.length) return codes;
+      }
+      notes.push('端末読取なし');
+    } catch (e) { notes.push('端末読取エラー'); }
+  } else notes.push('端末読取非対応');
+  let Z = null;
+  try { Z = await loadZxing(); } catch (e) { notes.push('ZXing読込失敗'); }
+  if (Z) {
+    const hints = new Map();
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E]);
+    hints.set(Z.DecodeHintType.TRY_HARDER, true);
+    const reader = new Z.MultiFormatReader(); reader.setHints(hints);
+    for (const c of list) {
+      for (const Bin of [Z.HybridBinarizer, Z.GlobalHistogramBinarizer]) {
+        try {
+          const r = reader.decode(new Z.BinaryBitmap(new Bin(new Z.HTMLCanvasElementLuminanceSource(c))));
+          if (r && r.getText()) return [r.getText()];
+        } catch (e) {}
+      }
+    }
+    notes.push('ZXingで見つからず');
+  }
+  barDiag = notes.join('・');
+  return [];
+}
+async function aiBarcodes(file) {
+  const b64 = (await fileToCanvas(file, 2400)).toDataURL('image/jpeg', 0.9).split(',')[1];
+  const res = (await S.db.scanBarcodes(b64, 'image/jpeg')) || {};
+  return Array.isArray(res) ? { codes: res, raw: [] } : { codes: res.codes || [], raw: res.raw || [] };
+}
+function addItemRow(id, n) {
+  const sc = S.scan;
+  let r = sc.rows.find(x => x.id === id);
+  if (r) r.qty = num(r.qty) + n; else { r = { jan: '', id, qty: n, known: true }; sc.rows.unshift(r); }
+  return r;
+}
+async function runBar(file) {
+  const sc = S.scan; if (!sc || sc.kind !== 'bar') return;
+  sc.reading = true; sc.err = ''; barDiag = ''; render();
+  try {
+    let got = [], raw = [];
+    if (S.barMany !== 'many') {
+      const codes = await decodeLocal(file);
+      got = codes.map(c => ({ jan: c.replace(/\D/g, ''), qty: 1, id: '' }));
+    }
+    /* 端末で読めなかったとき・未登録のバーコードのときは、AIで番号と商品名を読む */
+    if (!got.length || got.some(g => !itemByJan(g.jan))) {
+      if (got.length) sc.guessing = true;
+      render();
+      let ai = { codes: [], raw: [] };
+      try { ai = await aiBarcodes(file); } catch (e) { if (!got.length) throw e; }
+      raw = ai.raw;
+      if (!got.length) got = S.barMany === 'many' ? ai.codes : ai.codes.slice(0, 3).map(g => ({ ...g, qty: 1 }));
+      else got.forEach(g => {
+        const hit = ai.codes.find(a => a.jan && janKey(a.jan) === janKey(g.jan)) || (got.length === 1 && ai.codes.length === 1 ? ai.codes[0] : null);
+        if (hit) g.id = hit.id || '';
+      });
+    }
+    if (!got.length) {
+      sc.err = 'バーコードが読めませんでした。バーコードに5〜10cmまで近づけて、ピントが合ってから撮ってください。'
+        + (raw.length ? '（AIが読んだ数字：' + raw.join('、') + '）' : '') + (barDiag ? '［' + barDiag + '］' : '');
+    } else {
+      const names = got.map(g => {
+        const r = g.jan ? addJan(g.jan, g.qty, g.id) : sc.mode === 'link' ? { id: g.id } : addItemRow(g.id, g.qty);
+        const it = r.id && S.items.find(x => x.id === r.id);
+        if (sc.mode === 'link') return g.jan ? (it ? it.name : '未登録 ' + g.jan) : (it ? it.name : '') + '（バーコードの数字が読めず）';
+        return (it ? it.name : '未登録 ' + g.jan) + (g.qty > 1 ? ' ×' + g.qty : ' +1') + (g.jan ? '' : '（商品名から判定）');
+      });
+      sc.last = names.join('、');
+    }
+  } catch (e) { sc.err = (e && e.message) || 'バーコードを読めませんでした'; }
+  sc.reading = false; sc.guessing = false; render();
+}
+/* 商品の編集画面：カメラでJANを入れる */
+async function janFromPhoto(file) {
+  const btn = $('f-jan-cam'); if (btn) { btn.disabled = true; btn.textContent = '読み取り中…'; }
+  try {
+    let codes = await decodeLocal(file), raw = [];
+    if (!codes.length) { const ai = await aiBarcodes(file); codes = ai.codes.map(g => g.jan).filter(Boolean); raw = ai.raw; }
+    codes = codes.map(c => c.replace(/\D/g, '')).filter(Boolean);
+    if (!codes.length) { toast('バーコードが読めませんでした。近づいて撮り直してください' + (raw.length ? '（読めた数字：' + raw.join('、') + '）' : '')); return; }
+    const mine = c => { const it = itemByJan(c); return !it || (S.editing && it.id === S.editing.id); };
+    const other = codes.filter(c => !mine(c)).map(itemByJan)[0];
+    codes = codes.filter(mine);
+    if (!codes.length) { toast(`このバーコードは「${other.name}」に登録済みです`); return; }
+    const el = $('f-jan'); if (!el) return;
+    const cur = el.value.split(',').map(x => x.trim()).filter(Boolean);
+    codes.forEach(c => { if (!cur.some(x => janKey(x) === janKey(c))) cur.push(c); });
+    el.value = cur.join(','); if (S.editing) S.editing.jan = el.value; toast('JANコードを入れました。保存を押してください');
+  } catch (e) { toast((e && e.message) || '読み取れませんでした'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '📷 撮って入れる'; } }
+}
+function viewStock() {
+  const shorts = shortItems(S.store).length;
+  const ordering = S.orders.filter(o => o.store === S.store && o.status === 'ordered').length;
+  return `<div class="summary">
+    <span>要発注<b class="${shorts ? 'alert' : ''}">${shorts}</b> 点</span>
+    <span>入荷待ち<b>${ordering}</b> 件</span>
+    <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
+    <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
+  </div>
+  ${scanCard()}
+  <div class="tools">
+    ${lockBar()}
+    ${S.readOnly || S.scan ? '' : `<div class="scan-btns"><button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書で入荷</button><button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮って数える</button><button type="button" class="btn" id="bar-start" data-act="barStart" style="grid-column:1/-1">▥ バーコード（入荷・棚卸し・登録）</button></div>`}
+    <input type="file" id="scan-file" accept="image/&#42;" capture="environment" hidden>
+    <input type="file" id="bar-file" accept="image/&#42;" capture="environment" hidden>
+    <input class="field" id="search" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">
+    ${catChips(true)}
+  </div>
+  <div id="stock-list" style="display:flex;flex-direction:column;gap:16px"></div>`;
+}
+function stockList() {
+  if (!S.items.length) return '<div class="empty">商品がまだありません。「商品」タブから追加してください。</div>';
+  if (!S.items.some(it => carried(it, S.store))) return '<div class="empty">この店舗で扱う商品が未設定です。「商品」タブで商品を開き、この店舗の発注点と適正在庫を入れてください。</div>';
+  const q = S.q.trim().toLowerCase();
+  const list = S.items.filter(it => carried(it, S.store)
+    && (!q || it.name.toLowerCase().includes(q))
+    && catMatch(it)
+    && (!S.onlyShort || needOf(it, S.store) > 0));
+  if (!list.length) return '<div class="empty">条件に合う商品はありません。</div>';
+  const groups = {};
+  list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
+  return Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
+}
+function pillOf(it) {
+  const s = statusOf(it, S.store);
+  if (s === 'unset') return '<span class="pill sample">発注点未設定</span>';
+  return s === 'short' ? '<span class="pill short">要発注</span>' : s === 'ordering' ? `<span class="pill ordering">入荷待ち ${onOrder(S.store, it.id)}</span>` : '<span class="pill ok">適正</span>';
+}
+function stockRow(it) {
+  const q = qtyOf(S.store, it.id), dis = S.readOnly || !S.unlocked ? 'disabled' : '';
+  return `<div class="row"><div><div class="name">${esc(it.name)}</div>
+    <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(it.unit)}</span>`}</div></div>
+    <div class="stepper${S.unlocked ? '' : ' locked'}">
+      <button type="button" id="m-${it.id}" data-act="dec" data-id="${it.id}" aria-label="${esc(it.name)}を1減らす" ${dis}>−</button>
+      <input id="q-${it.id}" type="number" min="0" inputmode="numeric" value="${q}" data-chg="qty" data-id="${it.id}" aria-label="${esc(it.name)}の在庫数" ${dis}>
+      <button type="button" id="p-${it.id}" data-act="inc" data-id="${it.id}" aria-label="${esc(it.name)}を1増やす" ${dis}>＋</button>
+    </div></div>`;
+}
+
+function viewOrder() {
+  const ids = S.dealers.map(d => d.id).filter(did => linesFor(did).length);
+  const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
+  const st = storeOf(S.store);
+  const addable = S.dealers.filter(d => !ids.includes(d.id) && S.items.some(i => i.dealerId === d.id));
+  const extra = addable.length ? `<div class="tools"><label>他のディーラーへ商品を追加
+    <select class="field" id="add-other" data-chg="addOther"><option value="">商品を選ぶ</option>
+    ${addable.map(d => `<optgroup label="${esc(d.name)}">${S.items.filter(i => i.dealerId === d.id).map(i => `<option value="${d.id}|${i.id}">${esc(i.name)}</option>`).join('')}</optgroup>`).join('')}
+    </select></label></div>` : '';
+  let body = '';
+  if (unassigned.length) body += `<div class="note">ディーラーが未設定の商品が ${unassigned.length} 点あります。「商品」タブで設定すると発注文に入ります。</div>`;
+  if (!ids.length) body += `<div class="card"><div class="empty">${esc(st.full)}に発注が必要な商品はありません。</div></div>`;
+  return (ids.length ? lockBar() : '') + body + gotoCard() + ids.map(orderCard).join('') + extra;
+}
+function orderCard(did) {
+  const d = dealerOf(did), rows = linesFor(did);
+  const active = rows.filter(r => r.qty > 0);
+  const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
+  const others = S.items.filter(i => i.dealerId === did && !rows.some(r => r.it.id === i.id));
+  const dis = S.readOnly || !active.length ? 'disabled' : '';
+  return `<section class="card">
+    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${yen(total)}</span></div>
+    <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
+      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span><span>単価 ${yen(num(r.it.price))}</span></div></div>
+      <div class="stepper${S.unlocked ? '' : ' locked'}">
+        <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす" ${S.unlocked ? '' : 'disabled'}>−</button>
+        <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
+        <button type="button" id="op-${r.it.id}" data-act="oinc" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1増やす" ${S.unlocked ? '' : 'disabled'}>＋</button>
+      </div></div>`).join('')}</div>
+    ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${others.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>` : ''}
+    ${d.url ? `<div class="sub">${esc(storeOf(S.store).full)}の発注です。サイトのログイン店舗を確認して、上の数量を注文してください。</div>
+    <div class="actions">
+      <a class="btn primary" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
+      <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
+    </div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(active.length ? lineText(did) : '')}</textarea>
+    <div class="actions">
+      <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${active.length ? '' : 'disabled'}>発注文をコピー</button>
+      <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>LINEで送ったので発注済みにする</button>
+    </div>`}</section>`;
+}
+
+const GROUPS = [['カラー', ['アディクシー','オルディーブ','クリスタル','エノグ','プレトワ','ヴィラロドラ','カラー関連']], ['パーマ全般', ['パーマ']], ['Aujua店販', ['Aujua SP','Aujua TR','Aujua シャンプー','Aujua トリートメント','サッシェ','アウトバス']], ['Aujua業務', ['AujuaサロンTR']], ['インプレア', ['インプレア']], ['スタイリング剤', ['スタイリング剤']], ['美容器具', ['美容器具', 'Refa', 'その他器具']], ['その他業務', ['その他業務']], ['その他消耗品', ['その他消耗品', 'その他ドリンク類']]];
+function groupOf(line) {
+  const it = S.items.find(i => i.id === line.itemId);
+  const key = (it ? it.category : '') + ' ' + line.name;
+  if (it && /^Aujua (SP|TR)$/.test(it.category) && /1[.．]8\s*(L|kg)/i.test(line.name)) return 'Aujua業務';
+  for (const [g, ws] of GROUPS) if (ws.some(w => key.includes(w))) return g;
+  return 'その他業務';
+}
+function sumTable(rows, t) {
+  const sum = r => STORES.reduce((a, st) => a + t[r][st.id], 0);
+  const colSum = id => rows.reduce((a, r) => a + t[r][id], 0);
+  const total = rows.reduce((a, r) => a + sum(r), 0);
+  const head = `<tr><th></th>${STORES.map(st => `<th>${esc(st.short.replace(' design','').replace('在庫',''))}</th>`).join('')}<th>合計</th></tr>`;
+  const body = rows.map(r => `<tr><th>${r}</th>${STORES.map(st => `<td>${yenS(t[r][st.id])}</td>`).join('')}<td class="tot">${yenS(sum(r))}</td></tr>`).join('')
+    + `<tr class="foot"><th>合計</th>${STORES.map(st => `<td>${yenS(colSum(st.id))}</td>`).join('')}<td class="tot">${yenS(total)}</td></tr>`;
+  return [head, body, total];
+}
+function viewHistory() {
+  const n = new Date(), base = new Date(n.getFullYear(), n.getMonth() + (S.monthOff || 0), 1);
+  const y = base.getFullYear(), m = base.getMonth();
+  const rows = ['カラー', 'パーマ全般', 'Aujua店販', 'Aujua業務', 'インプレア', 'スタイリング剤', '美容器具', 'その他業務', 'その他消耗品'], t = {};
+  rows.forEach(r => { t[r] = {}; STORES.forEach(st => t[r][st.id] = 0); });
+  for (const o of S.orders) {
+    const d = new Date(o.orderedAt); if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    for (const l of o.lines || []) { const g = groupOf(l); if (t[g][o.store] !== undefined) t[g][o.store] += num(l.qty) * num(l.price); }
+  }
+  const [head, body, total] = sumTable(rows, t);
+  const v = {};
+  rows.forEach(r => { v[r] = {}; STORES.forEach(st => v[r][st.id] = 0); });
+  for (const it of S.items) { const g = groupOf({ itemId: it.id, name: it.name }); STORES.forEach(st => { v[g][st.id] += qtyOf(st.id, it.id) * num(it.price); }); }
+  const [vHead, vBody, vTotal] = sumTable(rows, v);
+  const stockCard = `<section class="card">
+    <div class="card-head"><h3>今の在庫金額</h3><span class="amount">${yen(vTotal)}</span></div>
+    <div class="sum-wrap"><table class="sum">${vHead}${vBody}</table></div>
+    <div class="sub">単位：円（税抜）。在庫数 × 仕入れ単価で計算しています。</div></section>`;
+  const card = `<section class="card">
+    <div class="card-head"><div class="month-nav"><button type="button" class="btn small" id="m-prev" data-act="month" data-id="-1" aria-label="前の月">‹</button><h3>${y}年${m + 1}月の発注額</h3><button type="button" class="btn small" id="m-next" data-act="month" data-id="1" aria-label="次の月" ${S.monthOff >= 0 ? 'disabled' : ''}>›</button></div><span class="amount">${yen(total)}</span></div>
+    <div class="sum-wrap"><table class="sum">${head}${body}</table></div>
+    <div class="sub">単位：円（税抜）。「発注済み」にした日の月で集計しています。</div></section>`;
+  if (!S.orders.length) return card + stockCard + '<div class="card"><div class="empty">発注履歴はまだありません。「発注」タブで発注済みにすると、ここに並びます。</div></div>';
+  return card + stockCard + `<div class="group"><h2>発注履歴（全店）</h2><div class="list">${S.orders.map(orderRow).join('')}</div></div>`;
+}
+function orderRow(o) {
+  const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
+  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${l.unit || ''}`).join('、');
+  const ctl = !open || S.readOnly ? '' : S.confirm === cKey
+    ? `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">取り消す</button><button type="button" class="btn small" id="cn-${o.id}" data-act="confirmNo">戻る</button>`
+    : `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">入荷済みにする</button><button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">取消</button>`;
+  return `<div class="row" style="grid-template-columns:minmax(0,1fr)">
+    <div class="card-head"><div class="name">${esc(o.dealerName)}</div><span class="amount">${yen(num(o.total))}</span></div>
+    <div class="sub"><span class="pill ${open ? 'ordering' : 'ok'}">${open ? '発注済み' : '入荷済み'}</span><span>${esc(storeOf(o.store).short)}</span><span>${dateStr(o.orderedAt)} 発注${o.receivedAt ? `・${dateStr(o.receivedAt)} 入荷` : ''}</span></div>
+    <div class="sub">${esc(summary)}</div>
+    ${ctl ? `<div class="actions">${ctl}</div>` : ''}</div>`;
+}
+
+const itemRow = it => `<div class="row${canEdit() ? ' has-grip' : ''}" data-row="${it.id}">${canEdit() ? `<button type="button" class="grip" data-grip="${it.id}" aria-label="${esc(it.name)}を並べ替え">⋮⋮</button>` : ''}<div><div class="name">${esc(it.name)}</div>
+    <div class="sub">${it.sample ? '<span class="pill sample">サンプル</span>' : ''}<span>${esc(it.category || 'その他')}</span><span>${esc(dealerOf(it.dealerId)?.name || 'ディーラー未設定')}</span><span>${yen(num(it.price))}/${esc(it.unit)}</span></div></div>
+    <button type="button" class="btn small" id="ed-${it.id}" data-act="edit" data-id="${it.id}" ${canEdit() ? '' : 'disabled'}>編集</button></div>`;
+function itemList() {
+  const q = S.q.trim().toLowerCase();
+  const list = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+  if (!list.length) return '<div class="empty">条件に合う商品はありません。</div>';
+  const g = {};
+  list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
+  return Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div class="list">${arr.map(itemRow).join('')}</div></section>`).join('');
+}
+function viewItems() {
+  if (S.editing && canEdit()) return itemForm();
+  const hasSample = S.items.some(i => i.sample) || S.dealers.some(d => d.sample);
+  const dis = canEdit() ? '' : 'disabled';
+  const sampleBar = !hasSample ? '' : `<div class="note"><div style="display:flex;flex-direction:column;gap:8px">今表示している商品は動作確認用のサンプルです。実際の商品を入れる前に削除できます。
+    <div class="actions">${S.confirm === 'samples'
+      ? `<button type="button" class="btn small danger" id="s2" data-act="clearSamples" ${dis}>サンプルを全部削除する</button><button type="button" class="btn small" id="sn" data-act="confirmNo">戻る</button>`
+      : `<button type="button" class="btn small" id="s1" data-act="confirm" data-id="samples" ${dis}>サンプルを削除</button>`}</div></div></div>`;
+
+  const dealers = S.dealers.map(d => {
+    const used = S.items.some(i => i.dealerId === d.id);
+    return `<div class="dealer-row"><input class="field" id="dn-${d.id}" value="${esc(d.name)}" data-chg="dealerName" data-id="${d.id}" aria-label="ディーラー名" ${dis}>
+    <button type="button" class="btn small danger" id="dd-${d.id}" data-act="delDealer" data-id="${d.id}" ${used || S.readOnly ? 'disabled' : ''} ${used ? 'title="使用中の商品があるため削除できません"' : ''}>削除</button></div>`;
+  }).join('');
+  return `${pinBar()}${sampleBar}
+  <div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button></div>
+  <div class="tools">
+    <input class="field" id="isearch" type="search" placeholder="商品名で探す（全 ${S.items.length} 点）" aria-label="商品名で探す" value="${esc(S.q)}">
+    ${catChips(false)}
+  </div>
+  <div id="item-list" style="display:flex;flex-direction:column;gap:16px">${S.items.length ? itemList() : '<div class="empty">商品がまだありません。</div>'}</div>
+  ${S.dealers.length ? `<div class="group"><h2>ディーラー</h2><div class="list">${dealers}</div></div>` : ''}`;
+}
+function catOptions(cats, cur) {
+  const used = new Set(), out = [];
+  const label = (b, c) => b === 'その他' ? c.replace(/^その他/, '') : c;
+  for (const [b, ms] of BIG) {
+    const list = ms.filter(c => cats.includes(c)); if (!list.length) continue;
+    list.forEach(c => used.add(c));
+    out.push(`<optgroup label="${esc(b)}">${list.map(c => `<option value="${esc(c)}" ${c === cur ? 'selected' : ''}>${esc(label(b, c))}</option>`).join('')}</optgroup>`);
+  }
+  const rest = cats.filter(c => !used.has(c));
+  if (cur && cur !== '__new' && !cats.includes(cur)) rest.push(cur);
+  out.push(...rest.map(c => `<option value="${esc(c)}" ${c === cur ? 'selected' : ''}>${esc(c)}</option>`));
+  return (cur ? '' : '<option value="" selected>選択してください</option>') + out.join('');
+}
+function itemForm() {
+  const it = S.editing, opts = S.dealers.map(d => `<option value="${d.id}" ${it.dealerId === d.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+  const cats = [...new Set(S.items.map(i => i.category).filter(Boolean))];
+  const dKey = 'del-' + (it.id || '');
+  return `<section class="card"><h3>${it.id ? '商品を編集' : '商品を追加'}</h3>
+  <form id="item-form" novalidate>
+    <label>商品名<input class="field" id="f-name" value="${esc(it.name)}" autocomplete="off"></label>
+    <div class="two">
+      <label>カテゴリ<select class="field" id="f-cat" data-chg="catPick">${catOptions(cats, it.category)}<option value="__new" ${it.category === '__new' ? 'selected' : ''}>＋ 新しいカテゴリ</option></select></label>
+      <label>単位<input class="field" id="f-unit" value="${esc(it.unit || '本')}" placeholder="本・箱・個" autocomplete="off"></label>
+    </div>
+    <div class="two">
+      <label>ディーラー<select class="field" id="f-dealer" data-chg="dealerPick"><option value="">選択してください</option>${opts}<option value="__new" ${it.dealerId === '__new' ? 'selected' : ''}>＋ 新しいディーラー</option></select></label>
+      <label>仕入れ単価（円）<input class="field" id="f-price" type="number" min="0" inputmode="numeric" value="${num(it.price)}"></label>
+    </div>
+    <label>JANコード（バーコードの数字・複数あれば , 区切り）<span class="jan-line"><input class="field" id="f-jan" inputmode="numeric" value="${esc(it.jan || '')}" placeholder="例：4954835123456" autocomplete="off"><button type="button" class="btn" id="f-jan-cam" data-act="janCam">📷 撮って入れる</button></span></label>
+    <input type="file" id="jan-file" accept="image/&#42;" capture="environment" hidden>
+    <label id="f-newc-w" ${it.category === '__new' ? '' : 'hidden'}>新しいカテゴリ名<input class="field" id="f-newc" autocomplete="off"></label>
+    <label id="f-newd-w" ${it.dealerId === '__new' ? '' : 'hidden'}>新しいディーラー名<input class="field" id="f-newd" autocomplete="off"></label>
+    <div class="levels">
+      <span class="lv-h">店舗</span><span class="lv-h">発注点</span><span class="lv-h">適正在庫</span>
+      ${STORES.map(s => `<span class="lv-s">${esc(s.short)}</span><input class="field" id="f-min-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の発注点" value="${it.min?.[s.id] ?? ''}"><input class="field" id="f-par-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の適正在庫" value="${it.par?.[s.id] ?? ''}">`).join('')}
+    </div>
+    <div class="sub">在庫が発注点以下になると、適正在庫までの不足分を発注文に入れます。空欄の店舗は在庫数だけ管理します。その店で扱わない商品は両方 0 にしてください。</div>
+    ${S.formErr ? `<div class="err">${esc(S.formErr)}</div>` : ''}
+    <div class="actions">
+      <button type="submit" class="btn primary" id="f-save">保存</button>
+      <button type="button" class="btn" id="f-cancel" data-act="cancelEdit">戻る</button>
+      ${it.id ? (S.confirm === dKey
+        ? `<button type="button" class="btn danger" id="f-del2" data-act="delItem">本当に削除する</button>`
+        : `<button type="button" class="btn danger" id="f-del" data-act="confirm" data-id="${dKey}">削除</button>`) : ''}
+    </div>
+  </form></section>`;
+}
+function readForm() {
+  const it = S.editing;
+  it.name = $('f-name').value; it.category = $('f-cat').value === '__new' ? $('f-newc').value.trim() || '__new' : $('f-cat').value; it.unit = $('f-unit').value;
+  it.dealerId = $('f-dealer').value; it.price = num($('f-price').value);
+  it.newDealer = $('f-newd').value; it.jan = $('f-jan').value.replace(/[^0-9,]/g, '');
+  it.min = {}; it.par = {};
+  STORES.forEach(s => { const a = $(`f-min-${s.id}`).value, b = $(`f-par-${s.id}`).value; if (a !== '' || b !== '') { it.min[s.id] = num(a); it.par[s.id] = num(b); } });
+}
+async function saveItem() {
+  readForm();
+  const it = S.editing, name = it.name.trim();
+  const bad = STORES.find(s => num(it.par[s.id]) < num(it.min[s.id]));
+  S.formErr = !name ? '商品名を入力してください。'
+    : !it.unit.trim() ? '単位を入力してください。'
+    : it.category === '__new' ? '新しいカテゴリ名を入力してください。'
+    : !it.dealerId ? 'ディーラーを選んでください。'
+    : it.dealerId === '__new' && !it.newDealer.trim() ? '新しいディーラー名を入力してください。'
+    : bad ? `${bad.short}の適正在庫は発注点以上にしてください。` : '';
+  if (S.formErr) { render(); return; }
+  try {
+    let did = it.dealerId;
+    if (did === '__new') { const ref = S.db.collection('dealers').doc(); await ref.set({ name: it.newDealer.trim(), createdAt: Date.now() }); did = ref.id; }
+    const ref = it.id ? S.db.doc('items/' + it.id) : S.db.collection('items').doc();
+    const data = { name, category: it.category.trim(), unit: it.unit.trim(), dealerId: did, price: it.price, min: it.min, par: it.par, jan: it.jan || '', createdAt: it.createdAt || Date.now() };
+    if (it.sample) data.sample = true;
+    await ref.set(data);
+    S.editing = null; S.formErr = ''; S.confirm = '';
+    toast('保存しました'); render();
+  } catch (e) { fail(e); }
+}
+
+/* ---- 操作 ---- */
+function bumpDraft(did, id, value) {
+  const k = draftKey(did); S.draft[k] = S.draft[k] || {}; S.draft[k][id] = Math.max(0, Math.round(value));
+}
+function draftValue(did, id) {
+  const r = linesFor(did).find(x => x.it.id === id); return r ? r.qty : 0;
+}
+async function markPlaced(did, quiet) {
+  const active = linesFor(did).filter(r => r.qty > 0); if (!active.length) return;
+  const d = dealerOf(did);
+  const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
+  try {
+    await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now() });
+    delete S.draft[draftKey(did)];
+    if (!quiet) { toast('発注済みにしました'); render(); }
+  } catch (e) { fail(e); }
+}
+const receiving = new Set();
+async function receive(id) {
+  const o = S.orders.find(x => x.id === id);
+  if (!o || o.status !== 'ordered' || receiving.has(id)) return;
+  receiving.add(id);
+  try {
+    await S.db.doc('orders/' + id).update({ status: 'received', receivedAt: Date.now() });
+    for (const l of o.lines || []) {
+      const key = o.store + '_' + l.itemId, next = (S.stock[key] ?? 0) + l.qty;
+      S.stock[key] = next;
+      await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at: Date.now() });
+    }
+    toast('入荷分を在庫に加えました'); render();
+  } catch (e) { fail(e); } finally { receiving.delete(id); }
+}
+async function clearSamples() {
+  try {
+    for (const it of S.items.filter(i => i.sample)) {
+      for (const s of STORES) await S.db.doc(`stock/${s.id}_${it.id}`).delete();
+      await S.db.doc('items/' + it.id).delete();
+    }
+    for (const d of S.dealers.filter(x => x.sample)) await S.db.doc('dealers/' + d.id).delete();
+    S.confirm = ''; toast('サンプルを削除しました'); render();
+  } catch (e) { fail(e); }
+}
+
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const { act, id, did } = b.dataset;
+  switch (act) {
+    case 'store': S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
+    case 'tab': S.tab = id; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
+    case 'lock': S.unlocked = !S.unlocked; armLock(); render(); break;
+    case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
+    case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
+    case 'onlyShort': S.onlyShort = !S.onlyShort; render(); break;
+    case 'cat': { const nb = b.dataset.big || ''; S.cat = S.big === nb && S.cat === id ? '' : id; S.big = nb; render(); break; }
+    case 'big': S.big = S.big === id ? '' : id; S.cat = ''; render(); break;
+    case 'oinc': armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
+    case 'odec': armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
+    case 'copy': {
+      const text = did === '__goto' ? gotoText() : lineText(did);
+      try { await navigator.clipboard.writeText(text); toast('コピーしました。LINEに貼り付けてください'); }
+      catch (e) { const t = $('msg-' + did); t.focus(); t.select(); toast('自動でコピーできません。選択された文章をコピーしてください'); }
+      break;
+    }
+    case 'placed': markPlaced(did); break;
+    case 'scanStart': S.scanMode = id; $('scan-file').click(); break;
+    case 'scanCancel': S.scan = null; render(); break;
+    case 'barStart': S.scan = { kind: 'bar', mode: 'receive', rows: [], err: '' }; render(); window.scrollTo(0, 0); break;
+    case 'barMode': S.scan.mode = id; render(); break;
+    case 'barShot': S.barMany = id; $('bar-file').click(); break;
+    case 'liveStart': liveStart(); break;
+    case 'liveStop': liveStop(); break;
+    case 'janCam': $('jan-file').click(); break;
+    case 'scanAdd': S.scan.rows.push({ text: '', qty: 1, id: '' }); render(); break;
+    case 'scanApply': applyScanNow(); break;
+    case 'placedGoto': { const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
+    case 'receive': receive(id); break;
+    case 'confirm': if (S.editing) readForm(); S.confirm = id; render(); break;
+    case 'month': S.monthOff = Math.min(0, (S.monthOff || 0) + Number(id)); render(); break;
+    case 'confirmNo': S.confirm = ''; render(); break;
+    case 'cancelYes': S.confirm = ''; S.db.doc('orders/' + id).delete().then(() => toast('発注を取り消しました')).catch(fail); break;
+    case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
+    case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'cancelEdit': S.editing = null; S.formErr = ''; S.confirm = ''; render(); break;
+    case 'delItem': {
+      const iid = S.editing.id;
+      try { for (const s of STORES) await S.db.doc(`stock/${s.id}_${iid}`).delete(); await S.db.doc('items/' + iid).delete(); S.editing = null; S.confirm = ''; toast('削除しました'); render(); } catch (e) { fail(e); }
+      break;
+    }
+    case 'delDealer': S.db.doc('dealers/' + id).delete().catch(fail); break;
+    case 'clearSamples': clearSamples(); break;
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target, c = el.dataset.chg; if (!c) return;
+  const { id, did } = el.dataset;
+  if (c === 'qty') { setQty(S.store, id, num(el.value)); el.blur(); render(); }
+  if (c === 'oqty') { bumpDraft(did, id, num(el.value)); el.blur(); render(); }
+  if (c === 'addLine' && el.value) { bumpDraft(did, el.value, 1); el.value = ''; el.blur(); render(); }
+  if (c === 'addOther' && el.value) { const [d, i] = el.value.split('|'); bumpDraft(d, i, 1); el.value = ''; el.blur(); render(); }
+  if (c === 'scanItem') { S.scan.rows[Number(id)].id = el.value; render(); return; }
+  if (c === 'scanQty') { S.scan.rows[Number(id)].qty = num(el.value); render(); return; }
+  if (c === 'catPick') { $('f-newc-w').hidden = el.value !== '__new'; }
+  if (c === 'dealerPick') { $('f-newd-w').hidden = el.value !== '__new'; }
+  if (c === 'dealerName') { const v = el.value.trim(); if (v) S.db.doc('dealers/' + id).update({ name: v }).catch(fail); }
+});
+document.addEventListener('input', ev => {
+  if (ev.target.id === 'search') { S.q = ev.target.value; $('stock-list').innerHTML = stockList(); }
+  if (ev.target.id === 'isearch') { S.q = ev.target.value; $('item-list').innerHTML = itemList(); }
+});
+/* ---- 商品の並べ替え（つまみを押したままスライド） ---- */
+function clearDrop() { document.querySelectorAll('.drop-before,.drop-after').forEach(e => e.classList.remove('drop-before', 'drop-after')); }
+document.addEventListener('pointerdown', ev => {
+  const g = ev.target.closest('[data-grip]'); if (!g || !canEdit()) return;
+  ev.preventDefault();
+  const row = g.closest('.row'), list = row.parentElement;
+  S.drag = { id: g.dataset.grip, row, list, target: null, where: '', y: ev.clientY };
+  row.classList.add('dragging'); document.body.classList.add('is-dragging');
+  try { g.setPointerCapture(ev.pointerId); } catch (e) {}
+  armPin();
+});
+document.addEventListener('pointermove', ev => {
+  const d = S.drag; if (!d) return;
+  ev.preventDefault(); d.y = ev.clientY;
+  if (ev.clientY < 70) window.scrollBy(0, -12); else if (ev.clientY > window.innerHeight - 90) window.scrollBy(0, 12);
+  const rows = [...d.list.children].filter(r => r.dataset.row && r !== d.row);
+  let t = null, where = '';
+  for (const r of rows) { const b = r.getBoundingClientRect(); if (ev.clientY < b.top + b.height / 2) { t = r; where = 'before'; break; } }
+  if (!t && rows.length) { t = rows[rows.length - 1]; where = 'after'; }
+  clearDrop();
+  if (t) t.classList.add(where === 'before' ? 'drop-before' : 'drop-after');
+  d.target = t ? t.dataset.row : null; d.where = where;
+}, { passive: false });
+function endDrag(ok) {
+  const d = S.drag; if (!d) return;
+  S.drag = null; clearDrop(); d.row.classList.remove('dragging'); document.body.classList.remove('is-dragging');
+  if (!ok || !d.target) { if (S.dirty) render(); return; }
+  const from = S.items.findIndex(i => i.id === d.id); const [it] = S.items.splice(from, 1);
+  let to = S.items.findIndex(i => i.id === d.target); if (d.where === 'after') to++;
+  const unchanged = to === from;
+  S.items.splice(to, 0, it);
+  render();
+  if (unchanged) return;
+  if (S.db && S.db.moveItem) S.db.moveItem(d.id, d.target, d.where).then(() => toast('並び順を変えました')).catch(fail);
+}
+document.addEventListener('pointerup', () => endDrag(true));
+document.addEventListener('pointercancel', () => endDrag(false));
+document.addEventListener('submit', ev => {
+  if (ev.target.id === 'item-form') { ev.preventDefault(); armPin(); saveItem(); }
+  if (ev.target.id === 'pin-form') { ev.preventDefault(); tryPin(); }
+});
+
+/* ---- カメラで連続読み取り ---- */
+let live = null;
+const liveLast = {};
+let actx;
+function beep(ok) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = ok ? 1320 : 440; g.gain.value = 0.12;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + (ok ? 0.09 : 0.22));
+  } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate(ok ? 40 : [60, 60, 60]); } catch (e) {}
+}
+function janValid(c) {
+  if (!/^(\d{8}|\d{12}|\d{13})$/.test(c)) return false;
+  const d = c.split('').map(Number), chk = d.pop();
+  let sum = 0; d.reverse().forEach((n, i) => { sum += n * (i % 2 === 0 ? 3 : 1); });
+  return (10 - sum % 10) % 10 === chk;
+}
+function liveCode(raw) {
+  let code = String(raw || '').replace(/\D/g, '');
+  if (code.length === 12) code = '0' + code;
+  if (!janValid(code) || !S.scan || S.scan.kind !== 'bar') return;
+  const now = Date.now();
+  if (liveLast[code] && now - liveLast[code] < 1800) { liveLast[code] = now; return; }
+  liveLast[code] = now;
+  const r = addJan(code, 1, '');
+  const it = r.id && S.items.find(x => x.id === r.id);
+  const msg = it ? `✓ ${it.name}${S.scan.mode === 'link' ? '（登録済み）' : '　' + r.qty}` : `新しいバーコード ${code}：下で商品を選んでください`;
+  S.scan.last = msg.replace(/^✓ /, ''); S.scan.err = '';
+  const el = $('live'); if (el) { el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 300); $('live-msg').textContent = msg; }
+  beep(!!it); render();
+}
+async function liveStart() {
+  if (live) return;
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume && actx.resume(); } catch (e) {}
+  const el = document.createElement('div');
+  el.id = 'live';
+  el.innerHTML = '<video id="live-v" playsinline muted autoplay></video><div class="live-guide"></div><div class="live-msg" id="live-msg">カメラを起動しています…</div><button type="button" class="btn small live-close" data-act="liveStop">閉じる</button>';
+  document.body.appendChild(el); document.body.classList.add('is-live');
+  live = { stream: null, timer: null, reader: null };
+  const video = $('live-v');
+  try {
+    let native = false;
+    if ('BarcodeDetector' in window) { try { native = (await BarcodeDetector.getSupportedFormats()).includes('ean_13'); } catch (e) {} }
+    if (native) {
+      live.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+      video.srcObject = live.stream; await video.play();
+      const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      const tick = async () => {
+        if (!live) return;
+        try { (await det.detect(video)).forEach(r => liveCode(r.rawValue)); } catch (e) {}
+        if (live) live.timer = setTimeout(tick, 120);
+      };
+      tick();
+    } else {
+      const Z = await loadZxing();
+      const hints = new Map();
+      hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E]);
+      live.reader = new Z.BrowserMultiFormatReader(hints, 150);
+      await live.reader.decodeFromConstraints({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } }, video, res => { if (res) liveCode(res.getText()); });
+      live.stream = video.srcObject;
+    }
+    $('live-msg').textContent = 'バーコードを枠に入れてください';
+    render();
+  } catch (e) {
+    const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    liveStop();
+    toast(denied ? 'カメラが許可されていません。ブラウザの設定でカメラを許可してください' : 'カメラを起動できませんでした');
+  }
+}
+function liveStop() {
+  if (live) {
+    clearTimeout(live.timer);
+    try { live.reader && live.reader.reset(); } catch (e) {}
+    if (live.stream) live.stream.getTracks().forEach(t => t.stop());
+  }
+  live = null;
+  const el = $('live'); if (el) el.remove();
+  document.body.classList.remove('is-live');
+  if (S.scan) render();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && live) liveStop(); });
+const liveWatch = () => { if (live && (!S.scan || S.scan.kind !== 'bar')) liveStop(); };
+
+/* ---- ログイン ---- */
+function loginView() {
+  return `<form class="card login" id="login-form" novalidate>
+    <h3>ログイン</h3>
+    <div class="sub">スタッフ共通のアカウントでログインします。一度ログインすれば、この端末では次から自動で開きます。</div>
+    <label>メールアドレス<input class="field" id="lg-email" type="email" autocomplete="username" value="${esc(S.loginEmail || '')}"></label>
+    <label>パスワード<input class="field" id="lg-pass" type="password" autocomplete="current-password"></label>
+    ${S.loginErr ? `<div class="err">${esc(S.loginErr)}</div>` : ''}
+    <button class="btn primary" type="submit" id="lg-go">ログイン</button>
+  </form>`;
+}
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'login-form') return;
+  ev.preventDefault();
+  const email = $('lg-email').value.trim(), pass = $('lg-pass').value;
+  S.loginEmail = email;
+  if (!email || !pass) { S.loginErr = 'メールアドレスとパスワードを入れてください'; render(); return; }
+  $('lg-go').disabled = true;
+  try { await firebase.auth().signInWithEmailAndPassword(email, pass); S.loginErr = ''; }
+  catch (e) { S.loginErr = 'ログインできませんでした。メールアドレスとパスワードを確認してください'; render(); }
+});
+
+/* ---- スプレッドシートからの引っ越し（最初の1回だけ） ---- */
+function importView() {
+  return `<form class="card login" id="import-form" novalidate>
+    <h3>データの引っ越し</h3>
+    <div class="sub">まだデータが入っていません。今のスプレッドシート版から、商品・ディーラー・在庫・発注履歴・JANコードをまとめて移します。商品編集の暗証番号を入れてください。</div>
+    <label>暗証番号<input class="field" id="im-pin" type="password" inputmode="numeric" autocomplete="off"></label>
+    ${S.importMsg ? `<div class="${S.importErr ? 'err' : 'sub'}">${esc(S.importMsg)}</div>` : ''}
+    <button class="btn primary" type="submit" id="im-go" ${S.importing ? 'disabled' : ''}>${S.importing ? '移しています…' : 'スプレッドシートから移す'}</button>
+  </form>`;
+}
+async function importFromSheet(pin) {
+  const d = await gas({ action: 'export', pin });
+  const snap = d.snapshot, fs = firebase.firestore(), now = Date.now();
+  const w = [];
+  snap.dealers.forEach((x, i) => w.push(['dealers/' + x.id, { name: x.name, sample: !!x.sample, url: x.url || '', createdAt: i + 1 }]));
+  snap.items.forEach((it, i) => w.push(['items/' + it.id, { name: it.name, category: it.category || '', unit: it.unit || '', dealerId: it.dealerId || '', price: Number(it.price) || 0, min: it.min || {}, par: it.par || {}, sample: !!it.sample, jan: it.jan || '', createdAt: (i + 1) * 1000 }]));
+  Object.entries(snap.stock || {}).forEach(([k, q]) => { if (Number(q)) { const i = k.indexOf('_'); w.push(['stock/' + k, { store: k.slice(0, i), itemId: k.slice(i + 1), qty: Number(q), at: now }]); } });
+  (snap.orders || []).forEach(o => w.push(['orders/' + o.id, { store: o.store, dealerId: o.dealerId || '', dealerName: o.dealerName || '', lines: o.lines || [], total: Number(o.total) || 0, status: o.status, orderedAt: Number(o.orderedAt) || now, receivedAt: Number(o.receivedAt) || null }]));
+  w.push(['settings/app', { pin: String(d.pin), importedAt: now }]);
+  for (let i = 0; i < w.length; i += 400) {
+    const b = fs.batch();
+    w.slice(i, i + 400).forEach(([path, data]) => b.set(fs.doc(path), data));
+    await b.commit();
+    S.importMsg = `移しています… ${Math.min(i + 400, w.length)} / ${w.length}`; render();
+  }
+  return { items: snap.items.length, dealers: snap.dealers.length, orders: (snap.orders || []).length };
+}
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'import-form') return;
+  ev.preventDefault();
+  const pin = $('im-pin').value.trim(); if (!pin || S.importing) return;
+  S.importing = true; S.importErr = false; S.importMsg = 'スプレッドシートを読んでいます…'; render();
+  try {
+    const r = await importFromSheet(pin);
+    S.needImport = false; S.importing = false; S.importMsg = '';
+    toast(`商品${r.items}件・ディーラー${r.dealers}件・発注${r.orders}件を移しました`); render();
+  } catch (e) { S.importing = false; S.importErr = true; S.importMsg = (e && e.message) || '移せませんでした'; render(); }
+});
+
+/* ---- 接続（Firebase） ---- */
+const FIREBASE = typeof firebaseConfig !== 'undefined' ? firebaseConfig : null;
+const GAS = "https://script.google.com/macros/s/AKfycbzLd5HUcScSlTagl3Jt6GWBgOsWNqdW9Z6NbOzbIh3wwQzLNQ0oeRQJO2SeZbj6MZYJgw/exec";
+function arrive(name, fromCache) { if (!fromCache) confirmed.add(name); S.ready.add(name); if (confirmed.size === 4 && slowT) { clearTimeout(slowT); slowT = null; S.slow = false; } scheduleRender(); }
+const confirmed = new Set();
+let slowT = null;
+const docs = snap => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+function onErr(e) {
+  if (e && e.code === 'permission-denied') { S.failed = 'データを読む権限がありません。ログインし直してください。'; render(); }
+  else { clearTimeout(slowT); S.slow = true; scheduleRender(); }
+}
+async function gas(body) {
+  const res = await fetch(GAS, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || '通信に失敗しました');
+  return j.data;
+}
+function makeApi(fs) {
+  const FV = firebase.firestore.FieldValue;
+  return {
+    doc: p => fs.doc(p),
+    collection: c => fs.collection(c),
+    async checkPin(v) {
+      const s = await fs.doc('settings/app').get();
+      const pin = s.exists ? String(s.data().pin || '') : '';
+      return pin ? v === pin : '暗証番号がまだ設定されていません';
+    },
+    async moveItem(id) {
+      const i = S.items.findIndex(x => x.id === id);
+      const p = S.items[i - 1], n = S.items[i + 1];
+      const a = p ? Number(p.createdAt) || 0 : null, b = n ? Number(n.createdAt) || 0 : null;
+      const v = a === null ? b - 1000 : b === null ? a + 1000 : (a + b) / 2;
+      await fs.doc('items/' + id).update({ createdAt: v });
+    },
+    scanPhoto: (mode, store, b64, mime) => gas({ action: 'scanPhoto', mode, store, b64, mime, items: S.items.map(it => ({ id: it.id, name: it.name, unit: it.unit })) }),
+    scanBarcodes: (b64, mime) => gas({ action: 'scanBarcodes', b64, mime, items: S.items.map(it => ({ id: it.id, name: it.name, jan: it.jan || '' })) }),
+    async applyScan(store, mode, lines) {
+      const batch = fs.batch();
+      for (const l of lines || []) {
+        if (!l.id) continue;
+        if (l.jan) {
+          const it = S.items.find(x => x.id === l.id);
+          const cur = String((it && it.jan) || '').split(',').map(x => x.trim()).filter(Boolean);
+          String(l.jan).split(',').forEach(j => { if (j && !cur.some(c => janKey(c) === janKey(j))) cur.push(j); });
+          batch.update(fs.doc('items/' + l.id), { jan: cur.join(',') });
+        }
+        if (mode === 'link') continue;
+        const key = store + '_' + l.id, q = Math.max(0, Math.round(Number(l.qty) || 0));
+        if (mode === 'count') { batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: q, at: Date.now() }); S.stock[key] = q; }
+        else if (q) { batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: FV.increment(q), at: Date.now() }, { merge: true }); S.stock[key] = (S.stock[key] || 0) + q; }
+      }
+      await batch.commit();
+    },
+  };
+}
+let started = false;
+function listen(fs) {
+  if (started) return; started = true;
+  slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
+  fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
+  fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
+  fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
+  fs.collection('stock').onSnapshot(s => {
+    const next = {};
+    s.docs.forEach(d => { next[d.id] = num(d.data().qty); });
+    for (const [k, p] of pending) if (p.timer) next[k] = S.stock[k];
+    S.stock = next; arrive('stock', s.metadata.fromCache);
+  }, onErr);
+}
+function start() {
+  shell();
+  if (!FIREBASE) { S.failed = '設定ファイル（config.js）がまだありません。'; render(); return; }
+  firebase.initializeApp(FIREBASE);
+  const fs = firebase.firestore();
+  try { fs.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+  S.db = makeApi(fs);
+  firebase.auth().onAuthStateChanged(u => {
+    if (u) { S.login = false; listen(fs); render(); }
+    else { S.login = true; render(); }
+  });
+}
+start();
+</script>
