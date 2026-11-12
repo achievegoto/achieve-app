@@ -117,6 +117,8 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 .badge { position: absolute; top: 6px; margin-left: 4px; background: var(--bad); color: #fff; font-size: 10px; border-radius: 99px; padding: 0 6px; font-weight: 700; }
 #toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
 .login { max-width: 420px; margin: 24px auto; }
+.tile.off { background: var(--bg); border-style: dashed; color: var(--muted); }
+.tile.off .btn { align-self: flex-start; }
 .row-act { display: flex; gap: 6px; }
 .who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
 
@@ -238,8 +240,11 @@ const itemOf = id => S.items.find(i => i.id === id);
 const activeStaff = () => S.staff.filter(s => !s.hidden);
 function yearNow(st) { if (!st || !st.start) return 0; return Math.floor((Date.now() - new Date(st.start).getTime()) / (365.25 * 864e5)) + 1; }
 const isLate = (st, it, p) => p.state !== 'passed' && yearNow(st) > 0 && yearNow(st) > yNum(it.yearLabel || it.year);
+const OPT = ['KITSUKE'];
+const optOn = (sid, cat) => !OPT.includes(cat) || !!(staffOf(sid) || {}).kitsuke;
+const itemsFor = sid => S.items.filter(i => optOn(sid, i.cat));
 function tally(sid, cat) {
-  const list = S.items.filter(i => !cat || i.cat === cat);
+  const list = itemsFor(sid).filter(i => !cat || i.cat === cat);
   const t = { total: list.length, passed: 0, requested: 0, going: 0 };
   list.forEach(i => { const s = pOf(sid, i.id).state; if (s === 'passed') t.passed++; else if (s === 'requested') t.requested++; else if (s !== 'none') t.going++; });
   return t;
@@ -326,7 +331,7 @@ function ring(pct) {
   return `<svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" class="ring-bg"/><circle cx="40" cy="40" r="${r}" class="ring-fg" stroke-dasharray="${d.toFixed(1)} ${c.toFixed(1)}"/></svg>`;
 }
 function nextUp(sid) {
-  return S.items.filter(i => pOf(sid, i.id).state !== 'passed').sort((a, b) => {
+  return itemsFor(sid).filter(i => pOf(sid, i.id).state !== 'passed').sort((a, b) => {
     const rank = x => ({ requested: 3, redo: 0, lectured: 1, none: 2 }[pOf(sid, x.id).state] ?? 2);
     return yNum(a.yearLabel || a.year) - yNum(b.yearLabel || b.year) || rank(a) - rank(b) || (a.order || 0) - (b.order || 0);
   }).slice(0, 3);
@@ -350,7 +355,9 @@ function progressCard(sid) {
 }
 function catGrid(sid) {
   const cats = CATS.filter(c => S.items.some(i => i.cat === c));
-  return `<div class="tiles">${cats.map(c => { const t = tally(sid, c); const done = t.passed === t.total;
+  const st = staffOf(sid), canT = S.teacher || S.me === sid;
+  return `<div class="tiles">${cats.map(c => { if (!optOn(sid, c)) return `<div class="tile off"><span class="tile-top"><span class="tile-h">${esc(CAT_SHORT[c] || c)}</span><span class="tile-n">選択制</span></span>${canT ? `<button type="button" class="btn small" data-act="optIn" data-id="${sid}">取り組む</button>` : '<span class="sub">取り組んでいません</span>'}</div>`;
+    const t = tally(sid, c); const done = t.passed === t.total;
     return `<button type="button" class="tile${done ? ' done' : ''}" data-act="cat" data-id="${esc(c)}" aria-pressed="${S.cat === c}">
       <span class="tile-top"><span class="tile-h">${esc(CAT_SHORT[c] || c)}</span><span class="tile-n"><b>${t.passed}</b>/${t.total}</span></span>${bar(t)}</button>`; }).join('')}</div>`;
 }
@@ -361,10 +368,11 @@ function itemList(sid) {
   const sfOk = p => !S.sf || (S.sf === 'open' ? p.state !== 'passed' : p.state === S.sf);
   const filt = `<div class="seg2">${SF.map(([id, l]) => `<button type="button" data-act="sf" data-id="${id}" aria-pressed="${(S.sf || '') === id}">${l}</button>`).join('')}</div>`;
   const groups = (S.cat ? [S.cat] : cats).map(c => {
+    if (!optOn(sid, c)) return '';
     const arr = S.items.filter(i => i.cat === c && sfOk(pOf(sid, i.id)));
     if (!arr.length) return '';
     const t = tally(sid, c);
-    return `<div class="group"><h2><span>${esc(c)}</span><span>${t.passed} / ${t.total} 合格</span></h2><div class="list">${arr.map(it => {
+    return `<div class="group"><h2><span>${esc(c)}${OPT.includes(c) && (S.teacher || S.me === sid) ? ` <button type="button" class="btn small" data-act="optOut" data-id="${sid}" style="padding:2px 8px;font-size:11px">やめる</button>` : ''}</span><span>${t.passed} / ${t.total} 合格</span></h2><div class="list">${arr.map(it => {
       const p = pOf(sid, it.id), n = (p.practice || []).length;
       return `<button type="button" class="row item s-${p.state}" id="it-${it.id}" data-act="open" data-sid="${sid}" data-id="${it.id}">
         <span class="ico i-${p.state}" aria-hidden="true">${p.state === 'passed' ? '✓' : p.state === 'requested' ? '!' : ''}</span>
@@ -402,7 +410,7 @@ function matrixCard(clickable) {
   const rows = STORES.map(([sid, l]) => [l, activeStaff().filter(s => s.store === sid)]).concat([['店舗未設定', activeStaff().filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
   return `<section class="card"><h3>全員の進み具合</h3><div class="tbl-wrap"><table class="mx">
     <thead><tr><th>名前</th><th>合計</th>${cats.map(c => `<th>${esc(short(c))}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)} ${rankTag(s.id)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
+    <tbody>${rows.map(([l, arr]) => (l ? `<tr><td colspan="${cats.length + 2}" style="color:var(--muted);font-size:11px;padding-top:12px">${esc(l)}</td></tr>` : '') + arr.map(s => { const a = tally(s.id); return `<tr class="${clickable ? 'click' : ''}" ${clickable ? `data-act="viewStaff" data-id="${s.id}"` : ''}><td>${esc(s.name)} ${rankTag(s.id)}${tally(s.id).requested ? ' <span class="pill p-requested">申請</span>' : ''}</td><td class="cell">${Math.round(a.passed / (a.total || 1) * 100)}%</td>${cats.map(c => { if (!optOn(s.id, c)) return '<td class="cell h0">—</td>'; const t = tally(s.id, c); const r = t.passed / (t.total || 1); return `<td class="cell ${t.passed === t.total ? 'full' : r === 0 ? 'h0' : r < .34 ? 'h1' : r < .67 ? 'h2' : 'h3'}">${t.passed}/${t.total}</td>`; }).join('')}</tr>`; }).join('')).join('')}</tbody>
   </table></div>${clickable ? '<div class="sub">名前を押すと、その人の項目を開けます。</div>' : ''}</section>`;
 }
 function allView() {
@@ -571,6 +579,7 @@ document.addEventListener('click', async ev => {
     case 'pracMinusT': { const p = pOf(o.sid, o.iid); await upd(o.sid, o.iid, { practice: (p.practice || []).slice(0, -1) }, '練習を1回取り消し'); break; }
     case 'lecture': if (!(S.teacher && S.tab !== 'me')) { const p = pOf(o.sid, o.iid); await upd(o.sid, o.iid, { pend: (p.pend || []).concat({ id: Math.random().toString(36).slice(2, 9), k: 'lecture', t: Date.now() }) }, 'レクチャー受講を申請'); toast('申請しました（講師の承認で記録されます）'); break; }
       await upd(o.sid, o.iid, { lectureAt: Date.now(), state: pOf(o.sid, o.iid).state === 'none' ? 'lectured' : pOf(o.sid, o.iid).state }, 'レクチャー'); toast('レクチャー日を記録しました'); break;
+    case 'optIn': case 'optOut': { const on = a === 'optIn'; await db.doc('cur_staff/' + id).update({ kitsuke: on }); toast(on ? '着付けを追加しました' : '着付けを外しました'); break; }
     case 'okPend': case 'ngPend': await decide(el.dataset.sid, el.dataset.iid, id, a === 'okPend'); break;
     case 'okAll': { const all = pendings(); for (const x of all) await decide(x.st.id, x.it.id, x.e.id, true); toast(all.length + '件を承認しました'); break; }
     case 'request': await upd(o.sid, o.iid, { state: 'requested', requestedAt: Date.now(), staffNote: noteVal('note-staff') }, 'チェック申請'); toast('講師に申請しました'); break;
