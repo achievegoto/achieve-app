@@ -283,6 +283,8 @@ details[open] > summary .sub { display: none; }
 table.mlist { margin-top: 8px; font-size: 13px; } table.mlist th small { color: var(--muted); font-size: 10px; margin-left: 2px; }
 table.mlist thead th { position: static; } table.mlist tr.here th, table.mlist tr.here td { background: var(--accent-soft); }
 table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
+.lv-free { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; font-size: 12px; color: rgba(255,255,255,.85); } .lv-free b { font-family: var(--font-num); font-size: 18px; font-weight: 500; color: #fff; } .hero .dt.up { color: #b9f3d6; } .hero .dt.dn { color: #ffc4bd; }
+@media (min-width: 641px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 </style>
 </head>
 <body>
@@ -301,11 +303,11 @@ table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
 <script>
 const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
 const M = [
-  ['tech', '技術売上', 'yen', 'sum'], ['retail', '店販売上', 'yen', 'sum'], ['cust', '客数', 'n', 'sum'], ['unit', '客単価', 'yen', 'calc'],
+  ['tech', '指名技術売上', 'yen', 'sum'], ['free', 'フリー技術売上', 'yen', 'sum'], ['retail', '店販売上', 'yen', 'sum'], ['cust', '客数', 'n', 'sum'], ['unit', '客単価', 'yen', 'calc'],
   ['buyers', '購入者', 'n', 'sum'], ['repeat', 'リピート率', 'pct', 'avg'], ['next', '次予率', 'pct', 'avg'], ['newc', '新規入客', 'n', 'sum'],
   ['over', '時間超過人数', 'n', 'sum', 'noyoy'], ['overRate', '時間超過率', 'pct', 'avg', 'noyoy'],
 ];
-const TG = [['tech', '技術売上'], ['retail', '店販売上'], ['cust', '客数'], ['newc', '新規入客'], ['next', '次予率']];
+const TG = [['tech', '指名技術売上'], ['free', 'フリー技術売上'], ['retail', '店販売上'], ['cust', '客数'], ['newc', '新規入客'], ['next', '次予率']];
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = n => String(n).padStart(2, '0');
@@ -324,7 +326,7 @@ const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}
 const D = (pid, ym) => S.data[pid + '_' + ym] || null;
 function val(d, k) {
   if (!d) return null;
-  if (k === 'unit') return d.unit != null ? d.unit : d.tech != null && d.cust ? d.tech / d.cust : null;
+  if (k === 'unit') return d.unit != null ? d.unit : d.tech != null && d.cust ? (d.tech + (d.free || 0)) / d.cust : null;
   return d[k] ?? null;
 }
 const T = (pid, ym) => S.targets[pid + '_' + ym] || {};
@@ -380,18 +382,18 @@ function monthView() {
   const people = active().filter(p => D(p.id, ym) || D(p.id, py) || Object.keys(T(p.id, ym)).length);
   const tot = k => people.reduce((a, p) => a + (val(D(p.id, ym), k) || 0), 0), totP = k => people.reduce((a, p) => a + (val(D(p.id, py), k) || 0), 0) * pc.ratio;
   const tTot = people.reduce((a, p) => a + (Number(T(p.id, ym).tech) || 0), 0);
-  const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の技術売上（全員）</div><div class="lv-big">¥${fmt(tot('tech'), 'yen')}</div></div>
+  const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の指名技術売上（全員）</div><div class="lv-big">¥${fmt(tot('tech'), 'yen')}</div>${tot('free') ? `<div class="lv-free"><span>フリー技術売上</span><b>¥${fmt(tot('free'), 'yen')}</b>${totP('free') ? diffTag(tot('free'), totP('free'), 'free') : ''}</div>` : ''}</div>
       <div class="lv-side"><span>前年同月${pc.ratio < 1 ? '（同じ日数分）' : ''} ¥${fmt(totP('tech'), 'yen')}</span><span>昨対 <b>${yoy(tot('tech'), totP('tech')) == null ? '—' : yoy(tot('tech'), totP('tech')).toFixed(1) + '%'}</b></span>${tTot ? `<span>目標達成 <b>${(tot('tech') / tTot * 100).toFixed(0)}%</b></span>` : ''}</div></div>
       ${tTot ? `<div class="hbar"><i style="width:${Math.min(100, tot('tech') / tTot * 100)}%"></i></div>` : ''}
       <div class="sub">${pc.label ? pc.label + 'のデータです。売上・客数の昨対は、前年同月を同じ日数分に換算して比べています。' : (S.meta[ym] && S.meta[ym].asOf ? '月末までのデータです。' : '')}${S.meta[ym] && S.meta[ym].src ? ' 取り込み元：' + esc(S.meta[ym].src) : ''}</div></section>`;
   if (!people.length) return mnav('ym') + head + '<div class="empty">この月のデータはまだありません。</div>';
   const cards = byStore(people).map(([l, arr]) => `<div class="group"><h2>${esc(l)}</h2>${arr.map(p => {
     const d = D(p.id, ym) || {}, q = D(p.id, py) || {}, t = T(p.id, ym);
-    const k = (key, label, type) => { const c = val(d, key), pv0 = val(q, key), pv = pv0 != null && ['tech', 'retail', 'cust', 'newc', 'buyers'].includes(key) ? pv0 * pc.ratio : pv0, y = yoy(c, pv), tg = Number(t[key]) || 0;
+    const k = (key, label, type) => { const c = val(d, key), pv0 = val(q, key), pv = pv0 != null && ['tech', 'free', 'retail', 'cust', 'newc', 'buyers'].includes(key) ? pv0 * pc.ratio : pv0, y = yoy(c, pv), tg = Number(t[key]) || 0;
       return `<div class="kpi"><span class="kl">${label}</span><b>${fmt(c, type) || '—'}${type === 'pct' && c != null ? '<small>%</small>' : ''}</b>
         <span class="ks">${y == null ? '' : `<span class="${y < 0 ? 'neg' : 'pos'}">昨対 ${y.toFixed(0)}%</span>`}${tg ? ` 目標 ${fmt(tg, type)}${type === 'pct' ? '%' : ''}` : ''}</span>${key !== 'next' && tg ? progBar(c || 0, tg, pc.ratio) : ''}</div>`; };
     return `<button type="button" class="card pcard" data-act="openP" data-id="${p.id}"><div class="card-head"><h3>${esc(p.name)}</h3><span class="sub">${t.tech ? `達成 ${((val(d, 'tech') || 0) / t.tech * 100).toFixed(0)}%` : ''}</span></div>
-      <div class="kpis">${k('tech', '技術売上', 'yen')}${k('retail', '店販売上', 'yen')}${k('cust', '客数', 'n')}${k('unit', '客単価', 'yen')}${k('next', '次予率', 'pct')}${k('newc', '新規', 'n')}</div></button>`;
+      <div class="kpis">${k('tech', '指名技術', 'yen')}${k('free', 'フリー技術', 'yen')}${k('retail', '店販売上', 'yen')}${k('cust', '客数', 'n')}${k('unit', '客単価', 'yen')}${k('next', '次予率', 'pct')}${k('newc', '新規', 'n')}</div></button>`;
   }).join('')}</div>`).join('');
   return mnav('ym') + head + cards + (WHO.isAdmin() ? `<div class="sub">数字の取り込みは、Claudeに「月報を更新して」と頼んでください（サロンアンサーから取得します）。</div>` : '');
 }
@@ -435,13 +437,14 @@ function personView() {
   const cum = (yr, k) => { let s = 0, n = 0; for (let m = 1; m <= mo; m++) { const v = val(D(p.id, `${yr}-${pad(m)}`), k); if (v != null) { s += v; n++; } } return n ? s : null; };
   const ct = cum(y, 'tech'), pt = cum(y - 1, 'tech');
   const tech = val(d, 'tech'), techP = q && q.tech != null ? q.tech * pc.ratio : null;
-  const hero = `<section class="hero"><div class="hero-top"><div style="min-width:0"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の技術売上</div>
-      <div class="lv-big">${tech == null ? '—' : '¥' + fmt(tech, 'yen')}</div></div>
+  const hero = `<section class="hero"><div class="hero-top"><div style="min-width:0"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の指名技術売上</div>
+      <div class="lv-big">${tech == null ? '—' : '¥' + fmt(tech, 'yen')}</div>
+      <div class="lv-free"><span>フリー技術売上</span><b>${val(d, 'free') == null ? '—' : '¥' + fmt(val(d, 'free'), 'yen')}</b>${q && q.free != null && val(d, 'free') != null ? diffTag(val(d, 'free'), q.free * pc.ratio, 'free') : ''}</div></div>
       <div class="lv-side">${techP != null ? `<span>前年同月 ¥${fmt(techP, 'yen')}</span><span>昨対 <b>${tech == null ? '—' : (yoy(tech, techP) >= 0 ? '+' : '') + yoy(tech, techP).toFixed(1) + '%'}</b></span>` : '<span>前年同月のデータなし</span>'}${t.tech ? `<span>目標 ¥${fmt(t.tech, 'yen')}・達成 <b>${((tech || 0) / t.tech * 100).toFixed(0)}%</b></span>` : ''}</div></div>
       ${t.tech ? `<div class="hbar"><i style="width:${Math.min(100, (tech || 0) / t.tech * 100)}%"></i></div>` : ''}
       ${ct != null ? `<div class="sub">${y}年1〜${mo}月の累計 ¥${fmt(ct, 'yen')}${pt ? `（前年同期 ¥${fmt(pt, 'yen')}・${(yoy(ct, pt) >= 0 ? '+' : '') + yoy(ct, pt).toFixed(1)}%）` : ''}</div>` : ''}
       ${pc.label ? `<div class="sub">${pc.label}のデータ。前年は同じ日数分に換算しています。</div>` : ''}</section>`;
-  const tiles = M.filter(([k]) => k !== 'tech' && k !== 'over').map(([k, label, type, , noyoy]) => {
+  const tiles = M.filter(([k]) => k !== 'tech' && k !== 'free' && k !== 'over').map(([k, label, type, , noyoy]) => {
     const c = val(d, k), pv0 = noyoy ? val(D(p.id, shiftYm(ym, -1)), k) : val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' && !noyoy ? pv0 * pc.ratio : pv0, tg = Number(t[k]) || 0;
     return `<button type="button" class="tile${S.metric === k ? ' on' : ''}" data-act="metric" data-id="${k}"><span class="kl">${label}</span>
       <b>${c == null ? '—' : (type === 'yen' ? '¥' : '') + fmt(c, type)}${type === 'pct' && c != null ? '<small>%</small>' : ''}</b>
@@ -452,12 +455,12 @@ function personView() {
   const list = last12(ym).reverse().map(m => { const a = D(p.id, m), b = D(p.id, shiftYm(m, -12)); if (!a) return '';
     const c = (k, type) => `<td class="c">${val(a, k) == null ? '' : fmt(val(a, k), type)}</td>`;
     const yv = yoy(val(a, 'tech'), val(b, 'tech'));
-    return `<tr${m === ym ? ' class="here"' : ''}><th>${Number(m.slice(5))}月${m.slice(0, 4) !== y ? `<small>${m.slice(2, 4)}</small>` : ''}</th>${c('tech', 'yen')}<td class="c ${yv == null ? '' : yv < 0 ? 'neg' : 'pos'}">${yv == null ? '—' : (yv >= 0 ? '+' : '') + yv.toFixed(0) + '%'}</td>${c('cust', 'n')}${c('unit', 'yen')}${c('next', 'pct')}${c('newc', 'n')}</tr>`; }).join('');
+    return `<tr${m === ym ? ' class="here"' : ''}><th>${Number(m.slice(5))}月${m.slice(0, 4) !== y ? `<small>${m.slice(2, 4)}</small>` : ''}</th>${c('tech', 'yen')}<td class="c ${yv == null ? '' : yv < 0 ? 'neg' : 'pos'}">${yv == null ? '—' : (yv >= 0 ? '+' : '') + yv.toFixed(0) + '%'}</td>${c('free', 'yen')}${c('cust', 'n')}${c('unit', 'yen')}${c('next', 'pct')}${c('newc', 'n')}</tr>`; }).join('');
   return `<div class="ptop">${sel}${mnav('ym')}</div>${hero}
     <div class="tiles">${tiles}</div>
     <section class="card"><div class="card-head"><h3>${mk[1]}の推移</h3><span class="sub">直近12か月</span></div>${metricChips}${chart(p.id, ym, mk[0], mk[2])}</section>
     <section class="card"><details><summary class="card-head" style="cursor:pointer"><h3>月ごとの数字</h3><span class="sub">開く</span></summary>
-    <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>技術売上</th><th>昨対</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
+    <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>指名技術</th><th>昨対</th><th>フリー技術</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
 }
 function targetView() {
   if (!WHO.isAdmin()) return '<div class="empty">管理者・オーナーだけが使える画面です。</div>';
