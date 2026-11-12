@@ -259,6 +259,30 @@ table.rep tr.r-tg td { background: var(--accent-soft); }
 table.rep td.tot { font-weight: 700; }
 table.rep.tg td { padding: 4px; } table.rep.tg .tgin { width: 7.5em; padding: 6px 8px; text-align: right; }
 table.rep tr.grp td { color: var(--muted); font-size: 11px; padding-top: 12px; }
+.ptop { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.ptop .psel { width: auto; min-width: 0; flex: 1 1 120px; max-width: 260px; font-weight: 500; }
+.ptop .mnav { margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tile { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 3px; min-width: 0; color: var(--ink); font: inherit; cursor: pointer; }
+.tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.tile .kl { font-size: 11px; color: var(--muted); }
+.tile b { font-family: var(--font-num); font-size: 20px; font-weight: 500; line-height: 1.15; } .tile b small { font-size: 12px; margin-left: 1px; }
+.tile .ks { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--muted); align-items: baseline; }
+.dt { font-family: var(--font-num); font-weight: 600; } .dt.up { color: var(--good); } .dt.dn { color: var(--bad); }
+.spark { width: 100%; height: 22px; margin-top: 2px; } .spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; opacity: .8; }
+.chart { margin-top: 10px; overflow-x: auto; } .chart svg { width: 100%; min-width: 320px; max-width: 620px; margin: 0 auto; height: auto; display: block; }
+.chart .b-cur { fill: color-mix(in srgb, var(--accent) 60%, transparent); } .chart .b-cur.sel { fill: var(--accent); }
+.chart .b-prev { fill: color-mix(in srgb, var(--muted) 35%, transparent); }
+.chart .b-tg { stroke: var(--warn); stroke-width: 2; stroke-dasharray: 3 2; }
+.chart .axis { stroke: var(--line); } .chart text { font-size: 10px; fill: var(--muted); text-anchor: middle; font-family: var(--font-num); } .chart text.sel { fill: var(--ink); font-weight: 600; } .chart text.ymax { text-anchor: start; }
+.legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-top: 6px; } .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.lg-cur { background: var(--accent); } .lg-prev { background: color-mix(in srgb, var(--muted) 35%, transparent); } .lg-tg { background: var(--warn); height: 3px !important; vertical-align: 2px !important; }
+details > summary { list-style: none; } details > summary::-webkit-details-marker { display: none; }
+details[open] > summary .sub { display: none; }
+table.mlist { margin-top: 8px; font-size: 13px; } table.mlist th small { color: var(--muted); font-size: 10px; margin-left: 2px; }
+table.mlist thead th { position: static; } table.mlist tr.here th, table.mlist tr.here td { background: var(--accent-soft); }
+table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -294,7 +318,7 @@ const yoyCell = v => v == null ? '<td class="c h0">—</td>' : `<td class="c ${v
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
-const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, tab: 'month', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false };
+const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, tab: 'month', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
 
 /* ---- 計算 ---- */
 const D = (pid, ym) => S.data[pid + '_' + ym] || null;
@@ -371,26 +395,69 @@ function monthView() {
   }).join('')}</div>`).join('');
   return mnav('ym') + head + cards + (WHO.isAdmin() ? `<div class="sub">数字の取り込みは、Claudeに「月報を更新して」と頼んでください（サロンアンサーから取得します）。</div>` : '');
 }
+const RATE = k => k === 'repeat' || k === 'next' || k === 'overRate';
+const last12 = ym => Array.from({ length: 12 }, (_, i) => shiftYm(ym, i - 11));
+function diffTag(c, p, k) {
+  if (c == null || p == null) return '';
+  const inv = k === 'over' || k === 'overRate', cls = d => (d < 0) !== inv ? 'dn' : 'up';
+  if (RATE(k)) { const d = c - p; return `<span class="dt ${cls(d)}">${d < 0 ? '▼' : '▲'}${Math.abs(d).toFixed(1)}pt</span>`; }
+  const y = yoy(c, p); return y == null ? '' : `<span class="dt ${cls(y)}">${y < 0 ? '▼' : '▲'}${Math.abs(y).toFixed(0)}%</span>`;
+}
+function spark(pid, ym, k) {
+  const v = last12(ym).map(m => val(D(pid, m), k)), nums = v.filter(x => x != null);
+  if (nums.length < 2) return '';
+  const mx = Math.max(...nums), mn = Math.min(...nums), r = mx - mn || 1;
+  const pts = v.map((x, i) => x == null ? null : `${(i / 11 * 100).toFixed(1)},${(22 - (x - mn) / r * 20).toFixed(1)}`).filter(Boolean).join(' ');
+  return `<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+}
+function chart(pid, ym, k, type) {
+  const ms = last12(ym), cur = ms.map(m => val(D(pid, m), k)), prev = ms.map(m => val(D(pid, shiftYm(m, -12)), k)), tg = ms.map(m => Number(T(pid, m)[k]) || 0);
+  const mx = Math.max(1, ...cur.filter(x => x != null), ...prev.filter(x => x != null), ...tg) * 1.08;
+  const H = 150, top = 14, h = y => top + (H - top) * (1 - y / mx), W = 30;
+  const unit = v => type === 'pct' ? v.toFixed(1) + '%' : type === 'yen' ? '¥' + fmt(v, 'yen') : fmt(v, 'n');
+  const bars = ms.map((m, i) => { const x = i * W; let o = '';
+    if (prev[i] != null) o += `<rect class="b-prev" x="${x + 4}" y="${h(prev[i])}" width="9" height="${H - h(prev[i])}" rx="2"><title>${ymLabel(shiftYm(m, -12))} ${unit(prev[i])}</title></rect>`;
+    if (cur[i] != null) o += `<rect class="b-cur${i === 11 ? ' sel' : ''}" x="${x + 13}" y="${h(cur[i])}" width="13" height="${H - h(cur[i])}" rx="2"><title>${ymLabel(m)} ${unit(cur[i])}</title></rect>`;
+    if (tg[i]) o += `<line class="b-tg" x1="${x + 2}" x2="${x + 28}" y1="${h(tg[i])}" y2="${h(tg[i])}"/>`;
+    const mo = Number(m.slice(5)); o += `<text x="${x + 15}" y="${H + 14}" class="${i === 11 ? 'sel' : ''}">${mo === 1 ? m.slice(2, 4) + '/' : ''}${mo}</text>`; return o; }).join('');
+  return `<div class="chart"><svg viewBox="0 0 360 ${H + 20}" role="img" aria-label="${esc(M.find(x => x[0] === k)[1])}の12か月の推移">
+    <line class="axis" x1="0" x2="360" y1="${H}" y2="${H}"/><text class="ymax" x="0" y="10">${unit(mx / 1.08)}</text>${bars}</svg></div>
+    <div class="legend"><span><i class="lg-cur"></i>今年</span><span><i class="lg-prev"></i>前年同月</span>${tg.some(Boolean) ? '<span><i class="lg-tg"></i>目標</span>' : ''}</div>`;
+}
 function personView() {
   const p = S.people.find(x => x.id === S.pid) || active()[0];
   if (!p) return '<div class="empty">データがありません。</div>';
-  const y = S.year, chips = byStore(active()).map(([l, arr]) => `<div class="chips"><span class="sub" style="min-width:4.5em">${esc(l)}</span>${arr.map(x => `<button type="button" class="chip" data-act="pick" data-id="${x.id}" aria-pressed="${x.id === p.id}">${esc(x.name)}</button>`).join('')}</div>`).join('');
-  const mons = Array.from({ length: 12 }, (_, i) => i + 1);
-  const rows = M.map(([k, label, type, kind, noyoy]) => {
-    const cur = mons.map(m => val(D(p.id, `${y}-${pad(m)}`), k)), prev = mons.map(m => val(D(p.id, `${y - 1}-${pad(m)}`), k));
-    const ca = yearAgg(p.id, y, k, kind), pa = yearAgg(p.id, y - 1, k, kind);
-    const r = (lab, arr, a, cls) => `<tr class="${cls}"><th>${lab}</th>${arr.map(v => `<td class="c">${fmt(v, type)}</td>`).join('')}<td class="c tot">${fmt(a, type)}</td></tr>`;
-    if (noyoy) return r(label, cur, ca, 'r-cur');
-    return r(label + '（前年）', prev, pa, 'r-prev') + r(label + '（今年）', cur, ca, 'r-cur')
-      + `<tr class="r-yoy"><th>${label} 昨対（％）</th>${mons.map((m, i) => cur[i] == null ? '<td class="c"></td>' : yoyCell(yoy(cur[i], prev[i]))).join('')}${yoyCell(yoy(ca, pa))}</tr>`;
+  const ym = S.ym, py = shiftYm(ym, -12), d = D(p.id, ym), q = D(p.id, py), t = T(p.id, ym), pc = pace(ym);
+  const sel = `<select class="field psel" data-chg="pickSel" aria-label="スタッフを選ぶ">${byStore(active()).map(([l, arr]) => `<optgroup label="${esc(l)}">${arr.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  const storeL = (STORES.find(s => s[0] === p.store) || [, '店舗未設定'])[1];
+  // 年間累計（1月〜選んだ月）
+  const y = ym.slice(0, 4), mo = Number(ym.slice(5));
+  const cum = (yr, k) => { let s = 0, n = 0; for (let m = 1; m <= mo; m++) { const v = val(D(p.id, `${yr}-${pad(m)}`), k); if (v != null) { s += v; n++; } } return n ? s : null; };
+  const ct = cum(y, 'tech'), pt = cum(y - 1, 'tech');
+  const tech = val(d, 'tech'), techP = q && q.tech != null ? q.tech * pc.ratio : null;
+  const hero = `<section class="hero"><div class="hero-top"><div style="min-width:0"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の技術売上</div>
+      <div class="lv-big">${tech == null ? '—' : '¥' + fmt(tech, 'yen')}</div></div>
+      <div class="lv-side">${techP != null ? `<span>前年同月 ¥${fmt(techP, 'yen')}</span><span>昨対 <b>${tech == null ? '—' : (yoy(tech, techP) >= 0 ? '+' : '') + yoy(tech, techP).toFixed(1) + '%'}</b></span>` : '<span>前年同月のデータなし</span>'}${t.tech ? `<span>目標 ¥${fmt(t.tech, 'yen')}・達成 <b>${((tech || 0) / t.tech * 100).toFixed(0)}%</b></span>` : ''}</div></div>
+      ${t.tech ? `<div class="hbar"><i style="width:${Math.min(100, (tech || 0) / t.tech * 100)}%"></i></div>` : ''}
+      ${ct != null ? `<div class="sub">${y}年1〜${mo}月の累計 ¥${fmt(ct, 'yen')}${pt ? `（前年同期 ¥${fmt(pt, 'yen')}・${(yoy(ct, pt) >= 0 ? '+' : '') + yoy(ct, pt).toFixed(1)}%）` : ''}</div>` : ''}
+      ${pc.label ? `<div class="sub">${pc.label}のデータ。前年は同じ日数分に換算しています。</div>` : ''}</section>`;
+  const tiles = M.filter(([k]) => k !== 'tech' && k !== 'over').map(([k, label, type, , noyoy]) => {
+    const c = val(d, k), pv0 = noyoy ? val(D(p.id, shiftYm(ym, -1)), k) : val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' && !noyoy ? pv0 * pc.ratio : pv0, tg = Number(t[k]) || 0;
+    return `<button type="button" class="tile${S.metric === k ? ' on' : ''}" data-act="metric" data-id="${k}"><span class="kl">${label}</span>
+      <b>${c == null ? '—' : (type === 'yen' ? '¥' : '') + fmt(c, type)}${type === 'pct' && c != null ? '<small>%</small>' : ''}</b>
+      <span class="ks">${diffTag(c, pv, k)}<span>${pv0 == null ? '' : noyoy ? '前月比' : '昨対'}</span>${tg ? `<span>目標 ${fmt(tg, type)}${type === 'pct' ? '%' : ''}</span>` : ''}</span>${spark(p.id, ym, k)}</button>`;
   }).join('');
-  const tg = mons.map(m => Number(T(p.id, `${y}-${pad(m)}`).tech) || 0);
-  const tgRow = tg.some(Boolean) ? `<tr class="r-tg"><th>技術売上 目標</th>${tg.map(v => `<td class="c">${v ? fmt(v, 'yen') : ''}</td>`).join('')}<td class="c tot">${fmt(tg.reduce((a, b) => a + b, 0), 'yen')}</td></tr>
-    <tr class="r-yoy"><th>目標達成率（％）</th>${mons.map((m, i) => { const c = val(D(p.id, `${y}-${pad(m)}`), 'tech'); return tg[i] && c != null ? `<td class="c ${c >= tg[i] ? 'pos' : 'neg'}">${(c / tg[i] * 100).toFixed(1)}</td>` : '<td class="c"></td>'; }).join('')}<td class="c"></td></tr>` : '';
-  return `<section class="card">${chips}</section>${mnav('year')}
-    <section class="card"><div class="card-head"><h3>${esc(p.name)}</h3><span class="sub">${y}年 ・ 前年は${y - 1}年</span></div>
-    <div class="tbl-wrap"><table class="rep"><thead><tr><th>項目</th>${mons.map(m => `<th>${m}月</th>`).join('')}<th>年間累計/平均</th></tr></thead><tbody>${tgRow}${rows}</tbody></table></div>
-    <div class="sub">昨対の（ ）はマイナスです。客単価＝技術売上÷客数。年間の率は月の平均です。</div></section>`;
+  const mk = M.find(x => x[0] === S.metric) || M[0];
+  const metricChips = `<div class="chips">${M.map(([k, l]) => `<button type="button" class="chip" data-act="metric" data-id="${k}" aria-pressed="${k === mk[0]}">${l}</button>`).join('')}</div>`;
+  const list = last12(ym).reverse().map(m => { const a = D(p.id, m), b = D(p.id, shiftYm(m, -12)); if (!a) return '';
+    const c = (k, type) => `<td class="c">${val(a, k) == null ? '' : fmt(val(a, k), type)}</td>`;
+    const yv = yoy(val(a, 'tech'), val(b, 'tech'));
+    return `<tr${m === ym ? ' class="here"' : ''}><th>${Number(m.slice(5))}月${m.slice(0, 4) !== y ? `<small>${m.slice(2, 4)}</small>` : ''}</th>${c('tech', 'yen')}<td class="c ${yv == null ? '' : yv < 0 ? 'neg' : 'pos'}">${yv == null ? '—' : (yv >= 0 ? '+' : '') + yv.toFixed(0) + '%'}</td>${c('cust', 'n')}${c('unit', 'yen')}${c('next', 'pct')}${c('newc', 'n')}</tr>`; }).join('');
+  return `<div class="ptop">${sel}${mnav('ym')}</div>${hero}
+    <div class="tiles">${tiles}</div>
+    <section class="card"><div class="card-head"><h3>${mk[1]}の推移</h3><span class="sub">直近12か月</span></div>${metricChips}${chart(p.id, ym, mk[0], mk[2])}</section>
+    <section class="card"><details><summary class="card-head" style="cursor:pointer"><h3>月ごとの数字</h3><span class="sub">開く</span></summary>
+    <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>技術売上</th><th>昨対</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
 }
 function targetView() {
   if (!WHO.isAdmin()) return '<div class="empty">管理者・オーナーだけが使える画面です。</div>';
@@ -421,7 +488,8 @@ document.addEventListener('click', async ev => {
       case 'ym': S.ym = shiftYm(S.ym, Number(id)); render(); break;
       case 'year': S.year += Number(id); render(); break;
       case 'pick': S.pid = id; render(); break;
-      case 'openP': S.pid = id; S.tab = 'person'; S.year = Number(S.ym.slice(0, 4)); render(); window.scrollTo(0, 0); break;
+      case 'metric': S.metric = id; render(); break;
+      case 'openP': S.pid = id; S.tab = 'person'; render(); window.scrollTo(0, 0); break;
       case 'saveTg': {
         const b = db.batch(); const by = {};
         document.querySelectorAll('.tgin').forEach(i => { (by[i.dataset.pid] ||= {})[i.dataset.k] = i.value.replace(/[,，]/g, '').trim(); });
@@ -436,6 +504,7 @@ document.addEventListener('click', async ev => {
 document.addEventListener('change', async ev => {
   const el = ev.target, c = el.dataset.chg; if (!c) return;
   try {
+    if (c === 'pickSel') { S.pid = el.value; el.blur(); render(); return; }
     if (c === 'pstore') await db.doc('mr_people/' + el.dataset.id).update({ store: el.value });
     if (c === 'plink') await db.doc('mr_people/' + el.dataset.id).update({ personId: el.value });
   } catch (e) { toast(e.message); }
