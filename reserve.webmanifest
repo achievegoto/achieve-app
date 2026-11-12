@@ -1,1 +1,1 @@
-{"name":"achieve 予約","short_name":"予約","start_url":"reserve.html","scope":"./","display":"standalone","background_color":"#f4f4f7","theme_color":"#7a2e3b","icons":[{"src":"reserve-icon.png","sizes":"512x512","type":"image/png"}]}
+{"name":"achieve 予約","short_name":"予約","start_url":"reserve.html","scope":"./","display":"standalone","background_color":"#f4f4f7","theme_color":"#7a2e3b","icons":[{"src":"reserve-icon.png?v=2","sizes":"512x512","type":"image/png"}]}
