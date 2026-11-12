@@ -156,10 +156,13 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 #live .live-close { position: absolute; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); }
 body.is-live { padding-top: 36vh; }
 .login { max-width: 420px; margin: 24px auto; display: grid; gap: 12px; }
+.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.who { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+.who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
 </style>
 
 <header><div class="wrap head">
-  <div class="brand">achieve Group <small>在庫・発注</small></div>
+  <div class="brand-row"><div class="brand">achieve Group <small>在庫・発注</small></div><button type="button" class="who" id="who" data-act="whoSwitch" hidden></button></div>
   <div class="seg" id="stores" role="group" aria-label="店舗"></div>
 </div></header>
 <main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
@@ -170,6 +173,7 @@ body.is-live { padding-top: 36vh; }
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
+<script src="who.js?v=1"></script>
 <script>
 const STORES = [
   { id: 'hair', short: 'hair design', full: 'achieve hair design' },
@@ -289,8 +293,9 @@ const BIG = [['SP・TR類', ['Aujua SP', 'Aujua TR', 'サッシェSP', 'サッ�
 let lockT;
 let pinT = 0;
 function armPin() { clearTimeout(pinT); if (S.pin) pinT = setTimeout(() => { S.pin = ''; S.editing = null; if (S.tab === 'items') scheduleRender(); }, 600000); }
-const canEdit = () => !S.readOnly && !!S.pin;
-const pinBar = () => S.readOnly ? '' : S.pin
+const canEdit = () => !S.readOnly && WHO.isAdmin();
+const pinBar = () => S.readOnly ? '' : WHO.isAdmin() ? '<div class="pinbar open"><span style="flex:1;min-width:0"><b>管理者として商品を編集できます</b></span></div>' : '<div class="pinbar"><span style="flex:1;min-width:0"><b>商品の編集は管理者だけです</b></span></div>';
+const pinBarOld = () => S.readOnly ? '' : S.pin
   ? `<div class="pinbar open"><span style="flex:1;min-width:0"><b>商品を編集できます</b><br>10分操作がないと自動でロックします</span><button type="button" class="btn small" id="pin-lock" data-act="pinLock">ロックする</button></div>`
   : `<form class="pinbar" id="pin-form" novalidate><span style="flex:1 1 12em;min-width:0"><b>商品の編集はロック中</b><br>編集する人は暗証番号を入れてください</span><input class="field" id="pin-in" type="password" inputmode="numeric" autocomplete="off" placeholder="暗証番号" aria-label="暗証番号"><button type="submit" class="btn small primary" id="pin-go">解除</button>${S.pinErr ? `<span class="err" style="flex-basis:100%">${esc(S.pinErr)}</span>` : ''}</form>`;
 async function tryPin() {
@@ -321,6 +326,7 @@ function render() {
   shell();
   const m = $('main');
   if (S.login) { m.innerHTML = loginView(); return; }
+  { const wg = WHO.gate(); if (wg) { $('who').hidden = true; m.innerHTML = wg; return; } $('who').hidden = false; $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>'; }
   if (S.needImport) { m.innerHTML = importView(); return; }
   if (S.failed) { m.innerHTML = `<div class="empty">${esc(S.failed)}</div>`; return; }
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
@@ -951,6 +957,8 @@ async function clearSamples() {
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const { act, id, did } = b.dataset;
+  if (act === 'whoSwitch') { WHO.handle('whoOut', b); window.scrollTo(0, 0); return; }
+  if (await WHO.handle(act, b)) return;
   switch (act) {
     case 'store': S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
@@ -1263,6 +1271,7 @@ function makeApi(fs) {
 let started = false;
 function listen(fs) {
   if (started) return; started = true;
+  WHO.init(fs, scheduleRender);
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
