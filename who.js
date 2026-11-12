@@ -2,7 +2,7 @@
    名簿は att_staff。各人に role（staff / admin / owner）と pinHash を持たせる。
    端末ごとに「名前＋個人PIN」で本人確認し、localStorage に覚える。 */
 (function () {
-  const STORES_W = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till']];
+  const STORES_W = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
   const KEY = 'achieve.who';
   const ROLE = { staff: 'スタッフ', admin: '管理者', owner: 'オーナー' };
   const e = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
