@@ -353,7 +353,7 @@ function reqRow(r, admin) {
 function recList(list, withName, admin) {
   if (!list.length) return '<div class="empty" style="padding:14px">記録はありません</div>';
   return `<div class="list">${list.slice().sort((a, b) => a.date < b.date ? 1 : -1).map(r => `<div class="row"><div><div class="name">${md(r.date)} <span class="tp t-${r.type}">${TYPES[r.type]}</span>${withName ? ' ' + esc((staffOf(r.staffId) || {}).name || '') : ''}</div>
-    ${r.note || r.min ? `<div class="sub">${r.min ? `<span>${r.min}分</span>` : ''}${r.note ? `<span>${esc(r.note)}</span>` : ''}</div>` : ''}</div>
+    ${r.note || r.time || r.min ? `<div class="sub">${r.time ? `<span>${r.time} ${r.type === 'late' ? '出勤' : '退勤'}</span>` : ''}${r.min ? `<span>${r.min}分</span>` : ''}${r.note ? `<span>${esc(r.note)}</span>` : ''}</div>` : ''}</div>
     ${admin ? `<button type="button" class="btn small danger" data-act="delRec" data-id="${r.id}" aria-label="削除">削除</button>` : ''}</div>`).join('')}</div>`;
 }
 function monthNav() {
@@ -395,7 +395,7 @@ function adminView() {
       <div class="grid2"><label class="lbl">スタッフ<select class="field" id="rc-staff">${opts}</select></label>
       <label class="lbl">日付<input class="field" id="rc-date" type="date" value="${today()}"></label></div>
       <div class="seg3" role="radiogroup" aria-label="種類">${Object.entries(TYPES).map(([k, v], i) => `<label><input type="radio" name="rc-type" value="${k}" ${i === 1 ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div>
-      <div class="grid2"><label class="lbl">遅刻・早退の分数（任意）<input class="field" id="rc-min" type="number" inputmode="numeric" min="0" placeholder="例：15"></label>
+      <div class="grid2"><label class="lbl" id="rc-time-w"><span id="rc-time-l">出勤した時刻（必須）</span><input class="field" id="rc-time" type="time" step="300"></label>
       <label class="lbl">メモ（任意）<input class="field" id="rc-note" placeholder="例：電車遅延"></label></div>
       <button type="button" class="btn primary" data-act="addRec">記録する</button></section>
     ${summaryCard()}${leaveTable()}${staffAdmin()}
@@ -465,8 +465,10 @@ document.addEventListener('click', async ev => {
       case 'addRec': {
         const staffId = $('rc-staff').value, date = $('rc-date').value, type = radio('rc-type');
         if (!staffId || !date || !type) { toast('スタッフ・日付・種類を選んでください'); break; }
-        const min = parseInt($('rc-min').value, 10);
-        await db.collection('att_rec').doc().set({ staffId, date, type, min: isNaN(min) ? null : min, note: $('rc-note').value.trim(), at: Date.now() });
+        const time = $('rc-time').value;
+        if ((type === 'late' || type === 'early') && !time) { toast(type === 'late' ? '出勤した時刻を選んでください' : '退勤した時刻を選んでください'); $('rc-time').focus(); break; }
+        await db.collection('att_rec').doc().set({ staffId, date, type, time: type === 'late' || type === 'early' ? time : null, note: $('rc-note').value.trim(), at: Date.now() });
+        $('rc-time').value = ''; $('rc-note').value = '';
         toast(`${(staffOf(staffId) || {}).name} ${md(date)} ${TYPES[type]}を記録しました`); break;
       }
       case 'delRec': {
@@ -495,6 +497,9 @@ document.addEventListener('click', async ev => {
       }
     }
   } catch (e) { toast('保存できませんでした：' + e.message); el.disabled = false; }
+});
+document.addEventListener('change', ev => {
+  if (ev.target.name === 'rc-type') { const t = ev.target.value, w = $('rc-time-w'); if (!w) return; w.style.visibility = t === 'late' || t === 'early' ? 'visible' : 'hidden'; $('rc-time-l').textContent = t === 'early' ? '退勤した時刻（必須）' : '出勤した時刻（必須）'; }
 });
 document.addEventListener('input', ev => {
   if (ev.target.id === 'rq-date') { const d = ev.target.value, w = $('rq-warn'); if (!w) return; const n = d ? daysUntil(d) : 99; w.innerHTML = d && n < 30 ? `<div class="note">${n}日前の申請です。原則1か月前までなので、申請したら管理者に一言伝えてください。</div>` : ''; }
