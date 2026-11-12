@@ -407,6 +407,10 @@ function summaryCard() {
     <details><summary class="sub" style="cursor:pointer">この月の記録を全部見る（${monthRecs(S.month).length}件）</summary><div style="margin-top:8px">${recList(monthRecs(S.month), true, true)}</div></details></section>`;
 }
 function leaveTable() {
+  if (!S.owner) return `<section class="card"><h3>有給の状況</h3>
+    <div class="sub">${S.ownerPin ? 'オーナー専用です。オーナーPINを入れてください。' : 'オーナー専用にするPINがまだありません。後藤さんだけが知っているPIN（4桁以上）を決めて入れてください。'}</div>
+    <div class="grid2"><input class="field" id="o-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="${S.ownerPin ? 'オーナーPIN' : '新しいオーナーPIN'}" aria-label="オーナーPIN">
+    <button type="button" class="btn primary" data-act="${S.ownerPin ? 'ownerIn' : 'ownerSet'}">${S.ownerPin ? '開く' : 'このPINに決める'}</button></div><div class="err" id="o-err"></div></section>`;
   return `<section class="card"><h3>有給の状況</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>付与</th><th>使用</th><th>リセット日</th></tr></thead>
     <tbody>${byStore(active()).map(([gl, arr]) => grpRow(gl, 4) + arr.map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
       return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')).join('')}</tbody></table></div>
@@ -437,13 +441,15 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act, id = el.dataset.id;
   try {
     switch (a) {
-      case 'tab': S.tab = id; render(); window.scrollTo(0, 0); break;
+      case 'tab': S.tab = id; S.owner = false; render(); window.scrollTo(0, 0); break;
       case 'pickMe': S.pickingMe = true; S.tab = 'me'; render(); break;
       case 'cancelPick': S.pickingMe = false; render(); break;
       case 'setMe': S.me = id; S.pickingMe = false; lsSet('att.me', id); render(); window.scrollTo(0, 0); break;
       case 'month': S.month = shiftMonth(S.month, Number(id)); render(); break;
-      case 'unlock': if (await checkPin($('a-pin').value)) { S.admin = true; render(); } else $('a-err').textContent = 'PINが違います'; break;
-      case 'lock': S.admin = false; render(); break;
+      case 'unlock': if (await checkPin($('a-pin').value)) { S.admin = true; try { const o = await db.doc('settings/owner').get(); S.ownerPin = o.exists ? String(o.data().pin || '') : ''; } catch (e) { S.ownerPin = ''; } render(); } else $('a-err').textContent = 'PINが違います'; break;
+      case 'lock': S.admin = false; S.owner = false; render(); break;
+      case 'ownerIn': if (String($('o-pin').value).trim() === S.ownerPin) { S.owner = true; render(); } else $('o-err').textContent = 'PINが違います'; break;
+      case 'ownerSet': { const v = String($('o-pin').value).trim(); if (v.length < 4) { $('o-err').textContent = '4桁以上にしてください'; break; } await db.doc('settings/owner').set({ pin: v }); S.ownerPin = v; S.owner = true; toast('オーナーPINを設定しました'); render(); break; }
       case 'request': {
         const date = $('rq-date').value, kind = $('rq-kind').value;
         if (!date) { toast('日付を選んでください'); break; }
