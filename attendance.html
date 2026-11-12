@@ -319,14 +319,12 @@ function leaveCard(st) {
   if (!l) return `<section class="hero"><div class="hero-name">${esc(st.name)}</div><div class="sub">入社日が未設定のため、有給日数を計算できません。管理者に入社日の登録を頼んでください。</div></section>`;
   if (l.before) return `<section class="hero"><div class="hero-name">${esc(st.name)}</div><div class="sub">有給は ${ymd(l.next)} に付与されます（入社6か月後）。</div></section>`;
   const pct = l.grant ? Math.min(100, l.used / l.grant * 100) : 0;
-  const duty = l.grant >= 10 ? Math.min(l.used, 5) : null;
   return `<section class="hero">
     <div class="hero-top"><div class="hero-name">${esc(st.name)}</div><div class="sub">${esc(storeName(st.store))}</div></div>
     <div class="lv"><div><span class="lv-l">使用</span><b class="lv-big">${l.used}</b><span class="lv-u">日</span></div>
       <div class="lv-side"><span>付与 <b>${l.grant}</b>日</span></div></div>
     <div class="hbar"><i style="width:${pct}%"></i></div>
     <div class="sub">今期 ${ymd(l.from)} 〜 ${ymd(iso(new Date(parse(l.to) - 864e5)))}　｜　${ymd(l.to)} にリセットして新しく付与</div>
-    ${duty != null ? `<div class="duty"><span>年5日の取得義務</span><span class="dots">${[0, 1, 2, 3, 4].map(i => `<i class="${i < duty ? 'on' : ''}"></i>`).join('')}</span><span>${duty >= 5 ? '達成' : `あと${5 - duty}日`}</span></div>` : ''}
   </section>`;
 }
 function reqForm() {
@@ -407,10 +405,9 @@ function summaryCard() {
     <details><summary class="sub" style="cursor:pointer">この月の記録を全部見る（${monthRecs(S.month).length}件）</summary><div style="margin-top:8px">${recList(monthRecs(S.month), true, true)}</div></details></section>`;
 }
 function leaveTable() {
-  return `<section class="card"><h3>有給の状況</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>付与</th><th>使用</th><th>5日義務</th><th>リセット日</th></tr></thead>
-    <tbody>${active().map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="4" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="4" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
-      const short = l.grant >= 10 && l.used < 5 && daysUntil(l.to) < 120;
-      return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell ${l.used >= 5 ? 'ok' : short ? 'warnc' : ''}">${l.grant >= 10 ? Math.min(l.used, 5) + '/5' : '—'}</td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')}</tbody></table></div>
+  return `<section class="card"><h3>有給の状況</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>付与</th><th>使用</th><th>リセット日</th></tr></thead>
+    <tbody>${active().map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
+      return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')}</tbody></table></div>
   </section>`;
 }
 function staffAdmin() {
