@@ -372,6 +372,7 @@ function meView() {
   const st = staffOf(S.me);
   if (!st) return '<div class="empty">読み込んでいます</div>';
   if (st.noLeave) return `<section class="card"><h3>${esc(st.name)}さん</h3><div class="sub">オーナーの有給は管理していません。「管理」タブから全体を見られます。</div></section>`;
+  if (st.noPaid) { const mr0 = monthRecs(S.month, st.id); return `<section class="hero"><div class="hero-top"><div class="hero-name">${esc(st.name)}</div><div class="sub">${esc(storeName(st.store))}</div></div><div class="sub">アルバイトのため、有給の申請はありません。</div></section><section class="card"><div class="card-head"><h3>自分の記録</h3></div>${monthNav()}${tiles(counts(mr0))}${recList(mr0, false, false)}</section>`; }
   const myReqs = S.reqs.filter(r => r.staffId === st.id && r.status !== 'cancelled' && (r.status === 'pending' || r.date >= addMonths(today(), -2))).sort((a, b) => a.date < b.date ? 1 : -1);
   const mr = monthRecs(S.month, st.id), c = counts(mr);
   return leaveCard(st) + reqForm()
@@ -416,7 +417,7 @@ function summaryCard() {
 function leaveTable() {
   if (!S.owner) return '';
   return `<section class="card"><h3>有給の状況 <span class="rank-o">オーナーのみ</span></h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>付与</th><th>使用</th><th>リセット日</th></tr></thead>
-    <tbody>${byStore(workers()).map(([gl, arr]) => grpRow(gl, 4) + arr.map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
+    <tbody>${byStore(workers().filter(x => !x.noPaid)).map(([gl, arr]) => grpRow(gl, 4) + arr.map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
       return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')).join('')}</tbody></table></div>
   </section>`;
 }
@@ -426,6 +427,7 @@ function staffAdmin() {
       <label class="lbl">名前<input class="field" id="sf-name" value="${esc(e.name || '')}"></label>
       <div class="grid2"><label class="lbl">店舗<select class="field" id="sf-store"><option value="">未設定</option>${STORES.map(([id, l]) => `<option value="${id}" ${e.store === id ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="lbl">入社日<input class="field" id="sf-start" type="date" value="${esc(e.start || '')}"></label></div>
+      <label class="lbl" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:14px"><input type="checkbox" id="sf-nopaid" ${e.noPaid ? 'checked' : ''} style="width:20px;height:20px">アルバイト（有給なし）</label>
       <label class="lbl">付与日数（パートなど法定と違う人だけ）<input class="field" id="sf-grant" type="number" inputmode="numeric" min="0" value="${esc(e.grant || '')}" placeholder="空欄なら自動"></label>
       <div class="grid2"><label class="lbl">権限<select class="field" id="sf-role" ${S.owner ? '' : 'disabled'}>${Object.entries(WHO.ROLE).map(([k, v]) => `<option value="${k}" ${(e.role || 'staff') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="lbl">${e.pinHash ? 'PINを変える（4〜8桁）' : 'PINを発行（4〜8桁）'}<input class="field" id="sf-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" placeholder="${e.pinHash ? '変えないなら空欄' : '本人に伝えるPIN'}"></label></div>
@@ -433,7 +435,7 @@ function staffAdmin() {
       <div class="actions"><button type="button" class="btn primary" data-act="saveStaff">保存</button><button type="button" class="btn" data-act="cancelStaff">やめる</button>
       ${e.id ? `<button type="button" class="btn danger" data-act="hideStaff">${e.hidden ? '表示に戻す' : '一覧から外す（退職など）'}</button>` : ''}</div></div>` : '';
   return `<section class="card"><div class="card-head"><h3>スタッフ</h3><button type="button" class="btn small" data-act="newStaff">＋ 追加</button></div>${form}
-    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer">スタッフ一覧（${S.staff.length}名）・店舗・入社日・PIN・権限</summary>${byStore(S.staff).map(([gl, arr]) => `<div class="group" style="margin-top:10px"><h2>${esc(gl)}</h2><div class="list">${arr.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}" ${WHO.canManage(s) ? '' : 'disabled'}><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc(storeName(s.store) || '店舗未設定')}</span><span>${s.start ? '入社 ' + ymd(s.start) : '入社日未設定'}</span>${s.grant ? `<span>付与 ${s.grant}日</span>` : ''}${s.role && s.role !== 'staff' ? `<span class="pill p-std">${WHO.ROLE[s.role]}</span>` : ''}${s.pinHash ? '' : '<span class="pill late">PIN未発行</span>'}</div></div><span class="sub">${WHO.canManage(s) ? '編集' : ''}</span></button>`).join('')}</div></div>`).join('')}</details>
+    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer">スタッフ一覧（${S.staff.length}名）・店舗・入社日・PIN・権限</summary>${byStore(S.staff).map(([gl, arr]) => `<div class="group" style="margin-top:10px"><h2>${esc(gl)}</h2><div class="list">${arr.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}" ${WHO.canManage(s) ? '' : 'disabled'}><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc(storeName(s.store) || '店舗未設定')}</span><span>${s.start ? '入社 ' + ymd(s.start) : '入社日未設定'}</span>${s.grant ? `<span>付与 ${s.grant}日</span>` : ''}${s.noPaid ? '<span class="pill p-std">アルバイト</span>' : ''}${s.role && s.role !== 'staff' ? `<span class="pill p-std">${WHO.ROLE[s.role]}</span>` : ''}${s.pinHash ? '' : '<span class="pill late">PIN未発行</span>'}</div></div><span class="sub">${WHO.canManage(s) ? '編集' : ''}</span></button>`).join('')}</div></div>`).join('')}</details>
   </section>`;
 }
 
@@ -492,7 +494,7 @@ document.addEventListener('click', async ev => {
       case 'saveStaff': {
         const name = $('sf-name').value.trim(); if (!name) { toast('名前を入れてください'); break; }
         const g = parseFloat($('sf-grant').value);
-        const data = { name, store: $('sf-store').value, start: $('sf-start').value, grant: isNaN(g) ? null : g };
+        const data = { name, store: $('sf-store').value, start: $('sf-start').value, grant: isNaN(g) ? null : g, noPaid: $('sf-nopaid').checked };
         const pin = String($('sf-pin').value).trim();
         if (pin && !/^\d{4,8}$/.test(pin)) { toast('PINは4〜8桁の数字にしてください'); break; }
         if (S.owner) { const r = $('sf-role').value; if (S.editStaff.id === S.me && r !== 'owner') { toast('自分のオーナー権限は外せません'); break; } data.role = r; }
