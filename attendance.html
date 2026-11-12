@@ -245,7 +245,7 @@ table.mx td.hot { font-weight: 700; } table.mx td.ok { color: var(--good); font-
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
-<script src="who.js?v=2"></script>
+<script src="who.js?v=3"></script>
 <script>
 const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
 const TYPES = { absent: '欠勤', late: '遅刻', early: '早退', paid: '有給', half: '半休' };
@@ -312,6 +312,8 @@ function render() {
   $('tabs').innerHTML = [['me', '自分'], ['cal', '休みの予定']].concat(S.admin ? [['admin', '管理']] : []).map(([id, l]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}${id === 'admin' && n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
   $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
   m.innerHTML = S.tab === 'me' ? meView() : S.tab === 'cal' ? calView() : adminView();
+  WHO.badge(S.admin ? pendingReqs().length : S.reqs.filter(r => r.staffId === S.me && r.status !== 'pending' && r.status !== 'cancelled' && (r.decidedAt || 0) > Number(lsGet('att.seen') || 0)).length);
+  if (S.tab === 'me' && !S.admin) lsSet('att.seen', String(Date.now()));
 }
 function loginView() {
   return `<form class="card login" id="login-form"><h3>ログイン</h3>
@@ -410,7 +412,7 @@ function adminView() {
   const pend = pendingReqs();
   const opts = byStore(workers()).map(([l, arr]) => `<optgroup label="${esc(l)}">${arr.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</optgroup>`).join('');
   const recent = S.reqs.filter(r => r.status !== 'pending' && r.status !== 'cancelled').sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)).slice(0, 5);
-  return `<section class="card"><div class="card-head"><h3>承認待ちの申請・報告</h3><span class="sub">${pend.length}件</span></div>
+  return WHO.badgeOffer() + `<section class="card"><div class="card-head"><h3>承認待ちの申請・報告</h3><span class="sub">${pend.length}件</span></div>
       ${pend.length ? `<div class="list">${pend.map(r => reqRow(r, true)).join('')}</div>` : '<div class="empty" style="padding:14px">承認待ちはありません</div>'}
       ${recent.length ? `<details><summary class="sub" style="cursor:pointer">最近の承認・却下</summary><div class="list" style="margin-top:8px">${recent.map(r => reqRow(r, true)).join('')}</div></details>` : ''}</section>
     <section class="card"><h3>欠勤・遅刻・早退を記録</h3>

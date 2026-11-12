@@ -63,6 +63,11 @@
     hash,
     async setPin(id, pin) { const h = await hash(id, pin); await this.db.doc('att_staff/' + id).update({ pinHash: h }); if (this.me && this.me.id === id) put({ id, h }); },
     canManage(p) { if (!this.me) return false; if (this.isOwner()) return true; return this.me.role === 'admin' && (!p || !p.role || p.role === 'staff'); },
+    badge(n) { try { if ('setAppBadge' in navigator) { n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } } catch (x) {} },
+    badgeOffer() {
+      if (!('setAppBadge' in navigator) || !('Notification' in window) || Notification.permission !== 'default') return '';
+      return '<div class="note" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>ホーム画面のアイコンに、承認待ちなどの数の通知マークを出せます。</span><button type="button" class="btn small" data-act="whoBadge">通知マークを有効にする</button></div>';
+    },
     bar() {
       if (!this.me) return '';
       return `${e(this.me.name)}<small>${ROLE[this.me.role || 'staff']}</small>`;
@@ -72,6 +77,7 @@
       this.err = '';
       switch (act) {
         case 'whoPick': this.pickId = el.dataset.id; this.step = 'pin'; this.onChange(); setTimeout(() => $('who-pin') && $('who-pin').focus(), 50); return true;
+        case 'whoBadge': try { await Notification.requestPermission(); } catch (x) {} this.onChange(); return true;
         case 'whoBack': this.step = 'pick'; this.onChange(); return true;
         case 'whoOut': put(null); this.me = null; this.step = 'pick'; this.onChange(); return true;
         case 'whoPin': {

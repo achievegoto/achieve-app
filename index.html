@@ -173,7 +173,7 @@ body.is-live { padding-top: 36vh; }
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
-<script src="who.js?v=2"></script>
+<script src="who.js?v=3"></script>
 <script>
 const STORES = [
   { id: 'hair', short: 'hair design', full: 'achieve hair design' },
@@ -341,6 +341,7 @@ function render() {
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
   const a = document.activeElement, fid = a && a.id;
   m.innerHTML = notes() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
+  WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
   S.dirty = false;
@@ -694,7 +695,7 @@ function viewOrder() {
   let body = '';
   if (unassigned.length) body += `<div class="note">ディーラーが未設定の商品が ${unassigned.length} 点あります。「商品」タブで設定すると発注文に入ります。</div>`;
   if (!ids.length) body += `<div class="card"><div class="empty">${esc(st.full)}に発注が必要な商品はありません。</div></div>`;
-  return (ids.length ? lockBar() : '') + body + gotoCard() + ids.map(orderCard).join('') + extra;
+  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + gotoCard() + ids.map(orderCard).join('') + extra;
 }
 function orderCard(did) {
   const d = dealerOf(did), rows = linesFor(did);
