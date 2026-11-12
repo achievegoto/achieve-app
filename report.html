@@ -293,6 +293,7 @@ table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
 .cmp-v { font-family: var(--font-num); font-size: 13px; white-space: nowrap; text-align: right; }
 @media (max-width: 480px) { .cmp-row { grid-template-columns: minmax(0, 1fr) auto; } .cmp-bar { grid-column: 1 / -1; grid-row: 2; } }
 .stores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } @media (max-width: 900px) { .stores { grid-template-columns: minmax(0, 1fr); } } .scard .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } @media (min-width: 901px) { .scard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } } @media (max-width: 420px) { .scard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+table.mlist td.tot { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -495,13 +496,14 @@ function personView() {
   const list = last12(ym).reverse().map(m => { const a = D(p.id, m), b = D(p.id, shiftYm(m, -12)); if (!a) return '';
     const c = (k, type) => `<td class="c">${val(a, k) == null ? '' : fmt(val(a, k), type)}</td>`;
     const yv = yoy(val(a, 'tech'), val(b, 'tech'));
-    return `<tr${m === ym ? ' class="here"' : ''}><th>${Number(m.slice(5))}月${m.slice(0, 4) !== y ? `<small>${m.slice(2, 4)}</small>` : ''}</th>${c('tech', 'yen')}<td class="c ${yv == null ? '' : yv < 0 ? 'neg' : 'pos'}">${yv == null ? '—' : (yv >= 0 ? '+' : '') + yv.toFixed(0) + '%'}</td>${c('free', 'yen')}${c('cust', 'n')}${c('unit', 'yen')}${c('next', 'pct')}${c('newc', 'n')}</tr>`; }).join('');
+    const tot = d => d ? (d.tech || 0) + (d.free || 0) + (d.retail || 0) : null, ta = tot(a), tb = tot(b), ty = yoy(ta, tb);
+    return `<tr${m === ym ? ' class="here"' : ''}><th>${Number(m.slice(5))}月${m.slice(0, 4) !== y ? `<small>${m.slice(2, 4)}</small>` : ''}</th><td class="c tot">${fmt(ta, 'yen')}</td><td class="c ${ty == null ? '' : ty < 0 ? 'neg' : 'pos'}">${ty == null ? '—' : (ty >= 0 ? '+' : '') + ty.toFixed(0) + '%'}</td>${c('tech', 'yen')}<td class="c ${yv == null ? '' : yv < 0 ? 'neg' : 'pos'}">${yv == null ? '—' : (yv >= 0 ? '+' : '') + yv.toFixed(0) + '%'}</td>${c('free', 'yen')}${c('retail', 'yen')}${c('cust', 'n')}${c('unit', 'yen')}${c('next', 'pct')}${c('newc', 'n')}</tr>`; }).join('');
   return `<div class="ptop">${sel}${mnav('ym')}</div>${hero}
     <div class="tiles">${tiles}</div>
     <section class="card"><div class="card-head"><h3>${mk[1]}の推移</h3><span class="sub">直近12か月</span></div>${metricChips}${chart(p.id, ym, mk[0], mk[2])}</section>
     ${ag ? compare(ag[0], ym, mk) : ''}
     <section class="card"><details><summary class="card-head" style="cursor:pointer"><h3>月ごとの数字</h3><span class="sub">開く</span></summary>
-    <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>指名技術</th><th>昨対</th><th>フリー技術</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
+    <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>総売上</th><th>昨対</th><th>指名技術</th><th>昨対</th><th>フリー技術</th><th>店販売上</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
 }
 function targetView() {
   if (!WHO.isAdmin()) return '<div class="empty">管理者・オーナーだけが使える画面です。</div>';
