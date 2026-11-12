@@ -437,6 +437,14 @@ document.addEventListener('submit', async ev => {
   try { await firebase.auth().signInWithEmailAndPassword($('lg-email').value.trim(), $('lg-pass').value); } catch (e) { $('lg-err').textContent = 'メールアドレスかパスワードが違います'; }
 });
 
+/* アプリを開いたらバッジを消す */
+async function clearBadge() {
+  try { const c = await caches.open('achieve-badge'); await c.put('n', new Response('0')); } catch (x) {}
+  try { if (navigator.clearAppBadge) await navigator.clearAppBadge(); } catch (x) {}
+}
+clearBadge();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') clearBadge(); });
+
 let db, started = false;
 function listen() {
   WHO.init(db, () => { render(); if (WHO.me && S.push !== 'on') checkPush(); });

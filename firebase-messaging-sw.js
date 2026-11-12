@@ -1,3 +1,13 @@
+// 予約が届くたびにホーム画面アイコンの数字（バッジ）を1増やす
+async function bump() {
+  try {
+    const c = await caches.open('achieve-badge'); const r = await c.match('n');
+    const n = (r ? Number(await r.text()) || 0 : 0) + 1;
+    await c.put('n', new Response(String(n)));
+    if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(n);
+  } catch (e) {}
+}
+self.addEventListener('push', e => { e.waitUntil(bump()); });
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 importScripts('config.js');
