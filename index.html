@@ -274,15 +274,24 @@ function fail(e) {
   toast('保存できませんでした。通信を確認してもう一度操作してください');
 }
 const pending = new Map();
+function logChange(kind, store, itemId, from, to, note) {
+  try {
+    const it = S.items.find(x => x.id === itemId), me = WHO.me || {};
+    S.db.collection('stock_log').doc().set({ at: Date.now(), by: me.id || '', byName: me.name || '', kind, store: store || '', itemId: itemId || '', itemName: it ? it.name : (note && note.name) || '', from: from ?? null, to: to ?? null, note: (note && note.text) || '' });
+  } catch (e) {}
+}
 function setQty(store, id, qty) {
   if (S.readOnly || !S.db) return;
   const key = store + '_' + id;
+  { const p0 = pending.get(key); if (!p0 || p0.from === undefined) { const pp = p0 || { chain: Promise.resolve() }; pp.from = S.stock[key] ?? 0; pending.set(key, pp); } }
   S.stock[key] = Math.max(0, Math.round(qty));
   const p = pending.get(key) || { chain: Promise.resolve() };
   clearTimeout(p.timer);
   p.timer = setTimeout(() => {
     p.timer = null;
     const value = S.stock[key];
+    const from = p.from; p.from = undefined;
+    if (from !== value) logChange('count', store, id, from, value);
     p.chain = p.chain.then(() => S.db.doc('stock/' + key).set({ store, itemId: id, qty: value, at: Date.now() })).catch(fail);
   }, 450);
   pending.set(key, p);
@@ -761,6 +770,17 @@ function sumTable(rows, t) {
     + `<tr class="foot"><th>合計</th>${STORES.map(st => `<td>${yenS(colSum(st.id))}</td>`).join('')}<td class="tot">${yenS(total)}</td></tr>`;
   return [head, body, total];
 }
+const LOGK = { count: '数を変更', receive: '入荷', order: '発注', item: '商品を編集', itemNew: '商品を追加' };
+function logCard() {
+  if (!WHO.isAdmin()) return '';
+  const all = (S.logs || []).filter(l => S.logAll || !l.store || l.store === S.store).slice(0, 150);
+  const st = id => (STORES.find(s => s.id === id) || {}).short || '';
+  const hm = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  return `<section class="card"><div class="card-head"><h3>変更の履歴</h3><button type="button" class="btn small" data-act="logAll">${S.logAll ? 'この店舗だけ' : '全店舗'}</button></div>
+    <div class="sub">だれが・いつ・何を変えたかを新しい順に表示します（管理者・オーナーだけに見えます）。</div>
+    ${all.length ? `<div class="list">${all.map(l => `<div class="row"><div><div class="name">${esc(l.itemName || '')}${l.from != null && l.to != null ? ` <span class="sub" style="display:inline">${l.from} → <b>${l.to}</b></span>` : ''}</div>
+      <div class="sub"><span>${hm(l.at)}</span><span>${esc(l.byName || '不明')}</span><span>${LOGK[l.kind] || l.kind}</span>${S.logAll && l.store ? `<span>${esc(st(l.store))}</span>` : ''}${l.note ? `<span>${esc(l.note)}</span>` : ''}</div></div></div>`).join('')}</div>` : '<div class="empty" style="padding:14px">まだ履歴はありません</div>'}</section>`;
+}
 function viewHistory() {
   const n = new Date(), base = new Date(n.getFullYear(), n.getMonth() + (S.monthOff || 0), 1);
   const y = base.getFullYear(), m = base.getMonth();
@@ -783,8 +803,8 @@ function viewHistory() {
     <div class="card-head"><div class="month-nav"><button type="button" class="btn small" id="m-prev" data-act="month" data-id="-1" aria-label="前の月">‹</button><h3>${y}年${m + 1}月の発注額</h3><button type="button" class="btn small" id="m-next" data-act="month" data-id="1" aria-label="次の月" ${S.monthOff >= 0 ? 'disabled' : ''}>›</button></div><span class="amount">${yen(total)}</span></div>
     <div class="sum-wrap"><table class="sum">${head}${body}</table></div>
     <div class="sub">単位：円（税抜）。「発注済み」にした日の月で集計しています。</div></section>`;
-  if (!S.orders.length) return card + stockCard + '<div class="card"><div class="empty">発注履歴はまだありません。「発注」タブで発注済みにすると、ここに並びます。</div></div>';
-  return card + stockCard + `<div class="group"><h2>発注履歴（全店）</h2><div class="list">${S.orders.map(orderRow).join('')}</div></div>`;
+  if (!S.orders.length) return card + stockCard + logCard() + '<div class="card"><div class="empty">発注履歴はまだありません。「発注」タブで発注済みにすると、ここに並びます。</div></div>';
+  return card + stockCard + logCard() + `<div class="group"><h2>発注履歴（全店）</h2><div class="list">${S.orders.map(orderRow).join('')}</div></div>`;
 }
 function orderRow(o) {
   const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
@@ -906,6 +926,7 @@ async function saveItem() {
     const data = { name, category: it.category.trim(), unit: it.unit.trim(), dealerId: did, price: it.price, min: it.min, par: it.par, jan: it.jan || '', createdAt: it.createdAt || Date.now() };
     if (it.sample) data.sample = true;
     await ref.set(data);
+    logChange(it.id ? 'item' : 'itemNew', '', ref.id, null, null, { name, text: it.id ? '商品を編集' : '商品を追加' });
     S.editing = null; S.formErr = ''; S.confirm = '';
     toast('保存しました'); render();
   } catch (e) { fail(e); }
@@ -925,6 +946,7 @@ async function markPlaced(did, quiet) {
   try {
     await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now() });
     delete S.draft[draftKey(did)];
+    logChange('order', S.store, '', null, null, { name: d.name + ' に発注', text: lines.map(l => l.name + '×' + l.qty).join('、') + '（' + lines.reduce((a, l) => a + l.qty * l.price, 0).toLocaleString() + '円）' });
     if (!quiet) { toast('発注済みにしました'); render(); }
   } catch (e) { fail(e); }
 }
@@ -936,8 +958,9 @@ async function receive(id) {
   try {
     await S.db.doc('orders/' + id).update({ status: 'received', receivedAt: Date.now() });
     for (const l of o.lines || []) {
-      const key = o.store + '_' + l.itemId, next = (S.stock[key] ?? 0) + l.qty;
+      const key = o.store + '_' + l.itemId, prev = S.stock[key] ?? 0, next = prev + l.qty;
       S.stock[key] = next;
+      logChange('receive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の発注を入荷' });
       await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at: Date.now() });
     }
     toast('入荷分を在庫に加えました'); render();
@@ -957,6 +980,7 @@ async function clearSamples() {
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const { act, id, did } = b.dataset;
+  if (act === 'logAll') { S.logAll = !S.logAll; render(); return; }
   if (act === 'whoSwitch') { WHO.handle('whoOut', b); window.scrollTo(0, 0); return; }
   if (await WHO.handle(act, b)) return;
   switch (act) {
@@ -1261,8 +1285,8 @@ function makeApi(fs) {
         }
         if (mode === 'link') continue;
         const key = store + '_' + l.id, q = Math.max(0, Math.round(Number(l.qty) || 0));
-        if (mode === 'count') { batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: q, at: Date.now() }); S.stock[key] = q; }
-        else if (q) { batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: FV.increment(q), at: Date.now() }, { merge: true }); S.stock[key] = (S.stock[key] || 0) + q; }
+        if (mode === 'count') { const prev = S.stock[key] ?? 0; batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: q, at: Date.now() }); S.stock[key] = q; if (prev !== q) logChange('count', store, l.id, prev, q, { text: 'スキャン・写真で棚卸し' }); }
+        else if (q) { const prev = S.stock[key] || 0; batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: FV.increment(q), at: Date.now() }, { merge: true }); S.stock[key] = prev + q; logChange('receive', store, l.id, prev, prev + q, { text: 'スキャン・写真で入荷' }); }
       }
       await batch.commit();
     },
@@ -1274,6 +1298,7 @@ function listen(fs) {
   WHO.init(fs, scheduleRender);
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
+  fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
   fs.collection('stock').onSnapshot(s => {
