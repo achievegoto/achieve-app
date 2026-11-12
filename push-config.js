@@ -1,1 +1,1 @@
-window.ACHIEVE_VAPID = '';
+window.ACHIEVE_VAPID = 'BO239nMg3oywx99P0ERCWLk-ZLB1Y9RfB8f9LmVaf8BMRd-qEfdDQ9Anw8Ev-76wXQcpnwih9YInun2jloNUP_I';
