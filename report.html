@@ -503,7 +503,7 @@ function targetView() {
     ${byStore(active()).map(([l, arr]) => `<tr class="grp"><td colspan="${TG.length + 1}">${esc(l)}</td></tr>` + arr.map(p => `<tr><th>${esc(p.name)}</th>${TG.map(([k]) => `<td><input class="field tgin" inputmode="numeric" data-pid="${p.id}" data-k="${k}" value="${esc(T(p.id, ym)[k] ?? '')}" placeholder="${fmt(val(D(p.id, py), k), k === 'next' ? 'pct' : 'n')}"></td>`).join('')}</tr>`).join('')).join('')}
     </tbody></table></div>
     <div class="actions"><button type="button" class="btn primary" data-act="saveTg">保存</button><button type="button" class="btn" data-act="copyTg">前月の目標をコピー</button></div></section>
-    ${peopleAdmin()}`;
+    ${WHO.isOwner() ? peopleAdmin() : ''}`;
 }
 function peopleAdmin() {
   return `<section class="card"><details><summary class="sub" style="cursor:pointer">月報の対象者（${S.people.length}名）・店舗・名簿とのつなぎ</summary><div class="list" style="margin-top:8px">${S.people.map(p => `<div class="row"><div><div class="name">${esc(p.name)}${p.hidden ? '（非表示）' : ''}</div>
@@ -533,12 +533,13 @@ document.addEventListener('click', async ev => {
         await b.commit(); toast('目標を保存しました'); break;
       }
       case 'copyTg': { const prev = shiftYm(S.ym, -1); document.querySelectorAll('.tgin').forEach(i => { const v = T(i.dataset.pid, prev)[i.dataset.k]; if (v != null) i.value = v; }); toast('前月の目標を入れました。保存を押してください'); break; }
-      case 'hideP': { const p = S.people.find(x => x.id === id); await db.doc('mr_people/' + id).update({ hidden: !p.hidden }); break; }
+      case 'hideP': { if (!WHO.isOwner()) break; const p = S.people.find(x => x.id === id); await db.doc('mr_people/' + id).update({ hidden: !p.hidden }); break; }
     }
   } catch (e) { toast('保存できませんでした：' + e.message); }
 });
 document.addEventListener('change', async ev => {
   const el = ev.target, c = el.dataset.chg; if (!c) return;
+  if ((c === 'pstore' || c === 'plink') && !WHO.isOwner()) return;
   try {
     if (c === 'pickSel') { S.pid = el.value; el.blur(); render(); return; }
     if (c === 'pstore') await db.doc('mr_people/' + el.dataset.id).update({ store: el.value });
