@@ -283,8 +283,15 @@ details[open] > summary .sub { display: none; }
 table.mlist { margin-top: 8px; font-size: 13px; } table.mlist th small { color: var(--muted); font-size: 10px; margin-left: 2px; }
 table.mlist thead th { position: static; } table.mlist tr.here th, table.mlist tr.here td { background: var(--accent-soft); }
 table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
-.lv-free { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; font-size: 12px; color: rgba(255,255,255,.85); } .lv-free b { font-family: var(--font-num); font-size: 18px; font-weight: 500; color: #fff; } .hero .dt.up { color: #b9f3d6; } .hero .dt.dn { color: #ffc4bd; }
+.lv-free { display: flex; flex-wrap: wrap; white-space: nowrap; gap: 4px 8px; align-items: baseline; margin-top: 6px; font-size: 12px; color: rgba(255,255,255,.85); } .lv-free b { font-family: var(--font-num); font-size: 18px; font-weight: 500; color: #fff; } .hero .dt.up { color: #b9f3d6; } .hero .dt.dn { color: #ffc4bd; }
 @media (min-width: 641px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cmp { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.cmp-row { display: grid; grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto; gap: 10px; align-items: center; background: none; border: 0; padding: 7px 4px; border-radius: 8px; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.cmp-row:hover { background: var(--accent-soft); }
+.cmp-n { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .cmp-n i { font-style: normal; font-family: var(--font-num); color: var(--muted); font-size: 11px; display: inline-block; width: 1.6em; }
+.cmp-bar { height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; } .cmp-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.cmp-v { font-family: var(--font-num); font-size: 13px; white-space: nowrap; text-align: right; }
+@media (max-width: 480px) { .cmp-row { grid-template-columns: minmax(0, 1fr) auto; } .cmp-bar { grid-column: 1 / -1; grid-row: 2; } }
 </style>
 </head>
 <body>
@@ -323,13 +330,28 @@ function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; c
 const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, tab: 'month', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
 
 /* ---- 計算 ---- */
-const D = (pid, ym) => S.data[pid + '_' + ym] || null;
+const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
+const AGG = [['ALL', '全員']].concat([['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till']].map(([id, l]) => ['S:' + id, l + ' 全体']));
+const GROUP = id => id === 'ALL' ? active() : String(id).startsWith('S:') ? active().filter(p => p.store === id.slice(2)) : null;
+const SUMK = ['tech', 'free', 'retail', 'cust', 'buyers', 'newc', 'over'], WK = ['repeat', 'next', 'overRate'];
+function D(pid, ym) {
+  const g = GROUP(pid); if (!g) return D0(pid, ym);
+  const rows = g.map(p => D0(p.id, ym)).filter(Boolean); if (!rows.length) return null;
+  const o = { pid, ym };
+  SUMK.forEach(k => { const r = rows.filter(d => d[k] != null); if (r.length) o[k] = r.reduce((a, d) => a + d[k], 0); });
+  WK.forEach(k => { const r = rows.filter(d => d[k] != null && d.cust); const w = r.reduce((a, d) => a + d.cust, 0); if (w) o[k] = r.reduce((a, d) => a + d[k] * d.cust, 0) / w; });
+  return o;
+}
 function val(d, k) {
   if (!d) return null;
   if (k === 'unit') return d.unit != null ? d.unit : d.tech != null && d.cust ? (d.tech + (d.free || 0)) / d.cust : null;
   return d[k] ?? null;
 }
-const T = (pid, ym) => S.targets[pid + '_' + ym] || {};
+const T0 = (pid, ym) => S.targets[pid + '_' + ym] || {};
+function T(pid, ym) {
+  const g = GROUP(pid); if (!g) return T0(pid, ym);
+  const o = {}; g.forEach(p => { const t = T0(p.id, ym); ['tech', 'free', 'retail', 'cust', 'newc'].forEach(k => { if (Number(t[k])) o[k] = (o[k] || 0) + Number(t[k]); }); }); return o;
+}
 const active = () => S.people.filter(p => !p.hidden);
 const byStore = list => STORES.map(([id, l]) => [l, list.filter(s => s.store === id)]).concat([['店舗未設定', list.filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
 function pace(ym) {
@@ -426,12 +448,22 @@ function chart(pid, ym, k, type) {
     <line class="axis" x1="0" x2="360" y1="${H}" y2="${H}"/><text class="ymax" x="0" y="10">${unit(mx / 1.08)}</text>${bars}</svg></div>
     <div class="legend"><span><i class="lg-cur"></i>今年</span><span><i class="lg-prev"></i>前年同月</span>${tg.some(Boolean) ? '<span><i class="lg-tg"></i>目標</span>' : ''}</div>`;
 }
+function compare(gid, ym, mk) {
+  const [k, label, type] = mk, pc = pace(ym);
+  const rows = GROUP(gid).map(p => { const c = val(D0(p.id, ym), k), q0 = val(D0(p.id, shiftYm(ym, -12)), k); return { p, c, q: q0 != null && !RATE(k) && k !== 'unit' ? q0 * pc.ratio : q0 }; }).filter(r => r.c != null).sort((a, b) => b.c - a.c);
+  if (!rows.length) return '';
+  const mx = Math.max(...rows.map(r => r.c)) || 1;
+  return `<section class="card"><div class="card-head"><h3>${label}のスタッフ比較</h3><span class="sub">${ymLabel(ym)}</span></div><div class="cmp">${rows.map((r, i) => `<button type="button" class="cmp-row" data-act="pick" data-id="${r.p.id}">
+    <span class="cmp-n"><i>${i + 1}</i>${esc(r.p.name)}</span><span class="cmp-bar"><i style="width:${(r.c / mx * 100).toFixed(1)}%"></i></span>
+    <span class="cmp-v">${type === 'yen' ? '¥' : ''}${fmt(r.c, type)}${type === 'pct' ? '%' : ''} ${diffTag(r.c, r.q, k)}</span></button>`).join('')}</div></section>`;
+}
 function personView() {
-  const p = S.people.find(x => x.id === S.pid) || active()[0];
+  const ag = AGG.find(a => a[0] === S.pid);
+  const p = ag ? { id: ag[0], name: ag[1], store: '' } : S.people.find(x => x.id === S.pid) || active()[0];
   if (!p) return '<div class="empty">データがありません。</div>';
   const ym = S.ym, py = shiftYm(ym, -12), d = D(p.id, ym), q = D(p.id, py), t = T(p.id, ym), pc = pace(ym);
-  const sel = `<select class="field psel" data-chg="pickSel" aria-label="スタッフを選ぶ">${byStore(active()).map(([l, arr]) => `<optgroup label="${esc(l)}">${arr.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select>`;
-  const storeL = (STORES.find(s => s[0] === p.store) || [, '店舗未設定'])[1];
+  const sel = `<select class="field psel" data-chg="pickSel" aria-label="スタッフを選ぶ"><optgroup label="まとめて見る">${AGG.filter(a => GROUP(a[0]).length).map(([id, l]) => `<option value="${id}" ${id === p.id ? 'selected' : ''}>${l}</option>`).join('')}</optgroup>${byStore(active()).map(([l, arr]) => `<optgroup label="${esc(l)}">${arr.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  const storeL = ag ? ag[1] + `（${GROUP(ag[0]).length}名）` : (STORES.find(s => s[0] === p.store) || [, '店舗未設定'])[1];
   // 年間累計（1月〜選んだ月）
   const y = ym.slice(0, 4), mo = Number(ym.slice(5));
   const cum = (yr, k) => { let s = 0, n = 0; for (let m = 1; m <= mo; m++) { const v = val(D(p.id, `${yr}-${pad(m)}`), k); if (v != null) { s += v; n++; } } return n ? s : null; };
@@ -459,6 +491,7 @@ function personView() {
   return `<div class="ptop">${sel}${mnav('ym')}</div>${hero}
     <div class="tiles">${tiles}</div>
     <section class="card"><div class="card-head"><h3>${mk[1]}の推移</h3><span class="sub">直近12か月</span></div>${metricChips}${chart(p.id, ym, mk[0], mk[2])}</section>
+    ${ag ? compare(ag[0], ym, mk) : ''}
     <section class="card"><details><summary class="card-head" style="cursor:pointer"><h3>月ごとの数字</h3><span class="sub">開く</span></summary>
     <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>指名技術</th><th>昨対</th><th>フリー技術</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
 }
