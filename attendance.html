@@ -226,6 +226,7 @@ table.mx td.full { background: var(--good); color: var(--surface); }
 .row.cal.today { background: var(--accent-soft); }
 .cal-d { font-weight: 700; font-size: 13px; padding-top: 1px; }
 .cal-n { display: flex; flex-wrap: wrap; gap: 4px; }
+table.mx tr.grp td { color: var(--muted); font-size: 11px; padding-top: 12px; text-align: left; letter-spacing: .06em; }
 table.mx td.hot { font-weight: 700; } table.mx td.ok { color: var(--good); font-weight: 700; } table.mx td.warnc { background: var(--warn-soft); color: var(--warn); font-weight: 700; }
 </style>
 </head>
@@ -242,7 +243,7 @@ table.mx td.hot { font-weight: 700; } table.mx td.ok { color: var(--good); font-
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
 <script>
-const STORES = [['hair', 'hair design'], ['liss', 'Liss'], ['till', 'till']];
+const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till']];
 const TYPES = { absent: '欠勤', late: '遅刻', early: '早退', paid: '有給', half: '半休' };
 const KIND = { full: '全日', am: '午前半休', pm: '午後半休' };
 const GRANT = [10, 11, 12, 14, 16, 18, 20];
@@ -267,6 +268,8 @@ const S = { user: undefined, ready: new Set(), staff: [], recs: [], reqs: [], pi
 /* ---- 計算 ---- */
 const staffOf = id => S.staff.find(s => s.id === id);
 const active = () => S.staff.filter(s => !s.hidden);
+const byStore = list => STORES.map(([id, l]) => [l, list.filter(s => s.store === id)]).concat([['店舗未設定', list.filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
+const grpRow = (l, n) => `<tr class="grp"><td colspan="${n}">${esc(l)}</td></tr>`;
 const storeName = id => (STORES.find(x => x[0] === id) || [, ''])[1];
 function leave(st, on) {
   on = on || today();
@@ -309,7 +312,7 @@ function loginView() {
 }
 function picker() {
   if (!active().length) return `<section class="card"><h3>スタッフがまだ登録されていません</h3><div class="sub">「管理」タブからスタッフを追加してください。</div></section>`;
-  const groups = STORES.map(([id, l]) => [l, active().filter(s => s.store === id)]).concat([['店舗未設定', active().filter(s => !storeName(s.store))]]).filter(g => g[1].length);
+  const groups = byStore(active());
   return `<section class="card"><h3>あなたの名前を選んでください</h3><div class="sub">この端末では次から自動で選ばれます。</div>
     ${groups.map(([l, arr]) => `<div class="group"><h2>${esc(l)}</h2><div class="chips">${arr.map(s => `<button type="button" class="chip" id="me-${s.id}" data-act="setMe" data-id="${s.id}" aria-pressed="${S.me === s.id}">${esc(s.name)}</button>`).join('')}</div></div>`).join('')}
     ${S.me ? '<button type="button" class="btn small" data-act="cancelPick">閉じる</button>' : ''}</section>`;
@@ -383,7 +386,7 @@ function adminView() {
     <input class="field" id="a-pin" type="password" inputmode="numeric" placeholder="PIN" aria-label="PIN"><div class="err" id="a-err"></div>
     <button type="button" class="btn primary" data-act="unlock">管理者モードにする</button></section>`;
   const pend = pendingReqs();
-  const opts = active().map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  const opts = byStore(active()).map(([l, arr]) => `<optgroup label="${esc(l)}">${arr.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</optgroup>`).join('');
   const recent = S.reqs.filter(r => r.status !== 'pending' && r.status !== 'cancelled').sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)).slice(0, 5);
   return `<section class="card"><div class="card-head"><h3>有給の申請</h3><span class="sub">承認待ち ${pend.length}件</span></div>
       ${pend.length ? `<div class="list">${pend.map(r => reqRow(r, true)).join('')}</div>` : '<div class="empty" style="padding:14px">承認待ちはありません</div>'}
@@ -399,15 +402,14 @@ function adminView() {
     <button type="button" class="btn small" data-act="lock" style="align-self:flex-start">管理者モードを終わる</button>`;
 }
 function summaryCard() {
-  const rows = active().map(s => [s, counts(monthRecs(S.month, s.id))]);
   return `<section class="card"><h3>月のまとめ</h3>${monthNav()}<div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th>${Object.values(TYPES).map(v => `<th>${v}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(([s, c]) => `<tr><td>${esc(s.name)}</td>${Object.keys(TYPES).map(k => `<td class="cell ${c[k] ? 'hot t-' + k : 'h0'}">${c[k] || '·'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <tbody>${byStore(active()).map(([l, arr]) => grpRow(l, 6) + arr.map(s => { const c = counts(monthRecs(S.month, s.id)); return `<tr><td>${esc(s.name)}</td>${Object.keys(TYPES).map(k => `<td class="cell ${c[k] ? 'hot t-' + k : 'h0'}">${c[k] || '·'}</td>`).join('')}</tr>`; }).join('')).join('')}</tbody></table></div>
     <details><summary class="sub" style="cursor:pointer">この月の記録を全部見る（${monthRecs(S.month).length}件）</summary><div style="margin-top:8px">${recList(monthRecs(S.month), true, true)}</div></details></section>`;
 }
 function leaveTable() {
   return `<section class="card"><h3>有給の状況</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>付与</th><th>使用</th><th>リセット日</th></tr></thead>
-    <tbody>${active().map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
-      return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')}</tbody></table></div>
+    <tbody>${byStore(active()).map(([gl, arr]) => grpRow(gl, 4) + arr.map(s => { const l = leave(s); if (!l) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">入社日未設定</td></tr>`; if (l.before) return `<tr><td>${esc(s.name)}</td><td colspan="3" class="h0">${ymd(l.next)} 付与予定</td></tr>`;
+      return `<tr><td>${esc(s.name)}</td><td class="cell">${l.grant}</td><td class="cell"><b>${l.used}</b></td><td class="cell">${ymd(l.to)}</td></tr>`; }).join('')).join('')}</tbody></table></div>
   </section>`;
 }
 function staffAdmin() {
@@ -420,7 +422,7 @@ function staffAdmin() {
       <div class="actions"><button type="button" class="btn primary" data-act="saveStaff">保存</button><button type="button" class="btn" data-act="cancelStaff">やめる</button>
       ${e.id ? `<button type="button" class="btn danger" data-act="hideStaff">${e.hidden ? '表示に戻す' : '一覧から外す（退職など）'}</button>` : ''}</div></div>` : '';
   return `<section class="card"><div class="card-head"><h3>スタッフ</h3><button type="button" class="btn small" data-act="newStaff">＋ 追加</button></div>${form}
-    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer">スタッフ一覧（${S.staff.length}名）・店舗と入社日の設定</summary><div class="list" style="margin-top:8px">${S.staff.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc(storeName(s.store) || '店舗未設定')}</span><span>${s.start ? '入社 ' + ymd(s.start) : '入社日未設定'}</span>${s.grant ? `<span>付与 ${s.grant}日</span>` : ''}</div></div><span class="sub">編集</span></button>`).join('')}</div></details>
+    <details ${e ? 'open' : ''}><summary class="sub" style="cursor:pointer">スタッフ一覧（${S.staff.length}名）・店舗と入社日の設定</summary>${byStore(S.staff).map(([gl, arr]) => `<div class="group" style="margin-top:10px"><h2>${esc(gl)}</h2><div class="list">${arr.map(s => `<button type="button" class="row" data-act="editStaff" data-id="${s.id}"><div><div class="name">${esc(s.name)}${s.hidden ? '（非表示）' : ''}</div><div class="sub"><span>${esc(storeName(s.store) || '店舗未設定')}</span><span>${s.start ? '入社 ' + ymd(s.start) : '入社日未設定'}</span>${s.grant ? `<span>付与 ${s.grant}日</span>` : ''}</div></div><span class="sub">編集</span></button>`).join('')}</div></div>`).join('')}</details>
     ${S.staff.length ? '' : '<button type="button" class="btn" data-act="importStaff">カリキュラムの名簿から取り込む</button>'}</section>`;
 }
 
