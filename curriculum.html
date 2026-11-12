@@ -406,7 +406,7 @@ function matrixCard(clickable) {
   </table></div>${clickable ? '<div class="sub">名前を押すと、その人の項目を開けます。</div>' : ''}</section>`;
 }
 function allView() {
-  if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 全員の一覧に戻る</button><div class="note" style="background:var(--accent-soft);color:var(--accent)">確認用の表示です。記録の変更はできません。</div>` + progressCard(S.viewStaff) + catGrid(S.viewStaff) + itemList(S.viewStaff);
+  if (S.viewStaff && staffOf(S.viewStaff)) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">‹ 全員の一覧に戻る</button>${S.teacher ? '' : '<div class="note" style="background:var(--accent-soft);color:var(--accent)">確認用の表示です。記録の変更はできません。</div>'}` + progressCard(S.viewStaff) + catGrid(S.viewStaff) + itemList(S.viewStaff);
   return matrixCard(true) + reqSummary();
 }
 function reqSummary() {
@@ -433,7 +433,7 @@ function renderSheet() {
   if (!o) { box.innerHTML = ''; box.dataset.key = ''; document.body.style.overflow = ''; return; }
   const it = itemOf(o.iid), st = staffOf(o.sid);
   if (!it || !st) { S.open = null; box.innerHTML = ''; return; }
-  const p = pOf(o.sid, o.iid), pr = p.practice || [], self = S.tab === 'me' && S.me === o.sid, t = S.teacher && S.tab === 'teacher';
+  const p = pOf(o.sid, o.iid), pr = p.practice || [], self = S.tab === 'me' && S.me === o.sid, t = S.teacher && S.tab !== 'me';
   const ws = document.activeElement && box.contains(document.activeElement) ? document.activeElement.id : '';
   const key = o.sid + '_' + o.iid, keep = box.dataset.key === key ? { s: $('note-staff') && $('note-staff').value, t: $('note-teacher') && $('note-teacher').value } : {};
   box.dataset.key = key;
@@ -563,13 +563,13 @@ document.addEventListener('click', async ev => {
     case 'unlock': { const v = $('t-pin').value; if (await checkPin(v)) { S.teacher = true; render(); } else $('t-err').textContent = 'PINが違います'; break; }
     case 'lock': S.teacher = false; S.viewStaff = ''; render(); break;
     case 'seed': el.disabled = true; try { await seed($('seed-pin').value); } catch (e) { toast(e.message); } el.disabled = false; break;
-    case 'pracPlus': if (!(S.teacher && S.tab === 'teacher')) { const p = pOf(o.sid, o.iid); const pend = (p.pend || []).concat({ id: Math.random().toString(36).slice(2, 9), k: 'practice', t: Date.now() }); await upd(o.sid, o.iid, { pend }, '練習1回を申請'); toast('練習1回を申請しました（講師の承認で回数に入ります）'); break; }
+    case 'pracPlus': if (!(S.teacher && S.tab !== 'me')) { const p = pOf(o.sid, o.iid); const pend = (p.pend || []).concat({ id: Math.random().toString(36).slice(2, 9), k: 'practice', t: Date.now() }); await upd(o.sid, o.iid, { pend }, '練習1回を申請'); toast('練習1回を申請しました（講師の承認で回数に入ります）'); break; }
     /* falls through */
     case 'pracPlusT': { const p = pOf(o.sid, o.iid); const pr = (p.practice || []).concat(Date.now()); await upd(o.sid, o.iid, { practice: pr, state: p.state === 'none' ? 'lectured' : p.state }, `練習 ${pr.length}回目`); toast(`練習 ${pr.length}回目を記録しました`); break; }
-    case 'pracMinus': if (!(S.teacher && S.tab === 'teacher')) { const p = pOf(o.sid, o.iid); const pend = (p.pend || []).slice(); const k = pend.map(e => e.k).lastIndexOf('practice'); if (k >= 0) { pend.splice(k, 1); await upd(o.sid, o.iid, { pend }, '練習の申請を1回取り消し'); } break; }
+    case 'pracMinus': if (!(S.teacher && S.tab !== 'me')) { const p = pOf(o.sid, o.iid); const pend = (p.pend || []).slice(); const k = pend.map(e => e.k).lastIndexOf('practice'); if (k >= 0) { pend.splice(k, 1); await upd(o.sid, o.iid, { pend }, '練習の申請を1回取り消し'); } break; }
     /* falls through */
     case 'pracMinusT': { const p = pOf(o.sid, o.iid); await upd(o.sid, o.iid, { practice: (p.practice || []).slice(0, -1) }, '練習を1回取り消し'); break; }
-    case 'lecture': if (!(S.teacher && S.tab === 'teacher')) { const p = pOf(o.sid, o.iid); await upd(o.sid, o.iid, { pend: (p.pend || []).concat({ id: Math.random().toString(36).slice(2, 9), k: 'lecture', t: Date.now() }) }, 'レクチャー受講を申請'); toast('申請しました（講師の承認で記録されます）'); break; }
+    case 'lecture': if (!(S.teacher && S.tab !== 'me')) { const p = pOf(o.sid, o.iid); await upd(o.sid, o.iid, { pend: (p.pend || []).concat({ id: Math.random().toString(36).slice(2, 9), k: 'lecture', t: Date.now() }) }, 'レクチャー受講を申請'); toast('申請しました（講師の承認で記録されます）'); break; }
       await upd(o.sid, o.iid, { lectureAt: Date.now(), state: pOf(o.sid, o.iid).state === 'none' ? 'lectured' : pOf(o.sid, o.iid).state }, 'レクチャー'); toast('レクチャー日を記録しました'); break;
     case 'okPend': case 'ngPend': await decide(el.dataset.sid, el.dataset.iid, id, a === 'okPend'); break;
     case 'okAll': { const all = pendings(); for (const x of all) await decide(x.st.id, x.it.id, x.e.id, true); toast(all.length + '件を承認しました'); break; }
