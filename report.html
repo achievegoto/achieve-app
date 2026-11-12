@@ -406,7 +406,7 @@ function monthView() {
   const people = active().filter(p => D(p.id, ym) || D(p.id, py) || Object.keys(T(p.id, ym)).length);
   const tot = k => people.reduce((a, p) => a + (val(D(p.id, ym), k) || 0), 0), totP = k => people.reduce((a, p) => a + (val(D(p.id, py), k) || 0), 0) * pc.ratio;
   const tTot = people.reduce((a, p) => a + (Number(T(p.id, ym).tech) || 0), 0);
-  const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の指名技術売上（全員）</div><div class="lv-big">¥${fmt(tot('tech'), 'yen')}</div>${tot('free') ? `<div class="lv-free"><span>フリー技術売上</span><b>¥${fmt(tot('free'), 'yen')}</b>${totP('free') ? diffTag(tot('free'), totP('free'), 'free') : ''}</div>` : ''}</div>
+  const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の指名技術売上（全員）</div><div class="lv-big">¥${fmt(tot('tech'), 'yen')}</div>${tot('free') ? `<div class="lv-free"><span>フリー技術売上</span><b>¥${fmt(tot('free'), 'yen')}</b>${totP('free') ? diffTag(tot('free'), totP('free'), 'free') : ''}</div>` : ''}${`<div class="lv-free"><span>店販売上</span><b>¥${fmt(tot('retail'), 'yen')}</b>${totP('retail') ? diffTag(tot('retail'), totP('retail'), 'retail') : ''}</div>`}</div>
       <div class="lv-side"><span>前年同月${pc.ratio < 1 ? '（同じ日数分）' : ''} ¥${fmt(totP('tech'), 'yen')}</span><span>昨対 <b>${yoy(tot('tech'), totP('tech')) == null ? '—' : yoy(tot('tech'), totP('tech')).toFixed(1) + '%'}</b></span>${tTot ? `<span>目標達成 <b>${(tot('tech') / tTot * 100).toFixed(0)}%</b></span>` : ''}</div></div>
       ${tTot ? `<div class="hbar"><i style="width:${Math.min(100, tot('tech') / tTot * 100)}%"></i></div>` : ''}
       <div class="sub">${pc.label ? pc.label + 'のデータです。売上・客数の昨対は、前年同月を同じ日数分に換算して比べています。' : (S.meta[ym] && S.meta[ym].asOf ? '月末までのデータです。' : '')}${S.meta[ym] && S.meta[ym].src ? ' 取り込み元：' + esc(S.meta[ym].src) : ''}</div></section>`;
@@ -480,7 +480,8 @@ function personView() {
   const tech = val(d, 'tech'), techP = q && q.tech != null ? q.tech * pc.ratio : null;
   const hero = `<section class="hero"><div class="hero-top"><div style="min-width:0"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の指名技術売上</div>
       <div class="lv-big">${tech == null ? '—' : '¥' + fmt(tech, 'yen')}</div>
-      <div class="lv-free"><span>フリー技術売上</span><b>${val(d, 'free') == null ? '—' : '¥' + fmt(val(d, 'free'), 'yen')}</b>${q && q.free != null && val(d, 'free') != null ? diffTag(val(d, 'free'), q.free * pc.ratio, 'free') : ''}</div></div>
+      <div class="lv-free"><span>フリー技術売上</span><b>${val(d, 'free') == null ? '—' : '¥' + fmt(val(d, 'free'), 'yen')}</b>${q && q.free != null && val(d, 'free') != null ? diffTag(val(d, 'free'), q.free * pc.ratio, 'free') : ''}</div>
+      <div class="lv-free"><span>店販売上</span><b>${val(d, 'retail') == null ? '—' : '¥' + fmt(val(d, 'retail'), 'yen')}</b>${q && q.retail != null && val(d, 'retail') != null ? diffTag(val(d, 'retail'), q.retail * pc.ratio, 'retail') : ''}</div></div>
       <div class="lv-side">${techP != null ? `<span>前年同月 ¥${fmt(techP, 'yen')}</span><span>昨対 <b>${tech == null ? '—' : (yoy(tech, techP) >= 0 ? '+' : '') + yoy(tech, techP).toFixed(1) + '%'}</b></span>` : '<span>前年同月のデータなし</span>'}${t.tech ? `<span>目標 ¥${fmt(t.tech, 'yen')}・達成 <b>${((tech || 0) / t.tech * 100).toFixed(0)}%</b></span>` : ''}</div></div>
       ${t.tech ? `<div class="hbar"><i style="width:${Math.min(100, (tech || 0) / t.tech * 100)}%"></i></div>` : ''}
       ${ct != null ? `<div class="sub">${y}年1〜${mo}月の累計 ¥${fmt(ct, 'yen')}${pt ? `（前年同期 ¥${fmt(pt, 'yen')}・${(yoy(ct, pt) >= 0 ? '+' : '') + yoy(ct, pt).toFixed(1)}%）` : ''}</div>` : ''}
