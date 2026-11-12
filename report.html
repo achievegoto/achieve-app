@@ -292,6 +292,7 @@ table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
 .cmp-bar { height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; } .cmp-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .cmp-v { font-family: var(--font-num); font-size: 13px; white-space: nowrap; text-align: right; }
 @media (max-width: 480px) { .cmp-row { grid-template-columns: minmax(0, 1fr) auto; } .cmp-bar { grid-column: 1 / -1; grid-row: 2; } }
+.stores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } @media (max-width: 900px) { .stores { grid-template-columns: minmax(0, 1fr); } } .scard .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } @media (min-width: 901px) { .scard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } } @media (max-width: 420px) { .scard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
 </head>
 <body>
@@ -417,7 +418,14 @@ function monthView() {
     return `<button type="button" class="card pcard" data-act="openP" data-id="${p.id}"><div class="card-head"><h3>${esc(p.name)}</h3><span class="sub">${t.tech ? `達成 ${((val(d, 'tech') || 0) / t.tech * 100).toFixed(0)}%` : ''}</span></div>
       <div class="kpis">${k('tech', '指名技術', 'yen')}${k('free', 'フリー技術', 'yen')}${k('retail', '店販売上', 'yen')}${k('cust', '客数', 'n')}${k('unit', '客単価', 'yen')}${k('next', '次予率', 'pct')}${k('newc', '新規', 'n')}</div></button>`;
   }).join('')}</div>`).join('');
-  return mnav('ym') + head + cards + (WHO.isAdmin() ? `<div class="sub">数字の取り込みは、Claudeに「月報を更新して」と頼んでください（サロンアンサーから取得します）。</div>` : '');
+  const storeCards = `<div class="group"><h2>店舗別</h2><div class="stores">${AGG.slice(1).filter(a => GROUP(a[0]).length).map(([gid, l]) => {
+    const d = D(gid, ym) || {}, q = D(gid, py) || {}, t = T(gid, ym);
+    const one = (k, label, ty) => { const c = val(d, k), pv0 = val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' ? pv0 * pc.ratio : pv0;
+      return `<div class="kpi"><span class="kl">${label}</span><b>${c == null ? '—' : (ty === 'yen' ? '¥' : '') + fmt(c, ty)}${ty === 'pct' && c != null ? '<small>%</small>' : ''}</b><span class="ks">${diffTag(c, pv, k)}</span></div>`; };
+    return `<button type="button" class="card pcard scard" data-act="openP" data-id="${gid}"><div class="card-head"><h3>${esc(l.replace(' 全体', ''))}</h3><span class="sub">${GROUP(gid).length}名${t.tech ? ` ・ 達成 ${((val(d, 'tech') || 0) / t.tech * 100).toFixed(0)}%` : ''}</span></div>
+      <div class="kpis">${one('tech', '指名技術', 'yen')}${one('free', 'フリー技術', 'yen')}${one('retail', '店販売上', 'yen')}${one('cust', '客数', 'n')}${one('unit', '客単価', 'yen')}${one('next', '次予率', 'pct')}${one('newc', '新規', 'n')}${one('overRate', '時間超過率', 'pct')}</div></button>`;
+  }).join('')}</div></div>`;
+  return mnav('ym') + head + storeCards + cards + (WHO.isAdmin() ? `<div class="sub">数字の取り込みは、Claudeに「月報を更新して」と頼んでください（サロンアンサーから取得します）。</div>` : '');
 }
 const RATE = k => k === 'repeat' || k === 'next' || k === 'overRate';
 const last12 = ym => Array.from({ length: 12 }, (_, i) => shiftYm(ym, i - 11));
