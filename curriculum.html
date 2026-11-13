@@ -507,6 +507,10 @@ function actionsFor(p, self, t) {
       if (p.state === 'requested') b.push('<button type="button" class="btn" data-act="redo">やり直し</button>');
       if (!p.lectureAt) b.push('<button type="button" class="btn" data-act="lecture">今日レクチャーした</button>');
     }
+    if (WHO.isOwner()) {
+      if (p.state === 'redo') b.push('<button type="button" class="btn danger" data-act="cancelRedo">再挑戦を取り消す</button>');
+      if (p.lectureAt) b.push('<button type="button" class="btn danger" data-act="cancelLecture">レクチャー日を取り消す</button>');
+    }
     b.push('<button type="button" class="btn" data-act="saveNote">コメントを保存</button>');
     b.push(`<button type="button" class="btn" data-act="editItem">${S.open.edit ? '編集をやめる' : '項目を編集'}</button>`);
   } else if (self) {
@@ -596,6 +600,10 @@ document.addEventListener('click', async ev => {
       if (ok) { S.open = null; renderSheet(); }
       break;
     }
+    case 'cancelRedo': { if (!WHO.isOwner()) break; const p = pOf(o.sid, o.iid), h = (p.history || []).slice(); if (h.length && !h[h.length - 1].ok) h.pop();
+      await upd(o.sid, o.iid, { state: p.lectureAt || (p.practice || []).length ? 'lectured' : 'none', history: h }, '再挑戦を取り消し'); toast('再挑戦を取り消しました'); break; }
+    case 'cancelLecture': { if (!WHO.isOwner()) break; const p = pOf(o.sid, o.iid);
+      await upd(o.sid, o.iid, { lectureAt: null, state: p.state === 'lectured' && !(p.practice || []).length ? 'none' : p.state }, 'レクチャー日を取り消し'); toast('レクチャー日を取り消しました'); break; }
     case 'editItem': o.edit = !o.edit; renderSheet(); break;
     case 'saveItem': {
       const links = $('ie-links').value.split('\n').map(x => x.trim()).filter(Boolean).map(x => { const k = x.lastIndexOf('|'); return k < 0 ? { t: x, u: x } : { t: x.slice(0, k).trim(), u: x.slice(k + 1).trim() }; });
