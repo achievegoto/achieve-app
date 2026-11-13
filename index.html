@@ -231,7 +231,8 @@ function needOf(it, store) {
 const shortItems = store => S.items.filter(it => carried(it, store) && needOf(it, store) > 0);
 /* ---- TONARI（過剰在庫）からの店舗間移動 ----
    TONARIに在庫があれば、ディーラーに発注せずTONARIから移す。
-   複数店舗で同じ商品が足りないときは、在庫が少ない（発注点に対して余裕がない）店舗から1個ずつ順に割り振る。 */
+   複数店舗で同じ商品が足りないときは、在庫が少ない（発注点に対して余裕がない）店舗から1個ずつ順に割り振る。同じならLiss→hair→till。
+   金額は受け取る店舗の発注金額に入れ、TONARIの在庫金額からは差し引かれる。 */
 let resvCache = { orders: null, map: {} };
 function tonariReserved(id) {
   if (resvCache.orders !== S.orders) {
@@ -243,7 +244,7 @@ function tonariReserved(id) {
 }
 const tonariFree = id => Math.max(0, qtyOf('tonari', id) - tonariReserved(id));
 function xferAlloc(it) {
-  const stores = STORES.map(s => s.id).filter(id => id !== 'tonari'), res = {};
+  const stores = ['liss', 'hair', 'till'], res = {};
   stores.forEach(st => res[st] = 0);
   let left = tonariFree(it.id); if (!left) return res;
   const need = {}; stores.forEach(st => need[st] = needOf(it, st));
@@ -736,14 +737,14 @@ function orderCard(did) {
   const d = dealerOf(did), rows = linesFor(did);
   const active = rows.filter(r => r.qty > 0);
   const xf = did === XFER;
-  const total = xf ? 0 : active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
+  const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
   const others = S.items.filter(i => (xf ? tonariFree(i.id) > 0 : i.dealerId === did) && !rows.some(r => r.it.id === i.id));
   const dis = S.readOnly || !active.length ? 'disabled' : '';
   return `<section class="card">
-    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${xf ? '発注なし' : yen(total)}</span></div>
-    ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。届いたら「入荷」でTONARIの在庫から自動で引かれます。</div>' : ''}
+    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${yen(total)}</span></div>
+    ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
-      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : `<span>単価 ${yen(num(r.it.price))}</span>`}</div></div>
+      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div></div>
       <div class="stepper${S.unlocked ? '' : ' locked'}">
         <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす" ${S.unlocked ? '' : 'disabled'}>−</button>
         <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
@@ -982,7 +983,7 @@ async function markPlaced(did, quiet) {
   const active = linesFor(did).filter(r => r.qty > 0); if (!active.length) return;
   const d = dealerOf(did);
   if (did === XFER) for (const r of active) if (r.qty > tonariFree(r.it.id)) { toast(r.it.name + ' はTONARIの在庫が足りません'); return; }
-  const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: did === XFER ? 0 : num(r.it.price) }));
+  const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
   try {
     await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now() });
     delete S.draft[draftKey(did)];
