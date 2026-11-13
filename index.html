@@ -199,7 +199,8 @@ const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const yenS = n => n ? Math.round(n).toLocaleString('ja-JP') : '-';
 const num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : d; };
 const storeOf = id => STORES.find(s => s.id === id) || { id, short: id, full: id };
-const dealerOf = id => S.dealers.find(d => d.id === id);
+const XFER = '__tonari', XFER_D = { id: XFER, name: 'TONARIから移動（店舗間）' };
+const dealerOf = id => id === XFER ? XFER_D : S.dealers.find(d => d.id === id);
 const dateStr = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 let toastT;
@@ -228,6 +229,33 @@ function needOf(it, store) {
   return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - onOrder(store, it.id), 1);
 }
 const shortItems = store => S.items.filter(it => carried(it, store) && needOf(it, store) > 0);
+/* ---- TONARI（過剰在庫）からの店舗間移動 ----
+   TONARIに在庫があれば、ディーラーに発注せずTONARIから移す。
+   複数店舗で同じ商品が足りないときは、在庫が少ない（発注点に対して余裕がない）店舗から1個ずつ順に割り振る。 */
+let resvCache = { orders: null, map: {} };
+function tonariReserved(id) {
+  if (resvCache.orders !== S.orders) {
+    const m = {};
+    for (const o of S.orders) if (o.dealerId === XFER && o.status === 'ordered') for (const l of o.lines || []) m[l.itemId] = (m[l.itemId] || 0) + num(l.qty);
+    resvCache = { orders: S.orders, map: m };
+  }
+  return resvCache.map[id] || 0;
+}
+const tonariFree = id => Math.max(0, qtyOf('tonari', id) - tonariReserved(id));
+function xferAlloc(it) {
+  const stores = STORES.map(s => s.id).filter(id => id !== 'tonari'), res = {};
+  stores.forEach(st => res[st] = 0);
+  let left = tonariFree(it.id); if (!left) return res;
+  const need = {}; stores.forEach(st => need[st] = needOf(it, st));
+  const room = st => qtyOf(st, it.id) + onOrder(st, it.id) + res[st] - num(it.min?.[st]);
+  while (left > 0) {
+    const c = stores.filter(st => need[st] > res[st]); if (!c.length) break;
+    c.sort((a, b) => room(a) - room(b) || stores.indexOf(a) - stores.indexOf(b));
+    res[c[0]]++; left--;
+  }
+  return res;
+}
+const xferOf = (it, store) => store === 'tonari' || qtyOf('tonari', it.id) <= 0 ? 0 : xferAlloc(it)[store] || 0;
 function monthTotal(store) {
   const n = new Date();
   return S.orders.filter(o => { const d = new Date(o.orderedAt); return (!store || o.store === store) && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth(); })
@@ -238,8 +266,9 @@ function linesFor(did) {
   const draft = S.draft[draftKey(did)] || {};
   const rows = [];
   for (const it of S.items) {
-    if ((it.dealerId || '') !== did) continue;
-    const need = needOf(it, S.store);
+    const x = xferOf(it, S.store);
+    if (did === XFER ? x <= 0 && !Object.prototype.hasOwnProperty.call(draft, it.id) : (it.dealerId || '') !== did) continue;
+    const need = did === XFER ? x : Math.max(0, needOf(it, S.store) - x);
     const has = Object.prototype.hasOwnProperty.call(draft, it.id);
     if (need > 0 || has) rows.push({ it, qty: has ? num(draft[it.id]) : need });
   }
@@ -267,6 +296,7 @@ function gotoCard() {
 function lineText(did) {
   const d = dealerOf(did), st = storeOf(S.store);
   const body = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${r.it.unit || ''}`).join('\n');
+  if (d && d.id === XFER) return `後藤さん\nTONARIの在庫から移動お願いします。\n${st.full}\n\n${body}`;
   if (d && (d.id === 'other-goto' || /後藤/.test(d.name))) return `後藤さん\n発注お願いします。\n${st.full}\n\n${body}`;
   return `${d ? d.name : ''} ご担当者様\nいつもお世話になっております。\n${st.full}です。\n下記の発注をお願いいたします。\n\n${body}\n\n納品先：${st.full}\n納期が分かりましたらご連絡ください。\nよろしくお願いいたします。`;
 }
@@ -693,7 +723,7 @@ function stockRow(it) {
 }
 
 function viewOrder() {
-  const ids = S.dealers.map(d => d.id).filter(did => linesFor(did).length);
+  const ids = (S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id)).filter(did => linesFor(did).length);
   const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
   const st = storeOf(S.store);
   const extra = S.readOnly ? '' : addPicker();
@@ -705,13 +735,15 @@ function viewOrder() {
 function orderCard(did) {
   const d = dealerOf(did), rows = linesFor(did);
   const active = rows.filter(r => r.qty > 0);
-  const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
-  const others = S.items.filter(i => i.dealerId === did && !rows.some(r => r.it.id === i.id));
+  const xf = did === XFER;
+  const total = xf ? 0 : active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
+  const others = S.items.filter(i => (xf ? tonariFree(i.id) > 0 : i.dealerId === did) && !rows.some(r => r.it.id === i.id));
   const dis = S.readOnly || !active.length ? 'disabled' : '';
   return `<section class="card">
-    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${yen(total)}</span></div>
+    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${xf ? '発注なし' : yen(total)}</span></div>
+    ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。届いたら「入荷」でTONARIの在庫から自動で引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
-      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span><span>単価 ${yen(num(r.it.price))}</span></div></div>
+      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : `<span>単価 ${yen(num(r.it.price))}</span>`}</div></div>
       <div class="stepper${S.unlocked ? '' : ' locked'}">
         <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす" ${S.unlocked ? '' : 'disabled'}>−</button>
         <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
@@ -725,7 +757,7 @@ function orderCard(did) {
     </div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(active.length ? lineText(did) : '')}</textarea>
     <div class="actions">
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${active.length ? '' : 'disabled'}>発注文をコピー</button>
-      <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>LINEで送ったので発注済みにする</button>
+      <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? '移動をお願いしたので依頼済みにする' : 'LINEで送ったので発注済みにする'}</button>
     </div>`}</section>`;
 }
 
@@ -949,7 +981,8 @@ async function markPlaced(did, quiet) {
   if (S.readOnly) return;
   const active = linesFor(did).filter(r => r.qty > 0); if (!active.length) return;
   const d = dealerOf(did);
-  const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
+  if (did === XFER) for (const r of active) if (r.qty > tonariFree(r.it.id)) { toast(r.it.name + ' はTONARIの在庫が足りません'); return; }
+  const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: did === XFER ? 0 : num(r.it.price) }));
   try {
     await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now() });
     delete S.draft[draftKey(did)];
@@ -970,6 +1003,12 @@ async function receive(id) {
       S.stock[key] = next;
       logChange('receive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の発注を入荷' });
       await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at: Date.now() });
+      if (o.dealerId === XFER) {
+        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, tn = Math.max(0, tp - l.qty);
+        S.stock[tk] = tn;
+        logChange('receive', 'tonari', l.itemId, tp, tn, { text: storeOf(o.store).short + 'へ移動' });
+        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at: Date.now() });
+      }
     }
     toast('入荷分を在庫に加えました'); render();
   } catch (e) { fail(e); } finally { receiving.delete(id); }
