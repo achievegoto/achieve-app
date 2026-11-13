@@ -187,6 +187,10 @@ const S = {
   store: 'hair', tab: 'stock', q: '', cat: '', onlyShort: false,
   draft: {}, editing: null, formErr: '', confirm: '', dirty: false,
 };
+/* TONARI在庫はオーナーだけが動かせる */
+const tonariLocked = () => S.store === 'tonari' && !(window.WHO && WHO.isOwner());
+S._ro = false;
+Object.defineProperty(S, 'readOnly', { get() { return this._ro || tonariLocked(); }, set(v) { this._ro = v; }, configurable: true });
 try { const v = localStorage.getItem('achieve-store'); if (STORES.some(s => s.id === v)) S.store = v; } catch (e) {}
 
 const $ = id => document.getElementById(id);
@@ -302,7 +306,7 @@ const BIG = [['SP・TR類', ['Aujua SP', 'Aujua TR', 'サッシェSP', 'サッ�
 let lockT;
 let pinT = 0;
 function armPin() { clearTimeout(pinT); if (S.pin) pinT = setTimeout(() => { S.pin = ''; S.editing = null; if (S.tab === 'items') scheduleRender(); }, 600000); }
-const canEdit = () => !S.readOnly && WHO.isAdmin();
+const canEdit = () => !S._ro && WHO.isAdmin();
 const pinBar = () => S.readOnly ? '' : WHO.isAdmin() ? '<div class="pinbar open"><span style="flex:1;min-width:0"><b>管理者として商品を編集できます</b></span></div>' : '<div class="pinbar"><span style="flex:1;min-width:0"><b>商品の編集は管理者だけです</b></span></div>';
 const pinBarOld = () => S.readOnly ? '' : S.pin
   ? `<div class="pinbar open"><span style="flex:1;min-width:0"><b>商品を編集できます</b><br>10分操作がないと自動でロックします</span><button type="button" class="btn small" id="pin-lock" data-act="pinLock">ロックする</button></div>`
@@ -326,7 +330,8 @@ function shell() {
 }
 function notes() {
   let h = '';
-  if (S.readOnly) h += '<div class="note">閲覧のみのアクセス権です。在庫の変更には編集権限が必要です。</div>';
+  if (tonariLocked()) h += '<div class="note">TONARI在庫はオーナーだけが変更できます（見るだけ）。</div>';
+  else if (S.readOnly) h += '<div class="note">閲覧のみのアクセス権です。在庫の変更には編集権限が必要です。</div>';
   if (S.slow) h += '<div class="note">データにまだ接続できていません。表示が古い可能性があります。</div>';
   return h;
 }
@@ -941,6 +946,7 @@ function draftValue(did, id) {
   const r = linesFor(did).find(x => x.it.id === id); return r ? r.qty : 0;
 }
 async function markPlaced(did, quiet) {
+  if (S.readOnly) return;
   const active = linesFor(did).filter(r => r.qty > 0); if (!active.length) return;
   const d = dealerOf(did);
   const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
@@ -955,6 +961,7 @@ const receiving = new Set();
 async function receive(id) {
   const o = S.orders.find(x => x.id === id);
   if (!o || o.status !== 'ordered' || receiving.has(id)) return;
+  if (S._ro || (o.store === 'tonari' && !WHO.isOwner())) { toast('TONARI在庫はオーナーだけが変更できます'); return; }
   receiving.add(id);
   try {
     await S.db.doc('orders/' + id).update({ status: 'received', receivedAt: Date.now() });
