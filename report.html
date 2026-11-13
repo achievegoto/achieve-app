@@ -405,7 +405,8 @@ function progBar(cur, tgt, ratio) {
 }
 const totalOf = x => x && (x.tech != null || x.free != null || x.retail != null) ? (x.tech || 0) + (x.free || 0) + (x.retail || 0) : null;
 /* ---- 材料費率（在庫アプリの発注金額と連動） ----
-   材料費率＝技術系の発注金額÷技術売上（指名＋フリー）、店販仕入率＝店販商品の発注金額÷店販売上。発注した月で集計（TONARIは除く）。 */
+   材料費率＝技術系の発注金額（ドリンク類を除く）÷技術売上、店販仕入率＝店販商品の発注金額÷店販売上、
+   総材料費率＝すべての発注金額÷総売上。発注した月で集計（TONARIは除く）。 */
 const RETAIL_CATS = ['Aujua SP', 'Aujua TR', 'アウトバス', 'サッシェSP', 'サッシェTR', 'インプレア', 'スタ販インプレア', 'スタイリング剤', 'Refa', 'その他SP・TR', 'その他化粧品'];
 function isRetailLine(l) {
   const it = S.itemCat[l.itemId], cat = it ? it.category : '';
@@ -415,12 +416,12 @@ function isRetailLine(l) {
 function costOf(gid, ym) {
   const st = gid === 'ALL' ? ['hair', 'liss', 'till'] : String(gid).startsWith('S:') ? [gid.slice(2)] : null;
   if (!st) return null;
-  const o = { mat: 0, ret: 0, n: 0 };
+  const o = { mat: 0, ret: 0, drink: 0, n: 0 };
   for (const od of S.orders) {
     if (!st.includes(od.store) || !od.orderedAt) continue;
     const d = new Date(od.orderedAt); if (`${d.getFullYear()}-${pad(d.getMonth() + 1)}` !== ym) continue;
     o.n++;
-    for (const l of od.lines || []) { const a = (Number(l.qty) || 0) * (Number(l.price) || 0); if (isRetailLine(l)) o.ret += a; else o.mat += a; }
+    for (const l of od.lines || []) { const a = (Number(l.qty) || 0) * (Number(l.price) || 0); const it = S.itemCat[l.itemId]; if (isRetailLine(l)) o.ret += a; else if (it && it.category === 'その他ドリンク類') o.drink += a; else o.mat += a; }
   }
   return o;
 }
@@ -430,7 +431,8 @@ function costTag(gid, d, ym) {
   const tech = (d && (d.tech || 0) + (d.free || 0)) || 0, ret = (d && d.retail) || 0;
   const r = (a, b) => b ? (a / b * 100).toFixed(1) + '<small>%</small>' : '—';
   if (!c.n) return '<div class="crate"><span>材料費率 <b>—</b></span><span class="cnote">この月の発注はまだありません</span></div>';
-  return `<div class="crate"><span>材料費率 <b>${r(c.mat, tech)}</b><small>¥${fmt(c.mat, 'yen')}</small></span><span>店販仕入率 <b>${r(c.ret, ret)}</b><small>¥${fmt(c.ret, 'yen')}</small></span></div>`;
+  const all = c.mat + c.ret + c.drink;
+  return `<div class="crate"><span>総材料費率 <b>${r(all, tech + ret)}</b><small>¥${fmt(all, 'yen')}</small></span><span>材料費率（技術） <b>${r(c.mat, tech)}</b><small>¥${fmt(c.mat, 'yen')}</small></span><span>店販仕入率 <b>${r(c.ret, ret)}</b><small>¥${fmt(c.ret, 'yen')}</small></span></div>`;
 }
 const totTag = (d, q, ratio) => { const a = totalOf(d), b = totalOf(q); return a == null ? '' : `<div class="ctot"><small>総売上</small><b>¥${fmt(a, 'yen')}</b>${b ? diffTag(a, b * ratio, 'tot') : ''}</div>`; };
 function monthView() {
