@@ -893,13 +893,49 @@ function viewHistory() {
   const stockCard = `<section class="card">
     <div class="card-head"><h3>今の在庫金額</h3><span class="amount">${yen(vTotal)}</span></div>
     <div class="sum-wrap"><table class="sum">${vHead}${vBody}</table></div>
-    <div class="sub">単位：円（税抜）。在庫数 × 仕入れ単価で計算しています。</div></section>`;
+    <div class="sub">単位：円（税抜）。在庫数 × 仕入れ単価で計算しています。</div>
+    ${WHO.isAdmin() ? `<div class="actions"><button type="button" class="btn primary" data-act="tana" data-id="all">📥 棚卸表（全店舗）をExcelで</button><button type="button" class="btn" data-act="tana" data-id="one">📥 ${esc(storeOf(S.store).short)}だけ</button></div><div class="sub">会計士さん提出用。在庫がある商品を、店舗ごとにカテゴリ・数量・単価・金額で出します。</div>` : ''}</section>`;
   const card = `<section class="card">
     <div class="card-head"><div class="month-nav"><button type="button" class="btn small" id="m-prev" data-act="month" data-id="-1" aria-label="前の月">‹</button><h3>${y}年${m + 1}月の発注額</h3><button type="button" class="btn small" id="m-next" data-act="month" data-id="1" aria-label="次の月" ${S.monthOff >= 0 ? 'disabled' : ''}>›</button></div><span class="amount">${yen(total)}</span></div>
     <div class="sum-wrap"><table class="sum">${head}${body}</table></div>
     <div class="sub">単位：円（税抜）。「発注済み」にした日の月で集計しています。</div></section>`;
   if (!S.orders.length) return card + stockCard + logCard() + '<div class="card"><div class="empty">発注履歴はまだありません。「発注」タブで発注済みにすると、ここに並びます。</div></div>';
   return card + stockCard + logCard() + `<div class="group"><h2>発注履歴（全店）</h2><div class="list">${S.orders.map(orderRow).join('')}</div></div>`;
+}
+/* ---- 棚卸表（Excel） ---- */
+let xlsxP = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return xlsxP ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/xlsx' + String.fromCharCode(64) + '0.18.5/dist/xlsx.full.min.js'; sc.onload = () => res(window.XLSX); sc.onerror = () => { xlsxP = null; rej(new Error('Excelの機能を読み込めませんでした')); }; document.head.appendChild(sc); });
+}
+async function exportTana(scope) {
+  const X = await loadXlsx();
+  const d = new Date(), ds = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`, fs = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const stores = scope === 'all' ? STORES : STORES.filter(s => s.id === S.store);
+  const wb = X.utils.book_new(), sum = [['棚卸表　集計', '', ''], ['棚卸日', ds, ''], ['', '', ''], ['店舗', '品目数', '在庫金額（税抜）']];
+  let grand = 0;
+  for (const st of stores) {
+    const rows = S.items.filter(it => qtyOf(st.id, it.id) > 0).sort((a, b) => (a.category || '').localeCompare(b.category || '', 'ja') || (a.createdAt || 0) - (b.createdAt || 0));
+    const aoa = [[`棚卸表　${st.full}`], ['棚卸日', ds], ['金額は仕入れ単価（税抜）× 数量'], [], ['カテゴリ', '商品名', '単位', '数量', '単価', '金額']];
+    let cat = null, sub = 0, tot = 0;
+    const flush = () => { if (cat !== null) aoa.push(['', `${cat}　小計`, '', '', '', sub]); };
+    for (const it of rows) {
+      if ((it.category || 'その他') !== cat) { flush(); cat = it.category || 'その他'; sub = 0; }
+      const q = qtyOf(st.id, it.id), pr = num(it.price), amt = q * pr;
+      aoa.push([cat, it.name, it.unit || '', q, pr, amt]); sub += amt; tot += amt;
+    }
+    flush();
+    aoa.push([], ['', '合計', '', '', '', tot]);
+    const ws = X.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 16 }, { wch: 44 }, { wch: 6 }, { wch: 7 }, { wch: 9 }, { wch: 12 }];
+    const r = X.utils.decode_range(ws['!ref']);
+    for (let R = 5; R <= r.e.r; R++) for (const C of [4, 5]) { const c = ws[X.utils.encode_cell({ r: R, c: C })]; if (c && c.t === 'n') c.z = '#,##0'; }
+    X.utils.book_append_sheet(wb, ws, st.short.replace(/[\\/?*\[\]:]/g, '').slice(0, 28));
+    sum.push([st.full, rows.length, tot]); grand += tot;
+  }
+  if (stores.length > 1) { sum.push(['合計', '', grand]); const ws = X.utils.aoa_to_sheet(sum); ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 16 }]; for (let R = 4; R < sum.length; R++) { const c = ws[X.utils.encode_cell({ r: R, c: 2 })]; if (c && c.t === 'n') c.z = '#,##0'; } X.utils.book_append_sheet(wb, ws, '集計'); wb.SheetNames.unshift(wb.SheetNames.pop()); }
+  X.writeFile(wb, `棚卸表_${scope === 'all' ? '全店舗' : stores[0].short}_${fs}.xlsx`);
+  toast('棚卸表を書き出しました');
 }
 function orderRow(o) {
   const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
@@ -1108,6 +1144,7 @@ document.addEventListener('click', async ev => {
     case 'placed': markPlaced(did); break;
     case 'scanStart': if (!confirmOther()) break; S.scanMode = id; $('scan-file').click(); break;
     case 'scanCancel': S.scan = null; render(); break;
+    case 'tana': exportTana(id).catch(e => toast(e.message)); break;
     case 'opPick': S.opOpen = S.opOpen === id ? '' : id; render(); break;
     case 'barStart': if (!confirmOther()) break; S.scan = { kind: 'bar', mode: id || 'receive', rows: [], err: '' }; render(); window.scrollTo(0, 0); break;
     case 'barMode': S.scan.mode = id; render(); break;
