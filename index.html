@@ -378,7 +378,7 @@ function render() {
   const a = document.activeElement, fid = a && a.id;
   m.innerHTML = notes() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
-  if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); fillInv(); }
+  if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
   S.dirty = false;
 }
@@ -438,137 +438,6 @@ function scanCard() {
     </div></section>`;
 }
 function fillScan() { if (S.scan && S.scan.rows) S.scan.rows.forEach((r, i) => { const el = $('sc-it-' + i); if (el) el.value = r.id || ''; }); }
-/* ---- 請求書（PDF）と入荷記録の突き合わせ（漏れチェック） ---- */
-const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/';
-let pdfjsP = null;
-function loadPdfjs() {
-  return pdfjsP ||= import(PDFJS + 'build/pdf.min.mjs').then(m => { m.GlobalWorkerOptions.workerSrc = PDFJS + 'build/pdf.worker.min.mjs'; return m; }).catch(e => { pdfjsP = null; throw e; });
-}
-async function pdfLines(file) {
-  const pdfjs = await loadPdfjs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), cMapUrl: PDFJS + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS + 'standard_fonts/' }).promise;
-  const out = [];
-  for (let p = 1; p <= doc.numPages; p++) {
-    const tc = await (await doc.getPage(p)).getTextContent();
-    const its = tc.items.map(it => ({ x: it.transform[4], y: it.transform[5], s: String(it.str || '').trim() })).filter(it => it.s).sort((a, b) => b.y - a.y || a.x - b.x);
-    let cur = null;
-    for (const it of its) { if (!cur || Math.abs(cur.y - it.y) > 2) { cur = { y: it.y, t: [] }; out.push(cur); } cur.t.push(it); }
-  }
-  return out.map(l => l.t.sort((a, b) => a.x - b.x).map(it => it.s));
-}
-const invNum = s => Number(String(s).replace(/,/g, '')) || 0;
-function parseInvoice(lines) {
-  const r = { to: '', close: '', items: [] }, isN = s => /^-?[\d,]+$/.test(s);
-  let date = '', pend = null;
-  for (const t of lines) {
-    if (!r.to) { const m = t.find(s => /achieve/i.test(s)); if (m) r.to = m; }
-    if (!r.close) { const m = t.join('').match(/(20\d\d)年?(\d{1,2})月?(\d{1,2})日?締/); if (m) r.close = `${m[1]}/${m[2].padStart(2, '0')}/${m[3].padStart(2, '0')}`; }
-    const d = t.find(s => /^20\d\d\/\d{1,2}\/\d{1,2}$/.test(s)); if (d) date = d;
-    const jan = t.find(s => /^\d{13}$/.test(s));
-    if (jan) { pend = { jan, date }; continue; }
-    if (!pend) continue;
-    const ix = t.map((s, k) => isN(s) ? k : -1).filter(k => k > 0), n = ix.length;
-    const qi = n >= 3 ? ix[n - 3] : -1;
-    if (qi > 0 && /^-?\d{1,5}$/.test(t[qi])) r.items.push({ jan: pend.jan, date: pend.date, name: t.slice(0, qi).join(' '), qty: Number(t[qi]), price: invNum(t[ix[n - 2]]), amount: invNum(t[ix[n - 1]]) });
-    pend = null;
-  }
-  return r;
-}
-const invStoreOf = to => /liss/i.test(to) ? 'liss' : /till/i.test(to) ? 'till' : /hair/i.test(to) ? 'hair' : '';
-const invKindOf = to => /スタッフ/.test(to) ? 'スタッフ' : /ﾐﾙﾎﾞﾝ|ミルボン/.test(to) ? 'ミルボンID' : /業務/.test(to) ? '業務' : '店販';
-const dayMs = 86400000, ymdMs = s => { const [y, m, d] = s.split('/').map(Number); return new Date(y, m - 1, d).getTime(); };
-async function runInvoice(files) {
-  S.scan = null; S.inv = { busy: true, docs: [], rows: [], err: '' }; render(); window.scrollTo(0, 0);
-  try {
-    const docs = [];
-    for (const f of files) {
-      const p = parseInvoice(await pdfLines(f));
-      docs.push({ file: f.name, ...p, store: invStoreOf(p.to), kind: invKindOf(p.to), total: p.items.reduce((a, x) => a + x.amount, 0) });
-    }
-    if (!docs.some(d => d.items.length)) throw new Error('請求書の明細が読み取れませんでした（TOPYの請求明細書PDFに対応しています）');
-    S.inv = { docs, rows: [], err: '' };
-    await invReconcile();
-  } catch (e) { S.inv = { docs: [], rows: [], err: (e && e.message) || '読み取りに失敗しました' }; }
-  render();
-}
-async function invReconcile() {
-  const inv = S.inv, rows = [], skip = /値引|送料|手数料|調整/;
-  const docs = inv.docs.filter(d => d.store && d.items.length);
-  const ds = docs.flatMap(d => d.items.map(x => x.date).filter(Boolean).map(ymdMs));
-  const closes = docs.map(d => d.close).filter(Boolean).map(ymdMs);
-  if (!ds.length) { inv.rows = []; return; }
-  const from = Math.min(...ds) - dayMs, to = Math.min(Date.now(), Math.max(...ds, ...closes) + 4 * dayMs);
-  inv.from = from; inv.to = to;
-  const snap = await S.db.collection('stock_log').where('at', '>=', from).where('at', '<', to).get();
-  const rec = {};
-  snap.docs.forEach(x => {
-    const l = x.data(), d = (Number(l.to) || 0) - (Number(l.from) || 0);
-    if (!l.itemId || d <= 0 || (l.kind !== 'receive' && l.kind !== 'count')) return;
-    const k = l.store + '_' + l.itemId, o = rec[k] ||= { recv: 0, hand: 0 };
-    if (l.kind === 'receive') o.recv += d; else o.hand += d;
-  });
-  inv.recMap = rec;
-  const by = new Map();
-  for (const d of docs) for (const x of d.items) {
-    if (x.qty <= 0 || skip.test(x.name)) continue;
-    const it = itemByJan(x.jan), key = d.store + '|' + (it ? it.id : 'j' + janKey(x.jan));
-    let r = by.get(key);
-    if (!r) { r = { store: d.store, jan: x.jan, name: x.name, id: it ? it.id : '', known: !!it, inv: 0, staff: d.kind === 'スタッフ' }; by.set(key, r); rows.push(r); }
-    r.inv += x.qty; if (d.kind !== 'スタッフ') r.staff = false;
-  }
-  rows.forEach(r => {
-    const o = r.id ? rec[r.store + '_' + r.id] || { recv: 0, hand: 0 } : { recv: 0, hand: 0 };
-    r.recv = o.recv; r.hand = o.hand; r.rec = o.recv + o.hand;
-    r.add = r.id && !r.staff ? Math.max(0, r.inv - r.rec) : 0;
-  });
-  const order = { hair: 0, liss: 1, till: 2 };
-  rows.sort((a, b) => order[a.store] - order[b.store] || (a.id ? 1 : 0) - (b.id ? 1 : 0) || (b.inv - b.rec) - (a.inv - a.rec));
-  inv.rows = rows;
-}
-const md = ms => { const d = new Date(ms); return (d.getMonth() + 1) + '/' + d.getDate(); };
-function invCard() {
-  const inv = S.inv; if (!inv) return '';
-  if (inv.busy) return `<section class="card"><h3>請求書で入荷チェック</h3><div class="scan-busy">請求書を読み取っています…</div></section>`;
-  const head = `<div class="card-head"><h3>請求書で入荷チェック</h3></div>`;
-  const cancel = `<button type="button" class="btn" id="inv-cancel" data-act="invCancel">閉じる</button>`;
-  if (inv.err) return `<section class="card">${head}<div class="err">${esc(inv.err)}</div><div class="actions"><button type="button" class="btn" data-act="invStart">ほかのPDFを選ぶ</button>${cancel}</div></section>`;
-  const docsHtml = inv.docs.map(d => `<div class="sub">📄 ${esc(d.to || d.file)}${d.close ? `（${esc(d.close)}締）` : ''}：${d.items.length}明細・${yen(d.total)}${d.store ? '' : ' <b class="alert">店舗がわからないため対象外</b>'}</div>`).join('');
-  const per = inv.from ? `<div class="sub">在庫アプリの入荷記録（${md(inv.from)}〜${md(inv.to - 1)}）と比べています。発注画面の「入荷」・スキャン入荷・在庫の＋ボタンで増やした数を記録として数えます。</div>` : '';
-  const bad = inv.rows.filter(r => !r.id || r.inv !== r.rec), ok = inv.rows.filter(r => r.id && r.inv === r.rec);
-  const row = r => {
-    const i = inv.rows.indexOf(r), st = storeOf(r.store).short;
-    const diff = r.inv - r.rec;
-    const label = !r.id ? '<span class="pill ordering">未登録の商品</span>' : diff > 0 ? `<span class="pill ordering">${diff} 足りない</span>` : diff < 0 ? `<span class="pill">記録の方が ${-diff} 多い</span>` : '<span class="pill ok">一致</span>';
-    return `<div class="row scan-row"><div style="min-width:0">
-      <div><b>${esc(r.name)}</b></div>
-      <div class="sub"><span>${esc(st)}</span><span>請求 ${r.inv}</span><span>記録 ${r.rec}${r.hand ? `（うち＋ボタン ${r.hand}）` : ''}</span>${label}${r.staff ? '<span>スタッフ購入分</span>' : ''}</div>
-      ${r.known ? '' : `<select class="field" id="iv-it-${i}" data-chg="invItem" data-id="${i}" aria-label="商品を選ぶ">${scanOptions()}</select><div class="sub">JAN ${esc(r.jan)}：選ぶとこのバーコードも登録されます</div>`}
-    </div>
-    <input class="field qty" type="number" min="0" inputmode="numeric" value="${num(r.add)}" data-chg="invAdd" data-id="${i}" aria-label="足す数" ${r.id ? '' : 'disabled'}></div>`;
-  };
-  const adds = inv.rows.filter(r => r.id && num(r.add) > 0), links = inv.rows.filter(r => r.id && !r.known);
-  const n = adds.reduce((a, r) => a + num(r.add), 0);
-  return `<section class="card">${head}${docsHtml}${per}
-    ${bad.length ? `<div class="sub" style="margin-top:6px">右の数を在庫に足します（足りない分を入れてあります。足さないものは0に）。</div><div class="lines">${bad.map(row).join('')}</div>` : '<div class="empty">漏れはありません。請求書と入荷記録が全部一致しています。</div>'}
-    ${ok.length ? `<details style="margin-top:8px"><summary class="sub">一致している商品 ${ok.length} 件</summary><div class="lines">${ok.map(row).join('')}</div></details>` : ''}
-    <div class="actions">
-      <button type="button" class="btn primary" id="inv-apply" data-act="invApply" ${adds.length || links.length ? '' : 'disabled'}>${adds.length ? `${adds.length} 品目・${n} 個を入荷に追加` : 'バーコードだけ登録'}</button>
-      <button type="button" class="btn" data-act="invStart">ほかのPDFを選ぶ</button>${cancel}
-    </div></section>`;
-}
-function fillInv() { if (S.inv && S.inv.rows) S.inv.rows.forEach((r, i) => { const el = $('iv-it-' + i); if (el) el.value = r.id || ''; }); }
-async function applyInvNow() {
-  const inv = S.inv; if (!inv || inv.saving) return;
-  const per = {};
-  inv.rows.filter(r => r.id && (num(r.add) > 0 || !r.known)).forEach(r => (per[r.store] ||= []).push({ id: r.id, qty: num(r.add), jan: r.known ? '' : r.jan }));
-  if (!Object.keys(per).length) return;
-  inv.saving = true;
-  try {
-    let n = 0;
-    for (const [st, lines] of Object.entries(per)) { await S.db.applyScan(st, 'receive', lines, '請求書チェックで入荷を追加'); n += lines.filter(l => l.qty > 0).length; }
-    S.inv = null; toast(n ? n + '品目を入荷に追加しました' : 'バーコードを登録しました'); render();
-  } catch (e) { inv.saving = false; fail(e); }
-}
 function imageToJpeg(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -610,7 +479,6 @@ async function applyScanNow() {
 }
 document.addEventListener('change', ev => {
   const tid = ev.target.id;
-  if (tid === 'inv-file') { const fs = [...(ev.target.files || [])]; ev.target.value = ''; if (fs.length) runInvoice(fs); return; }
   if (tid !== 'scan-file' && tid !== 'bar-file' && tid !== 'jan-file') return;
   const f = ev.target.files && ev.target.files[0]; ev.target.value = '';
   if (f) tid === 'bar-file' ? runBar(f) : tid === 'jan-file' ? janFromPhoto(f) : runScan(f);
@@ -839,14 +707,12 @@ function viewStock() {
     <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
     <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
   </div>
-  ${invCard()}
   ${scanCard()}
   <div class="tools">
     ${lockBar()}
-    ${S.readOnly || S.scan || S.inv ? '' : `<div class="scan-btns"><button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書で入荷</button><button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮って数える</button><button type="button" class="btn" id="bar-start" data-act="barStart" style="grid-column:1/-1">▥ バーコード（入荷・棚卸し・登録）</button><button type="button" class="btn" id="inv-start" data-act="invStart" style="grid-column:1/-1">🧾 請求書PDFで入荷漏れチェック</button></div>`}
+    ${S.readOnly || S.scan ? '' : `<div class="scan-btns"><button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書で入荷</button><button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮って数える</button><button type="button" class="btn" id="bar-start" data-act="barStart" style="grid-column:1/-1">▥ バーコード（入荷・棚卸し・登録）</button></div>`}
     <input type="file" id="scan-file" accept="image/&#42;" capture="environment" hidden>
     <input type="file" id="bar-file" accept="image/&#42;" capture="environment" hidden>
-    <input type="file" id="inv-file" accept="application/pdf,.pdf" multiple hidden>
     <input class="field" id="search" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">
     ${catChips(true)}
   </div>
@@ -1218,9 +1084,6 @@ document.addEventListener('click', async ev => {
     case 'janCam': $('jan-file').click(); break;
     case 'scanAdd': S.scan.rows.push({ text: '', qty: 1, id: '' }); render(); break;
     case 'scanApply': applyScanNow(); break;
-    case 'invStart': $('inv-file').click(); break;
-    case 'invCancel': S.inv = null; render(); break;
-    case 'invApply': applyInvNow(); break;
     case 'placedGoto': { const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
     case 'receive': receive(id); break;
     case 'confirm': if (S.editing) readForm(); S.confirm = id; render(); break;
@@ -1249,8 +1112,6 @@ document.addEventListener('change', ev => {
   if (c === 'addOther' && el.value) { const [d, i] = el.value.split('|'); bumpDraft(d, i, 1); el.value = ''; el.blur(); render(); }
   if (c === 'scanItem') { S.scan.rows[Number(id)].id = el.value; render(); return; }
   if (c === 'scanQty') { S.scan.rows[Number(id)].qty = num(el.value); render(); return; }
-  if (c === 'invItem' && S.inv) { const r = S.inv.rows[Number(id)]; r.id = el.value; const o = (r.id && (S.inv.recMap || {})[r.store + '_' + r.id]) || { recv: 0, hand: 0 }; r.recv = o.recv; r.hand = o.hand; r.rec = o.recv + o.hand; r.add = r.id ? Math.max(0, r.inv - r.rec) : 0; render(); return; }
-  if (c === 'invAdd' && S.inv) { S.inv.rows[Number(id)].add = num(el.value); render(); return; }
   if (c === 'catPick') { $('f-newc-w').hidden = el.value !== '__new'; }
   if (c === 'dealerPick') { $('f-newd-w').hidden = el.value !== '__new'; }
   if (c === 'dealerName') { const v = el.value.trim(); if (v) S.db.doc('dealers/' + id).update({ name: v }).catch(fail); }
@@ -1483,7 +1344,7 @@ function makeApi(fs) {
     },
     scanPhoto: (mode, store, b64, mime) => gas({ action: 'scanPhoto', mode, store, b64, mime, items: S.items.map(it => ({ id: it.id, name: it.name, unit: it.unit })) }),
     scanBarcodes: (b64, mime) => gas({ action: 'scanBarcodes', b64, mime, items: S.items.map(it => ({ id: it.id, name: it.name, jan: it.jan || '' })) }),
-    async applyScan(store, mode, lines, note) {
+    async applyScan(store, mode, lines) {
       const batch = fs.batch();
       for (const l of lines || []) {
         if (!l.id) continue;
@@ -1496,7 +1357,7 @@ function makeApi(fs) {
         if (mode === 'link') continue;
         const key = store + '_' + l.id, q = Math.max(0, Math.round(Number(l.qty) || 0));
         if (mode === 'count') { const prev = S.stock[key] ?? 0; batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: q, at: Date.now() }); S.stock[key] = q; if (prev !== q) logChange('count', store, l.id, prev, q, { text: 'スキャン・写真で棚卸し' }); }
-        else if (q) { const prev = S.stock[key] || 0; batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: FV.increment(q), at: Date.now() }, { merge: true }); S.stock[key] = prev + q; logChange('receive', store, l.id, prev, prev + q, { text: note || 'スキャン・写真で入荷' }); }
+        else if (q) { const prev = S.stock[key] || 0; batch.set(fs.doc('stock/' + key), { store, itemId: l.id, qty: FV.increment(q), at: Date.now() }, { merge: true }); S.stock[key] = prev + q; logChange('receive', store, l.id, prev, prev + q, { text: 'スキャン・写真で入荷' }); }
       }
       await batch.commit();
     },
