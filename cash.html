@@ -883,25 +883,23 @@ function xlsxExport(span) {
   const wb = XLSX.utils.book_new();
   const short = st => storeName(st).replace('achieve ', '');
   const sum = [['店舗', '期間', '前月繰越', '入金', '出金', '月末残高']], catRows = [['店舗', '区分', '勘定科目', '金額']];
+  const nf = ws => { const rng = XLSX.utils.decode_range(ws['!ref']); for (let R = 0; R <= rng.e.r; R++) for (const C of [4, 5, 6]) { const c = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (c && c.t === 'n') c.z = '#,##0'; } };
   list.forEach(st => {
-    const aoa = [[`現金出納帳　${storeName(st)}`], [], ['日付', '勘定科目', '摘要', '入金', '出金', '残高']];
     const ct = { in: {}, out: {} };
-    months.forEach((ym, i) => {
-      const mr = monthRows(st, ym);
-      if (i === 0) aoa.push([ym + '-01', '', '前月繰越', null, null, mr.carry]);
-      mr.rows.forEach(r => { aoa.push([r.date, r.cat || '', r.memo || '', r.kind === 'in' ? Number(r.amount) : null, r.kind === 'out' ? Number(r.amount) : null, r.bal]); ct[r.kind][r.cat || '未分類'] = (ct[r.kind][r.cat || '未分類'] || 0) + Number(r.amount); });
+    months.forEach(ym => {
+      const mr = monthRows(st, ym), [y, m] = ym.split('-').map(Number);
+      // 元の出納帳と同じ形：1シート＝1か月
+      const aoa = [[`現金出納帳　${storeName(st)}`, null, null, null, null, null, `${y}年${m}月`], [], ['日', '勘定科目', '取引先名・摘要', '', '収入金額', '支払金額', '残　　高'], [1, null, null, '前月繰り越し', null, null, mr.carry]];
+      mr.rows.forEach(r => { aoa.push([Number(r.date.slice(8)), r.cat || '', r.memo || '', '', r.kind === 'in' ? Number(r.amount) : null, r.kind === 'out' ? Number(r.amount) : null, r.bal]); ct[r.kind][r.cat || '未分類'] = (ct[r.kind][r.cat || '未分類'] || 0) + Number(r.amount); });
+      aoa.push([], ['合　　　計', null, null, null, mr.tin, mr.tout, mr.end], ['次月繰り越し', null, null, null, null, null, mr.end]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 13 }];
+      ws['!merges'] = [{ s: { r: 2, c: 2 }, e: { r: 2, c: 3 } }];
+      nf(ws);
+      XLSX.utils.book_append_sheet(wb, ws, list.length > 1 ? `${short(st)} ${m}月`.slice(0, 31) : String(m));
       sum.push([short(st), ymLabel(ym), mr.carry, mr.tin, mr.tout, mr.end]);
     });
-    const first = monthRows(st, months[0]), last = monthRows(st, months[months.length - 1]);
-    const tin = months.reduce((a, ym) => a + monthRows(st, ym).tin, 0), tout = months.reduce((a, ym) => a + monthRows(st, ym).tout, 0);
-    aoa.push([], ['', '', '合計', tin, tout, last.end]);
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 32 }, { wch: 11 }, { wch: 11 }, { wch: 12 }];
-    const rng = XLSX.utils.decode_range(ws['!ref']);
-    for (let R = 3; R <= rng.e.r; R++) for (const C of [3, 4, 5]) { const c = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (c && c.t === 'n') c.z = '#,##0'; }
-    XLSX.utils.book_append_sheet(wb, ws, short(st).slice(0, 28));
     ['out', 'in'].forEach(k => Object.entries(ct[k]).sort((a, b) => b[1] - a[1]).forEach(([c, v]) => catRows.push([short(st), k === 'in' ? '入金' : '出金', c, v])));
-    void first;
   });
   const ws2 = XLSX.utils.aoa_to_sheet(sum); ws2['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, ws2, '月次集計');
