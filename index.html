@@ -446,7 +446,7 @@ function opsCard() {
   const op = (m, btns) => `<div class="op"><span class="sg ${MODE[m].cls}">${MODE[m].sg}</span><b>${MODE[m].t}</b><span class="sub">${MODE[m].d}</span><div class="obtns">${btns}</div></div>`;
   return `<div class="ops">
     ${op('receive', '<button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書を撮る</button><button type="button" class="btn" data-act="barStart" data-id="receive">▥ バーコード</button>')}
-    ${op('use', '<button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード</button>')}
+    ${op('use', '<button type="button" class="btn" data-act="scanStart" data-id="use">📷 使った物を撮る</button><button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード</button>')}
     ${op('count', '<button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮る</button><button type="button" class="btn" data-act="barStart" data-id="count">▥ バーコード</button>')}
     <button type="button" class="btn small" data-act="barStart" data-id="link" style="align-self:flex-start">▥ バーコードを商品に登録するだけ</button>
   </div>`;
@@ -454,7 +454,7 @@ function opsCard() {
 function scanCard() {
   const sc = S.scan; if (!sc) return '';
   if (sc.kind === 'bar') return barCard();
-  const st = storeOf(S.store).short, how = sc.mode === 'count' ? '（棚の写真）' : '（納品書の写真）';
+  const st = storeOf(S.store).short, how = sc.mode === 'count' ? '（棚の写真）' : sc.mode === 'use' ? '（写真）' : '（納品書の写真）';
   if (sc.busy) return `<section class="card">${modeHead(sc.mode, how, st)}<div class="scan-busy">写真を読み取っています（10〜30秒ほど）</div></section>`;
   const rows = sc.rows.map((r, i) => `<div class="row scan-row"><div style="min-width:0"><div class="sub">読み取り：${esc(r.text || '（手で追加）')}</div>
       <select class="field" id="sc-it-${i}" data-chg="scanItem" data-id="${i}" aria-label="商品を選ぶ">${scanOptions()}</select>
@@ -466,7 +466,7 @@ function scanCard() {
     ${sc.err ? `<div class="err">${esc(sc.err)}</div>` : '<div class="sub">商品と個数を確認して、違うところは直してください。</div>'}
     <div class="lines">${rows || '<div class="empty">読み取れた商品がありません。</div>'}</div>
     <div class="actions">
-      <button type="button" class="btn primary" id="scan-apply" data-act="scanApply" ${n ? '' : 'disabled'}>${MODE[sc.mode].sg} ${n} 件を${sc.mode === 'count' ? '上書き' : '在庫に足す'}</button>
+      <button type="button" class="btn primary" id="scan-apply" data-act="scanApply" ${n ? '' : 'disabled'}>${MODE[sc.mode].sg} ${n} 件を${sc.mode === 'count' ? '上書き' : sc.mode === 'use' ? '在庫から引く' : '在庫に足す'}</button>
       <button type="button" class="btn" id="scan-add" data-act="scanAdd">行を追加</button>
       <button type="button" class="btn" id="scan-again" data-act="scanStart" data-id="${sc.mode}">撮り直す</button>
       <button type="button" class="btn" id="scan-cancel" data-act="scanCancel">やめる</button>
