@@ -446,7 +446,7 @@ function opsCard() {
   const op = (m, btns) => `<div class="op"><span class="sg ${MODE[m].cls}">${MODE[m].sg}</span><b>${MODE[m].t}</b><span class="sub">${MODE[m].d}</span><div class="obtns">${btns}</div></div>`;
   return `<div class="ops">
     ${op('receive', '<button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書を撮る</button><button type="button" class="btn" data-act="barStart" data-id="receive">▥ バーコード</button>')}
-    ${op('use', '<button type="button" class="btn" data-act="scanStart" data-id="use">📷 使った物を撮る</button><button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード</button>')}
+    ${op('use', '<button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード（カメラ・写真）</button>')}
     ${op('count', '<button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮る</button><button type="button" class="btn" data-act="barStart" data-id="count">▥ バーコード</button>')}
     <button type="button" class="btn small" data-act="barStart" data-id="link" style="align-self:flex-start">▥ バーコードを商品に登録するだけ</button>
   </div>`;
