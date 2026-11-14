@@ -336,7 +336,7 @@ const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}
 /* ---- 計算 ---- */
 const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
 const AGG = [['ALL', '全員']].concat([['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till']].map(([id, l]) => ['S:' + id, l + ' 全体']));
-const GROUP = id => id === 'ALL' ? active() : String(id).startsWith('S:') ? active().filter(p => p.store === id.slice(2)) : null;
+const GROUP = id => id === 'ALL' ? active().filter(p => !p.ownerOnly) : String(id).startsWith('S:') ? active().filter(p => p.store === id.slice(2) && !p.ownerOnly) : null;
 const SUMK = ['tech', 'free', 'retail', 'cust', 'buyers', 'newc', 'over'], WK = ['repeat', 'next', 'overRate'];
 function D(pid, ym) {
   const g = GROUP(pid); if (!g) return D0(pid, ym);
@@ -356,7 +356,8 @@ function T(pid, ym) {
   const g = GROUP(pid); if (!g) return T0(pid, ym);
   const o = {}; g.forEach(p => { const t = T0(p.id, ym); ['tech', 'free', 'retail', 'cust', 'newc'].forEach(k => { if (Number(t[k])) o[k] = (o[k] || 0) + Number(t[k]); }); }); return o;
 }
-const active = () => S.people.filter(p => !p.hidden);
+/* ownerOnly の人（後藤）はオーナーだけに表示し、全員・店舗の合計には入れない */
+const active = () => S.people.filter(p => !p.hidden && (!p.ownerOnly || WHO.isOwner()));
 const byStore = list => STORES.map(([id, l]) => [l, list.filter(s => s.store === id)]).concat([['店舗未設定', list.filter(s => !STORES.some(x => x[0] === s.store))]]).filter(g => g[1].length);
 function pace(ym) {
   const m = S.meta[ym]; const [y, mo] = ym.split('-').map(Number); const days = new Date(y, mo, 0).getDate();
@@ -438,8 +439,9 @@ const totTag = (d, q, ratio) => { const a = totalOf(d), b = totalOf(q); return a
 function monthView() {
   const ym = S.ym, py = shiftYm(ym, -12), pc = pace(ym);
   const people = active().filter(p => D(p.id, ym) || D(p.id, py) || Object.keys(T(p.id, ym)).length);
-  const tot = k => people.reduce((a, p) => a + (val(D(p.id, ym), k) || 0), 0), totP = k => people.reduce((a, p) => a + (val(D(p.id, py), k) || 0), 0) * pc.ratio;
-  const tTot = people.reduce((a, p) => a + (Number(T(p.id, ym).tech) || 0), 0);
+  const staffP = people.filter(p => !p.ownerOnly);
+  const tot = k => staffP.reduce((a, p) => a + (val(D(p.id, ym), k) || 0), 0), totP = k => staffP.reduce((a, p) => a + (val(D(p.id, py), k) || 0), 0) * pc.ratio;
+  const tTot = staffP.reduce((a, p) => a + (Number(T(p.id, ym).tech) || 0), 0);
   const all = tot('tech') + tot('free') + tot('retail'), allP = totP('tech') + totP('free') + totP('retail');
   const line = (k, l) => `<div class="lv-free"><span>${l}</span><b>¥${fmt(tot(k), 'yen')}</b>${totP(k) ? diffTag(tot(k), totP(k), k) : ''}</div>`;
   const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の総売上（全員）</div><div class="lv-big">¥${fmt(all, 'yen')}</div>${line('tech', '指名技術')}${line('free', 'フリー技術')}${line('retail', '店販')}${costTag('ALL', D('ALL', ym), ym)}</div>
