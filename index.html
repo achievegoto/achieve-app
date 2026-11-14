@@ -426,8 +426,8 @@ function scheduleRender() {
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !S.editing) scheduleRender(); }, 0));
 
-function catChips(withShort) {
-  const cats = [...new Set(S.items.map(i => i.category).filter(Boolean))];
+function catChips(withShort, all) {
+  const cats = [...new Set(S.items.filter(i => all || carried(i, S.store)).map(i => i.category).filter(Boolean))];
   const bigs = BIG.map(([n, ms]) => [n, ms.filter(c => cats.includes(c))]).filter(b => b[1].length);
   const solo = cats.filter(c => !bigs.some(b => b[1].includes(c)));
   const rank = t => t.big ? ({ 'カラー': 0, 'SP・TR類': 2, 'コスメ': 3, '美容器具': 4.5, 'その他': 6 }[t.big[0]] ?? 2.5) : (t.cat.includes('パーマ') ? 1 : 4);
@@ -828,7 +828,7 @@ function addPicker() {
   const active = q || S.cat || S.big;
   let list = '';
   if (active) {
-    const hits = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+    const hits = S.items.filter(it => carried(it, S.store) && (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
     const shown = hits.slice(0, 60);
     list = hits.length ? `<div class="list">${shown.map(it => {
       const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
@@ -943,7 +943,7 @@ function viewItems() {
   <div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button></div>
   <div class="tools">
     <input class="field" id="isearch" type="search" placeholder="商品名で探す（全 ${S.items.length} 点）" aria-label="商品名で探す" value="${esc(S.q)}">
-    ${catChips(false)}
+    ${catChips(false, true)}
   </div>
   <div id="item-list" style="display:flex;flex-direction:column;gap:16px">${S.items.length ? itemList() : '<div class="empty">商品がまだありません。</div>'}</div>
   ${S.dealers.length ? `<div class="group"><h2>ディーラー</h2><div class="list">${dealers}</div></div>` : ''}`;
