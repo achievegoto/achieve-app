@@ -365,6 +365,19 @@ async function tryPin() {
   } catch (e) { S.pinErr = '確認できませんでした。通信を確認してください'; }
   render();
 }
+/* 他店所属のスタッフが別店舗の在庫を動かすときは確認する（オーナーと所属なしは除く） */
+const okOther = new Set();
+function otherStore() {
+  const me = WHO.me; if (!me || WHO.isOwner()) return false;
+  return ['hair', 'liss', 'till'].includes(me.store) && me.store !== S.store;
+}
+function confirmOther() {
+  if (!otherStore() || okOther.has(S.store)) return true;
+  const mine = storeOf(WHO.me.store).short, here = storeOf(S.store).short;
+  const ok = window.confirm(`${WHO.me.name}さんは「${mine}」所属です。\n今開いているのは「${here}」の在庫です。\n\n${here}の数を変更しますか？`);
+  if (ok) okOther.add(S.store);
+  return ok;
+}
 function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
@@ -374,6 +387,7 @@ function shell() {
 }
 function notes() {
   let h = '';
+ if (otherStore()) h += `<div class="note">${esc(storeOf(S.store).short)}の在庫を開いています（${esc(WHO.me.name)}さんの所属は${esc(storeOf(WHO.me.store).short)}）。</div>`;
   if (tonariLocked()) h += '<div class="note">TONARI在庫はオーナーだけが変更できます（見るだけ）。</div>';
   else if (S.readOnly) h += '<div class="note">閲覧のみのアクセス権です。在庫の変更には編集権限が必要です。</div>';
   if (S.slow) h += '<div class="note">データにまだ接続できていません。表示が古い可能性があります。</div>';
@@ -446,7 +460,7 @@ function opsCard() {
   const op = (m, btns) => `<div class="op"><span class="sg ${MODE[m].cls}">${MODE[m].sg}</span><b>${MODE[m].t}</b><span class="sub">${MODE[m].d}</span><div class="obtns">${btns}</div></div>`;
   return `<div class="ops">
     ${op('receive', '<button type="button" class="btn" id="scan-recv" data-act="scanStart" data-id="receive">📷 納品書を撮る</button><button type="button" class="btn" data-act="barStart" data-id="receive">▥ バーコード</button>')}
-    ${op('use', '<button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード（カメラ・写真）</button>')}
+    ${op('use', '<button type="button" class="btn" data-act="scanStart" data-id="use">📷 使った物を撮る</button><button type="button" class="btn" data-act="barStart" data-id="use">▥ バーコード</button>')}
     ${op('count', '<button type="button" class="btn" id="scan-count" data-act="scanStart" data-id="count">📷 棚を撮る</button><button type="button" class="btn" data-act="barStart" data-id="count">▥ バーコード</button>')}
     <button type="button" class="btn small" data-act="barStart" data-id="link" style="align-self:flex-start">▥ バーコードを商品に登録するだけ</button>
   </div>`;
@@ -1071,7 +1085,7 @@ document.addEventListener('click', async ev => {
     case 'store': S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
     case 'tab': S.tab = id; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
-    case 'lock': S.unlocked = !S.unlocked; armLock(); render(); break;
+    case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
     case 'onlyShort': S.onlyShort = !S.onlyShort; render(); break;
@@ -1086,9 +1100,9 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'placed': markPlaced(did); break;
-    case 'scanStart': S.scanMode = id; $('scan-file').click(); break;
+    case 'scanStart': if (!confirmOther()) break; S.scanMode = id; $('scan-file').click(); break;
     case 'scanCancel': S.scan = null; render(); break;
-    case 'barStart': S.scan = { kind: 'bar', mode: id || 'receive', rows: [], err: '' }; render(); window.scrollTo(0, 0); break;
+    case 'barStart': if (!confirmOther()) break; S.scan = { kind: 'bar', mode: id || 'receive', rows: [], err: '' }; render(); window.scrollTo(0, 0); break;
     case 'barMode': S.scan.mode = id; render(); break;
     case 'barShot': S.barMany = id; $('bar-file').click(); break;
     case 'liveStart': liveStart(); break;
