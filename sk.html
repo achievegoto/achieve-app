@@ -345,6 +345,10 @@ table.mlist td.tot { font-weight: 600; }
 .capbtn { align-self: flex-start; background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; }
 .capedit { display: flex; gap: 8px; align-items: center; } .capedit .field { max-width: 120px; background: #fff; color: #222; }
 .yearbar select { font-weight: 700; }
+.ytabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } .ytabs::-webkit-scrollbar { display: none; }
+.ytabs button { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 76px; padding: 7px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
+.ytabs button b { font-size: 15px; color: var(--fg, inherit); } .ytabs button span { font-size: 10px; } .ytabs button small { font-size: 11px; }
+.ytabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: rgba(255,255,255,.85); } .ytabs button[aria-selected="true"] b { color: #fff; }
 .row.ent { align-items: start; }
 .steps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .st { font-size: 11px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
@@ -476,7 +480,7 @@ function loginView() {
 
 /* ---- 一覧 ---- */
 function years() {
-  const ys = new Set(S.entries.map(e => Number(e.year)).filter(Boolean)); ys.add(defaultYear());
+  const ys = new Set(S.entries.map(e => Number(e.year)).filter(Boolean)); for (let i = 0; i <= 5; i++) ys.add(defaultYear() + i);
   return [...ys].sort((a, b) => a - b);
 }
 const FILTERS = [['', 'すべて'], ['mine', '自分の担当'], ['noStaff', '担当が決まっていない'], ['prio', '★ 優先（来店歴あり）'], ['r:self', '自身の予約'], ['r:parent', '親の紹介'], ['r:gofuku', '呉服屋さんの紹介（全部）'], ...GOFUKU.map(g => ['g:' + g, '└ ' + g]), ['maedoriUndecided', '前撮り未定'], ['maedoriYes', '前撮りする'], ['noLineJul', '7月LINE未'], ['noLineAug', '8月LINE未'], ['noMeet', '打合せ日未定'], ['pending', '申請中']];
@@ -504,7 +508,7 @@ function listView() {
     .sort((a, b) => (S.sort === 'prio' ? prio(b) - prio(a) : 0) || (a.kana || a.name || '').localeCompare(b.kana || b.name || '', 'ja'));
   const cnt = k => all.filter(e => (e.menus || []).includes(k)).length;
   const cap = Number((S.settings.cap || {})[y]) || 0, left = cap - all.length;
-  const head = `<div class="yearbar"><select class="field" data-chg="year" aria-label="成人式の年">${years().map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${v}年 成人式（${reiwa(v)}）</option>`).join('')}</select></div>
+  const head = `<div class="ytabs" role="tablist" aria-label="成人式の年">${years().map(v => { const n = S.entries.filter(e => Number(e.year) === v).length; return `<button type="button" role="tab" data-act="year" data-id="${v}" aria-selected="${v === y}"><b>${v}</b><span>${reiwa(v)}</span><small>${n}名</small></button>`; }).join('')}</div>
     <section class="hero"><div class="hero-row"><div class="hero-n"><b>${all.length}</b><span>名</span></div>
         ${cap ? `<div class="hero-cap"><span>受付可能 残り</span><b class="${left <= 0 ? 'full' : ''}">${left <= 0 ? '満員' : left + '<small>名</small>'}</b><span>最大 ${cap}名</span></div>` : ''}</div>
       ${cap ? `<div class="capbar"><i style="width:${Math.min(100, all.length / cap * 100)}%"></i></div>` : ''}
@@ -723,6 +727,7 @@ document.addEventListener('click', async ev => {
     if (await WHO.handle(a, el)) return;
     switch (a) {
       case 'tab': S.tab = id; S.edit = null; S.open = null; render(); window.scrollTo(0, 0); break;
+      case 'year': S.year = Number(id); render(); document.querySelector('.ytabs [aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' }); break;
       case 'venue': S.venue = id; render(); break;
       case 'sort': S.sort = id; render(); break;
       case 'view': S.view = id; try { localStorage.setItem('sk.view', id); } catch (x) {} render(); break;
