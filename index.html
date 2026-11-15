@@ -195,6 +195,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .manual { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 3px; }
 .mpill { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d48a; font-size: 11px; }
 .lnk { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.xlbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.xtra { min-height: 64px; font-size: 14px; }
 </style>
 
 <header><div class="wrap head">
@@ -314,16 +316,20 @@ function linesFor(did) {
 /* 単位が「50個」のように数字で始まると「× 2」と続けて「250個」に見えるので、括弧で区切る */
 const uTxt = u => !u ? '' : /^[0-9０-９]/.test(u) ? `（${u}）` : u;
 const isGoto = d => !!d && !d.url && (d.id === 'other-goto' || /後藤/.test(d.name));
-const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).filter(did => linesFor(did).some(r => r.qty > 0));
+/* 在庫にない商品などの手打ち追記（ディーラーごと・order_draftsのextraに保存） */
+const extraOf = did => ((S.draftExtra || {})[draftKey(did)] || '');
+const extraLines = did => extraOf(did).split('\n').map(x => x.trim()).filter(Boolean).map(x => /^[・\-]/.test(x) ? x : '・' + x);
+const bodyOf = did => linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).concat(extraLines(did)).join('\n');
+const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).filter(did => linesFor(did).some(r => r.qty > 0) || extraLines(did).length);
 function gotoText() {
   const st = storeOf(S.store);
-  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).join('\n'));
+  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + bodyOf(did));
   return `後藤さん\n発注お願いします。\n${st.full}\n\n${parts.join('\n\n')}`;
 }
 function gotoCard(force) {
   const g = gotoIds(); if (g.length < 2) return '';
   const total = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).reduce((b, r) => b + r.qty * num(r.it.price), 0), 0);
-  const n = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).length, 0);
+  const n = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).length + extraLines(did).length, 0);
   return `<details class="card ocard" data-did="__goto" ${force || (S.oOpen ||= new Set()).has('__goto') ? 'open' : ''}>
     <summary class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="osum"><span class="ocnt">${n}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     <div class="sub">${g.map(did => esc(dealerOf(did).name)).join('・')} の ${g.length} 件を1つの文章にしています。下のカードで数量を変えると、ここにも反映されます。</div>
@@ -335,7 +341,7 @@ function gotoCard(force) {
 }
 function lineText(did) {
   const d = dealerOf(did), st = storeOf(S.store);
-  const body = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).join('\n');
+  const body = bodyOf(did);
   if (d && d.id === XFER) return `後藤さん\nTONARIの在庫から移動お願いします。\n${st.full}\n\n${body}`;
   if (d && (d.id === 'other-goto' || /後藤/.test(d.name))) return `後藤さん\n発注お願いします。\n${st.full}\n\n${body}`;
   return `${d ? d.name : ''} ご担当者様\nいつもお世話になっております。\n${st.full}です。\n下記の発注をお願いいたします。\n\n${body}\n\n納品先：${st.full}\n納期が分かりましたらご連絡ください。\nよろしくお願いいたします。`;
@@ -436,6 +442,7 @@ function render() {
   S.dirty = false;
 }
 function scheduleRender() {
+  if (S.holdUntil && Date.now() < S.holdUntil) { clearTimeout(S.holdT); S.holdT = setTimeout(scheduleRender, S.holdUntil - Date.now() + 50); return; }
   const a = document.activeElement;
   const typing = a && $('main').contains(a) && a.matches('input:not([readonly]),select,textarea:not([readonly])');
   if (typing || S.editing || S.drag) { S.dirty = true; shell(); return; }
@@ -798,7 +805,8 @@ function stockRow(it) {
 
 function viewOrder() {
   const top = S.dealers.filter(d => /TOPY/i.test(d.name)).map(d => d.id); /* TOPYを一番上に */
-  const ids = top.concat(S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id).filter(id => !top.includes(id))).filter(did => linesFor(did).length);
+  const xs = (S.xShow ||= new Set());
+  const ids = top.concat(S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id).filter(id => !top.includes(id))).filter(did => linesFor(did).length || extraLines(did).length || xs.has(S.store + ':' + did));
   const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
   const st = storeOf(S.store);
   const extra = S.readOnly ? '' : addPicker();
@@ -809,11 +817,13 @@ function viewOrder() {
   const g = gotoIds().length >= 2;
   const opts = (g ? ['__goto'] : []).concat(ids);
   const pick = opts.includes(S.oPick) ? S.oPick : '';
-  const sumOf = did => { const rs = did === '__goto' ? gotoIds().flatMap(x => linesFor(x)) : linesFor(did); const a = rs.filter(r => r.qty > 0); return `${a.length}品・${yen(a.reduce((t, r) => t + r.qty * num(r.it.price), 0))}`; };
+  const sumOf = did => { const rs = did === '__goto' ? gotoIds().flatMap(x => linesFor(x)) : linesFor(did); const a = rs.filter(r => r.qty > 0); const xn = did === '__goto' ? gotoIds().reduce((t, x) => t + extraLines(x).length, 0) : extraLines(did).length; return `${a.length}品${xn ? `＋手打ち${xn}` : ''}・${yen(a.reduce((t, r) => t + r.qty * num(r.it.price), 0))}`; };
   const nameOf = did => did === '__goto' ? '後藤さん宛て（まとめて）' : dealerOf(did).name;
   const sel = opts.length ? `<label class="lbl opick">ディーラーを選ぶ<select class="field" data-chg="oPick" aria-label="ディーラーを選ぶ"><option value="">すべて表示（${opts.length}件）</option>${opts.map(did => `<option value="${did}" ${pick === did ? 'selected' : ''}>${esc(nameOf(did))}（${sumOf(did)}）</option>`).join('')}</select></label>` : '';
   const cards = pick ? (pick === '__goto' ? gotoCard(true) : orderCard(pick, true)) : gotoCard() + ids.map(did => orderCard(did)).join('');
-  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + sel + cards + extra;
+  const rest = S.dealers.filter(d => !ids.includes(d.id));
+  const xsel = !S.readOnly && rest.length ? `<label class="lbl opick">ほかのディーラーに在庫にない商品を手打ちで発注<select class="field" data-chg="xShow"><option value="">ディーラーを選ぶ</option>${rest.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></label>` : '';
+  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + sel + cards + xsel + extra;
 }
 function orderCard(did, force) {
   const d = dealerOf(did), rows = linesFor(did);
@@ -821,10 +831,12 @@ function orderCard(did, force) {
   const xf = did === XFER;
   const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
   const others = S.items.filter(i => (xf ? tonariFree(i.id) > 0 : i.dealerId === did) && !rows.some(r => r.it.id === i.id));
-  const dis = S.readOnly || !active.length ? 'disabled' : '';
+  const xl = extraLines(did), any = active.length || xl.length;
+  const dis = S.readOnly || !any ? 'disabled' : '';
+  const xbox = `<label class="xlbl">在庫にない商品・追記（1行に1つ。LINE文章の最後に入ります）<textarea class="field xtra" id="ex-${did}" data-chg="oextra" data-did="${did}" placeholder="例：ホイル 1箱" ${S.readOnly ? 'disabled' : ''}>${esc(extraOf(did))}</textarea></label>`;
   const open = force || (S.oOpen ||= new Set()).has(did);
   return `<details class="card ocard" data-did="${did}" ${open ? 'open' : ''}>
-    <summary class="card-head"><h3>${esc(d.name)}</h3><span class="osum"><span class="ocnt">${active.length}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
+    <summary class="card-head"><h3>${esc(d.name)}</h3><span class="osum"><span class="ocnt">${active.length}品${xl.length ? `＋手打ち${xl.length}` : ''}</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
       <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(uTxt(r.it.unit))}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div>
@@ -835,13 +847,14 @@ function orderCard(did, force) {
         <button type="button" id="op-${r.it.id}" data-act="oinc" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1増やす" ${S.unlocked ? '' : 'disabled'}>＋</button>
       </div></div>`).join('')}</div>
     ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${catGroups(others, i => `<option value="${i.id}">${esc(i.name)}</option>`)}</select>` : ''}
+    ${xbox}
     ${d.url ? `<div class="sub">${esc(storeOf(S.store).full)}の発注です。サイトのログイン店舗を確認して、上の数量を注文してください。</div>
     <div class="actions">
       <a class="btn primary" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
-    </div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(active.length ? lineText(did) : '')}</textarea>
+    </div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
     <div class="actions">
-      <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${active.length ? '' : 'disabled'}>発注文をコピー</button>
+      <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>発注文をコピー</button>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? '移動をお願いしたので依頼済みにする' : 'LINEで送ったので発注済みにする'}</button>
     </div>`}</details>`;
 }
@@ -969,7 +982,7 @@ async function exportTana(scope) {
 }
 function orderRow(o) {
   const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
-  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${uTxt(l.unit)}`).join('、');
+  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${uTxt(l.unit)}`).concat(o.extra ? [o.extra.replace(/・/g, '').replace(/\n/g, '、') + '（手打ち）'] : []).join('、');
   const ctl = !open || S.readOnly ? '' : S.confirm === cKey
     ? `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">取り消す</button><button type="button" class="btn small" id="cn-${o.id}" data-act="confirmNo">戻る</button>`
     : `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">入荷済みにする</button><button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">取消</button>`;
@@ -1110,14 +1123,14 @@ function draftValue(did, id) {
 }
 async function markPlaced(did, quiet) {
   if (S.readOnly) return;
-  const active = linesFor(did).filter(r => r.qty > 0); if (!active.length) return;
+  const active = linesFor(did).filter(r => r.qty > 0), xt = extraLines(did).join('\n'); if (!active.length && !xt) return;
   const d = dealerOf(did);
   if (did === XFER) for (const r of active) if (r.qty > tonariFree(r.it.id)) { toast(r.it.name + ' はTONARIの在庫が足りません'); return; }
   const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
   try {
-    await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now() });
+    await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now(), extra: xt });
     delete S.draft[draftKey(did)]; draftDoc(did).delete().catch(() => {});
-    logChange('order', S.store, '', null, null, { name: d.name + ' に発注', text: lines.map(l => l.name + '×' + l.qty).join('、') + '（' + lines.reduce((a, l) => a + l.qty * l.price, 0).toLocaleString() + '円）' });
+    logChange('order', S.store, '', null, null, { name: d.name + ' に発注', text: lines.map(l => l.name + '×' + l.qty).concat(xt ? [xt.replace(/\n/g, '、')] : []).join('、') + '（' + lines.reduce((a, l) => a + l.qty * l.price, 0).toLocaleString() + '円）' });
     if (!quiet) { toast('発注済みにしました'); render(); }
   } catch (e) { fail(e); }
 }
@@ -1217,6 +1230,11 @@ document.addEventListener('change', ev => {
   const { id, did } = el.dataset;
   if (c === 'qty') { setQty(S.store, id, num(el.value)); el.blur(); render(); }
   if (c === 'oqty') { bumpDraft(did, id, num(el.value)); el.blur(); render(); }
+  if (c === 'oextra') { S.holdUntil = Date.now() + 700; const k = draftKey(did); (S.draftExtra ||= {})[k] = el.value; const me = WHO.me || {}; draftDoc(did).set({ store: S.store, did, extra: el.value, at: Date.now(), by: me.id || '', byName: me.name || '' }, { merge: true }).catch(fail);
+    /* ここで再描画するとコピーボタンの押下が消えるので、文章欄とボタンだけ更新 */
+    const any = linesFor(did).some(r => r.qty > 0) || extraLines(did).length, m = $('msg-' + did), cp = $('copy-' + did), dn = $('done-' + did), gm = $('msg-__goto');
+    if (m) m.value = any ? lineText(did) : ''; if (cp) cp.disabled = !any; if (dn) dn.disabled = S.readOnly || !any; if (gm) gm.value = gotoText(); return; }
+  if (c === 'xShow' && el.value) { (S.xShow ||= new Set()).add(S.store + ':' + el.value); (S.oOpen ||= new Set()).add(el.value); S.oPick = el.value; render(); window.scrollTo(0, 0); return; }
   if (c === 'oPick') { S.oPick = el.value; el.blur(); render(); window.scrollTo(0, 0); return; }
   if (c === 'addLine' && el.value) { bumpDraft(did, el.value, 1); el.value = ''; el.blur(); render(); }
   if (c === 'addOther' && el.value) { const [d, i] = el.value.split('|'); bumpDraft(d, i, 1); el.value = ''; el.blur(); render(); }
@@ -1482,7 +1500,7 @@ function listen(fs) {
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
-  fs.collection('order_drafts').onSnapshot(s => { const d = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) d[v.store + ':' + v.did] = v.lines || {}; }); S.draft = d; scheduleRender(); }, () => {});
+  fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; } }); S.draft = d; S.draftExtra = ex; scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
   fs.collection('stock').onSnapshot(s => {
