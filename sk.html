@@ -128,6 +128,14 @@ table.mx .rank { font-size: 10px; padding: 0 6px; }
 .sec-t { font-size: 12px; letter-spacing: .06em; color: var(--muted); font-weight: 500; }
 .sheet .sec-t { margin-top: 12px; padding-bottom: 4px; border-bottom: 1px solid var(--line, #e5e5e5); }
 .sheet .kv { margin-top: 6px; }
+.phgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.ph { aspect-ratio: 1; max-width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font: inherit; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph.add { flex-direction: column; gap: 2px; color: var(--accent); font-size: 22px; border-style: dashed; } .ph.add span { font-size: 11px; }
+.ph.wait { font-size: 11px; color: var(--muted); text-align: center; cursor: default; }
+.pv { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.pv img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; border-radius: 8px; }
+.pv-bar { display: flex; gap: 10px; align-items: center; color: #ddd; font-size: 12px; flex-wrap: wrap; justify-content: center; }
 .crit { list-style: none; padding: 0; margin: -6px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .crit li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
 .crit .cn { font-family: var(--font-num); color: var(--accent); font-weight: 500; min-width: 1em; }
@@ -495,7 +503,7 @@ function listView() {
     const pend = pendingOf(e.id).length;
     const steps = [['前撮り', e.maedori === 'yes' ? 'on' : e.maedori === 'no' ? 'off' : ''], ['7月LINE', e.lineJul ? 'on' : ''], ['8月LINE', e.lineAug ? 'on' : ''], ['打合せ', e.meetDate ? 'on' : '']];
     return `<button type="button" class="row ent" data-act="open" data-id="${e.id}">
-      <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
+      <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
         <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}${e.route === 'gofuku' ? `<span>紹介：${esc(e.gofuku || '呉服屋さん')}</span>` : e.route === 'parent' ? '<span>親の紹介</span>' : ''}${e.booker ? `<span>受付 ${esc(e.booker)}</span>` : ''}</div>
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
@@ -531,21 +539,71 @@ async function exportXlsx() {
   toast('Excelを書き出しました');
 }
 
+/* ---- 写真（Firestoreに圧縮して保存：1枚1ドキュメント） ---- */
+let photoUnsub = null, photoFor = null;
+function watchPhotos(id) {
+  if (photoFor === id) return;
+  if (photoUnsub) photoUnsub(); photoUnsub = null; photoFor = id; S.photos = []; S.photoLoading = !!id;
+  if (!id) return;
+  photoUnsub = db.collection('sk_photos').where('entryId', '==', id).onSnapshot(s => {
+    S.photos = s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.at - b.at); S.photoLoading = false; renderSheet();
+  }, e => { S.photoLoading = false; toast('写真を読み込めません：' + e.message); renderSheet(); });
+}
+function shrink(file, max, q) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const r = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像を読み込めませんでした')); };
+    img.src = url;
+  });
+}
+async function addPhotos(files) {
+  const id = S.open; if (!id || !files.length) return;
+  const m = me(); let n = 0; S.uploading = files.length; renderSheet();
+  for (const f of files) {
+    try {
+      let data = await shrink(f, 1600, .75); if (data.length > 900000) data = await shrink(f, 1200, .6); if (data.length > 900000) data = await shrink(f, 900, .5);
+      const thumb = await shrink(f, 320, .7);
+      await db.collection('sk_photos').add({ entryId: id, data, thumb, at: Date.now(), by: m.id, byName: m.name });
+      await db.doc('sk_entries/' + id).update({ photos: firebase.firestore.FieldValue.increment(1) });
+      n++;
+    } catch (e) { toast('写真を保存できませんでした：' + e.message); }
+    S.uploading--; renderSheet();
+  }
+  S.uploading = 0; if (n) toast(`写真を${n}枚追加しました`); renderSheet();
+}
+const delPhotosOf = async id => { const s = await db.collection('sk_photos').where('entryId', '==', id).get(); const b = db.batch(); s.docs.forEach(d => b.delete(d.ref)); if (s.size) await b.commit(); };
+const canDelPhoto = p => isApprover() || (WHO.me && p.by === WHO.me.id);
+
 /* ---- 詳細 ---- */
 function renderSheet() {
   const box = $('sheet'), e = S.open && S.entries.find(x => x.id === S.open);
-  if (!e) { box.innerHTML = ''; document.body.style.overflow = ''; return; }
+  if (!e) { box.innerHTML = ''; document.body.style.overflow = ''; watchPhotos(null); S.viewPhoto = null; return; }
+  watchPhotos(e.id);
+  const keep = box.querySelector('.sheet')?.scrollTop || 0;
+  const ph = S.photos || [], pv = S.viewPhoto && ph.find(p => p.id === S.viewPhoto);
+  const photoSec = `<div class="sec-t">写真${ph.length ? `（${ph.length}枚）` : ''}</div>
+    <div class="phgrid">${ph.map(p => `<button type="button" class="ph" data-act="pv" data-id="${p.id}" aria-label="写真を開く"><img src="${p.thumb || p.data}" alt=""></button>`).join('')}
+      ${S.uploading ? `<div class="ph wait">保存中…<br>残り${S.uploading}枚</div>` : ''}
+      <label class="ph add">＋<span>写真を追加</span><input type="file" accept="image/*" multiple hidden data-chg="photo"></label></div>
+    ${S.photoLoading ? '<div class="sub">写真を読み込んでいます</div>' : ''}`;
   const pend = pendingOf(e.id);
   const kv = SECTIONS.map(([t, fs]) => { const rows = fs.filter(([k]) => k !== 'name' && (k !== 'gofuku' || e.route === 'gofuku')).map(([k, l]) => `<dt>${l}</dt><dd>${esc(fmtVal(k, e[k]))}</dd>`).join(''); return rows ? `<div class="sec-t">${t}</div><dl class="kv">${rows}</dl>` : ''; }).join('');
   box.innerHTML = `<div class="sheet-bg" data-act="close"><div class="sheet" data-stop="1" role="dialog" aria-modal="true" aria-label="${esc(e.name)}">
     <button type="button" class="btn small x" data-act="close" aria-label="閉じる">✕</button>
     <div><div class="sub">${e.year}年 成人式</div><h3>${esc(e.name)}</h3></div>
     ${pend.length ? `<div class="note">変更の申請が${pend.length}件あります（承認待ち）。</div>` : ''}
+    ${photoSec}
     ${kv}
     <div class="sub">登録：${esc(e.createdByName || '')} ${e.createdAt ? new Date(e.createdAt).toLocaleDateString('ja-JP') : ''}${e.updatedByName ? ` ／ 最終変更：${esc(e.updatedByName)} ${new Date(e.updatedAt).toLocaleDateString('ja-JP')}` : ''}</div>
     <div class="actions"><button type="button" class="btn primary" data-act="edit" data-id="${e.id}">${isApprover() ? '変更する' : '変更を申請する'}</button>
     <button type="button" class="btn danger" data-act="del" data-id="${e.id}">${S.confirm === 'del-' + e.id ? (isApprover() ? '本当に削除する' : '削除を申請する（確認）') : '削除'}</button></div>
-  </div></div>`;
+  </div></div>
+  ${pv ? `<div class="pv"><img src="${pv.data}" alt="">
+    <div class="pv-bar"><span>${esc(pv.byName || '')} ${new Date(pv.at).toLocaleDateString('ja-JP')}</span>
+      ${canDelPhoto(pv) ? `<button type="button" class="btn small danger" data-act="pvDel" data-id="${pv.id}">${S.confirm === 'ph-' + pv.id ? '本当に削除' : '削除'}</button>` : ''}
+      <button type="button" class="btn small" data-act="pvClose">閉じる</button></div></div>` : ''}`;
+  const sh = box.querySelector('.sheet'); if (sh) sh.scrollTop = keep;
   document.body.style.overflow = 'hidden';
 }
 
@@ -629,7 +687,16 @@ document.addEventListener('click', async ev => {
       case 'sort': S.sort = id; render(); break;
       case 'view': S.view = id; try { localStorage.setItem('sk.view', id); } catch (x) {} render(); break;
       case 'xlsx': if (isApprover()) await exportXlsx(); break;
-      case 'open': S.open = id; S.confirm = ''; renderSheet(); break;
+      case 'open': S.open = id; S.confirm = ''; S.viewPhoto = null; renderSheet(); break;
+      case 'pv': S.viewPhoto = id; S.confirm = ''; renderSheet(); break;
+      case 'pvClose': S.viewPhoto = null; S.confirm = ''; renderSheet(); break;
+      case 'pvDel': {
+        const p = (S.photos || []).find(x => x.id === id); if (!p || !canDelPhoto(p)) break;
+        if (S.confirm !== 'ph-' + id) { S.confirm = 'ph-' + id; renderSheet(); break; }
+        await db.doc('sk_photos/' + id).delete();
+        await db.doc('sk_entries/' + p.entryId).update({ photos: firebase.firestore.FieldValue.increment(-1) }).catch(() => {});
+        S.viewPhoto = null; S.confirm = ''; toast('写真を削除しました'); renderSheet(); break;
+      }
       case 'close': S.open = null; S.confirm = ''; renderSheet(); break;
       case 'edit': S.edit = Object.assign({}, S.entries.find(x => x.id === id)); S.open = null; S.tab = 'list'; render(); window.scrollTo(0, 0); break;
       case 'cancelEdit': S.edit = null; render(); break;
@@ -660,7 +727,7 @@ document.addEventListener('click', async ev => {
         const before = {}; FIELDS.forEach(([k]) => before[k] = e[k] ?? null);
         if (isApprover()) {
           await db.collection('sk_req').add({ entryId: id, type: 'delete', before, by: m.id, byName: m.name, at: Date.now(), status: 'approved', doneBy: m.id, doneByName: m.name, doneAt: Date.now(), direct: true });
-          await db.doc('sk_entries/' + id).delete(); toast('削除しました');
+          await db.doc('sk_entries/' + id).delete(); delPhotosOf(id); toast('削除しました');
         } else { await db.collection('sk_req').add({ entryId: id, type: 'delete', before, by: m.id, byName: m.name, at: Date.now(), status: 'pending' }); toast('削除を申請しました'); }
         S.open = null; S.confirm = ''; renderSheet(); break;
       }
@@ -668,7 +735,7 @@ document.addEventListener('click', async ev => {
         if (!isApprover()) break;
         const r = S.reqs.find(x => x.id === id), m = me();
         if (a === 'approve') {
-          if (r.type === 'delete') await db.doc('sk_entries/' + r.entryId).delete().catch(() => {});
+          if (r.type === 'delete') { await db.doc('sk_entries/' + r.entryId).delete().catch(() => {}); delPhotosOf(r.entryId); }
           else await db.doc('sk_entries/' + r.entryId).update(clean(Object.assign({}, r.after, { updatedAt: Date.now(), updatedBy: r.by, updatedByName: r.byName })));
         }
         await db.doc('sk_req/' + id).update({ status: a === 'approve' ? 'approved' : 'rejected', doneBy: m.id, doneByName: m.name, doneAt: Date.now() });
@@ -694,6 +761,7 @@ document.addEventListener('input', ev => {
   if (ev.target.dataset.inp === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
 });
 document.addEventListener('change', ev => {
+  if (ev.target.dataset.chg === 'photo') { const fs = [...ev.target.files]; ev.target.value = ''; addPhotos(fs); return; }
   if (ev.target.dataset.chg === 'filter') { S.filter = ev.target.value; render(); }
   if (ev.target.dataset.chg === 'gofukuSel') { const x = $('f-gofukuX'); if (x) x.hidden = ev.target.value !== '__x'; }
   if (ev.target.dataset.chg === 'route') { const w = $('w-gofuku'); if (w) w.hidden = ev.target.value !== 'gofuku'; }
