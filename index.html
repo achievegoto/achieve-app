@@ -451,7 +451,7 @@ function render() {
 }
 /* ---- 日曜19時の発注締め：発注済みになっていない発注があれば警告 ---- */
 const DUE_STORES = ['hair', 'liss', 'till'];
-function dueWindow() { const d = new Date(), w = d.getDay(); return (w === 0 && d.getHours() >= 19) || w === 1; } /* 日曜19:00〜月曜いっぱい */
+function dueWindow() { const d = new Date(), w = d.getDay(), m = d.getHours() * 60 + d.getMinutes(); return (w === 0 && m >= 18 * 60 + 30) || w === 1 || w === 2 || (w === 3 && m < 10 * 60); } /* 日曜18:30〜水曜10:00 */
 function pendingOf(store) {
   const prev = S.store; S.store = store;
   try { return [XFER].concat(S.dealers.map(d => d.id)).filter(did => dealerOf(did) && (linesFor(did).some(r => r.qty > 0) || extraLines(did).length)).map(did => dealerOf(did).name); }
@@ -464,7 +464,7 @@ function dueList() {
 }
 function dueBanner() {
   const L = dueList(); if (!L.length) return '';
-  const html = `<section class="due"><div class="due-h">⚠️ 日曜19時の発注締めを過ぎています</div>
+  const html = `<section class="due"><div class="due-h">⚠️ 日曜18:30の発注締めを過ぎています</div>
     <div class="due-b">まだ「発注済み」になっていない発注があります。</div>
     ${L.map(x => `<div class="due-s"><b>${esc(storeOf(x.st).short)}</b>${x.names.map(n => `<span>${esc(n)}</span>`).join('')}</div>`).join('')}
     ${S.tab !== 'order' ? `<button type="button" class="btn due-btn" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button>` : ''}</section>`;
