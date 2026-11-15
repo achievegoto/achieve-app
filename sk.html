@@ -383,7 +383,7 @@ const MENUS = ['セット', '着付け', 'メイク'];
 const FIELDS = [
   ['name', '名前', 'text'], ['kana', 'ふりがな', 'text'], ['year', '成人式の年', 'year'], ['reservedAt', '予約日', 'date'],
   ['menus', 'メニュー', 'menus'], ['venue', '会場', 'venue'], ['tel', '自宅・保護者の電話', 'tel'], ['mobile', '本人の携帯', 'tel'], ['line', 'LINEつながり', 'bool'],
-  ['birth', '生年月日', 'date'], ['school', '出身中学', 'text'], ['booker', '予約した人', 'text'], ['selfVisit', '本人のachieve来店歴', 'visit'], ['visitSince', '通い始め（いつ頃から）', 'text'], ['parentVisited', '保護者の来店歴あり', 'bool'], ['tagOk', 'タブ付けOK', 'bool'],
+  ['birth', '生年月日', 'date'], ['school', '出身中学', 'text'], ['booker', '予約を受けたスタッフ', 'staff'], ['route', '予約のきっかけ', 'route'], ['gofuku', '呉服屋さんの名前', 'gofuku'], ['selfVisit', '本人のachieve来店歴', 'visit'], ['visitSince', '通い始め（いつ頃から）', 'text'], ['parentVisited', '保護者の来店歴あり', 'bool'], ['tagOk', 'タブ付けOK', 'bool'],
   ['maedori', '前撮り', 'maedori'], ['maedoriMeet', '前撮り打合せ日', 'date'], ['maedoriDate', '前撮り日', 'date'],
   ['lineJul', '7月スケジュールLINE', 'bool'], ['lineAug', '8月打合せLINE', 'bool'], ['meetDate', '打合せ日', 'date'],
   ['mark', '印', 'text'], ['memo', 'メモ', 'area'],
@@ -396,6 +396,7 @@ const fmtVal = (k, v) => {
   if (t === 'date') return ymd(v);
   if (t === 'menus') return v.join('・');
   if (t === 'maedori') return v === 'yes' ? 'する' : v === 'no' ? 'しない' : '未定';
+  if (t === 'route') return v === 'self' ? '自身の予約' : v === 'gofuku' ? '呉服屋さんの紹介' : v === 'other' ? 'その他' : '—';
   if (t === 'visit') return v === 'long' ? '昔から通っている（常連）' : v === 'yes' ? 'あり' : 'なし';
   if (t === 'year') return `${v}年（${reiwa(Number(v))}）`;
   return String(v);
@@ -442,9 +443,10 @@ function years() {
   const ys = new Set(S.entries.map(e => Number(e.year)).filter(Boolean)); ys.add(defaultYear());
   return [...ys].sort((a, b) => a - b);
 }
-const FILTERS = [['', 'すべて'], ['prio', '★ 優先（来店歴あり）'], ['maedoriUndecided', '前撮り未定'], ['maedoriYes', '前撮りする'], ['noLineJul', '7月LINE未'], ['noLineAug', '8月LINE未'], ['noMeet', '打合せ日未定'], ['pending', '申請中']];
+const FILTERS = [['', 'すべて'], ['prio', '★ 優先（来店歴あり）'], ['gofuku', '呉服屋さん紹介'], ['maedoriUndecided', '前撮り未定'], ['maedoriYes', '前撮りする'], ['noLineJul', '7月LINE未'], ['noLineAug', '8月LINE未'], ['noMeet', '打合せ日未定'], ['pending', '申請中']];
 function passFilter(e) {
   switch (S.filter) {
+    case 'gofuku': return e.route === 'gofuku';
     case 'prio': return e.selfVisit === 'long' || e.selfVisit === 'yes';
     case 'maedoriUndecided': return !e.maedori;
     case 'maedoriYes': return e.maedori === 'yes';
@@ -459,13 +461,13 @@ function listView() {
   const y = S.year || defaultYear();
   const all = S.entries.filter(e => Number(e.year) === y);
   const q = S.q.trim().toLowerCase();
-  const list = all.filter(e => (!S.venue || e.venue === S.venue) && passFilter(e) && (!q || [e.name, e.kana, e.school, e.booker, e.tel, e.mobile].join(' ').toLowerCase().includes(q)))
+  const list = all.filter(e => (!S.venue || e.venue === S.venue) && passFilter(e) && (!q || [e.name, e.kana, e.school, e.booker, e.gofuku, e.tel, e.mobile].join(' ').toLowerCase().includes(q)))
     .sort((a, b) => (S.sort === 'prio' ? prio(b) - prio(a) : 0) || (a.kana || a.name || '').localeCompare(b.kana || b.name || '', 'ja'));
   const cnt = k => all.filter(e => (e.menus || []).includes(k)).length;
   const venueCnt = v => all.filter(e => e.venue === v).length;
   const head = `<div class="yearbar"><select class="field" data-chg="year" aria-label="成人式の年">${years().map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${v}年 成人式（${reiwa(v)}）</option>`).join('')}</select></div>
     <section class="hero"><div class="hero-n"><b>${all.length}</b><span>名</span></div>
-      <div class="hero-s"><span>セット ${cnt('セット')}</span><span>着付け ${cnt('着付け')}</span><span>メイク ${cnt('メイク')}</span><span>前撮り ${all.filter(e => e.maedori === 'yes').length}</span><span>★常連 ${all.filter(e => e.selfVisit === 'long').length}</span></div>
+      <div class="hero-s"><span>セット ${cnt('セット')}</span><span>着付け ${cnt('着付け')}</span><span>メイク ${cnt('メイク')}</span><span>前撮り ${all.filter(e => e.maedori === 'yes').length}</span><span>★常連 ${all.filter(e => e.selfVisit === 'long').length}</span><span>呉服屋紹介 ${all.filter(e => e.route === 'gofuku').length}</span></div>
       <div class="hero-s">${VENUES.map(v => `<span>${v} ${venueCnt(v)}</span>`).join('')}</div></section>
     <input class="field" id="q" type="search" placeholder="名前・中学・電話で探す" value="${esc(S.q)}" data-inp="q" aria-label="探す">
     <div class="chips">${['', ...VENUES].map(v => `<button type="button" class="chip" data-act="venue" data-id="${v}" aria-pressed="${S.venue === v}">${v || '全会場'}</button>`).join('')}</div>
@@ -477,7 +479,7 @@ function listView() {
     const steps = [['前撮り', e.maedori === 'yes' ? 'on' : e.maedori === 'no' ? 'off' : ''], ['7月LINE', e.lineJul ? 'on' : ''], ['8月LINE', e.lineAug ? 'on' : ''], ['打合せ', e.meetDate ? 'on' : '']];
     return `<button type="button" class="row ent" data-act="open" data-id="${e.id}">
       <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.mark ? ` <span class="pill p-std">${esc(e.mark)}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
-        <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}</div>
+        <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}${e.route === 'gofuku' ? `<span>紹介：${esc(e.gofuku || '呉服屋さん')}</span>` : ''}${e.booker ? `<span>受付 ${esc(e.booker)}</span>` : ''}</div>
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
   }).join('');
@@ -503,7 +505,7 @@ function loadXlsx() {
 }
 async function exportXlsx() {
   const X = await loadXlsx(), list = window.__skList || [], y = S.year || defaultYear();
-  const xv = (k, v) => { const t = (FIELDS.find(f => f[0] === k) || [])[2]; if (v == null || v === '') return ''; if (t === 'bool') return v ? '○' : ''; if (t === 'menus') return (v || []).join('・'); if (t === 'maedori') return v === 'yes' ? 'する' : v === 'no' ? 'しない' : ''; if (t === 'visit') return v === 'long' ? '常連' : v === 'yes' ? 'あり' : ''; if (t === 'date') return ymd(v); return v; };
+  const xv = (k, v) => { const t = (FIELDS.find(f => f[0] === k) || [])[2]; if (v == null || v === '') return ''; if (t === 'bool') return v ? '○' : ''; if (t === 'menus') return (v || []).join('・'); if (t === 'maedori') return v === 'yes' ? 'する' : v === 'no' ? 'しない' : ''; if (t === 'visit') return v === 'long' ? '常連' : v === 'yes' ? 'あり' : ''; if (t === 'route') return v === 'self' ? '自身' : v === 'gofuku' ? '呉服屋紹介' : v === 'other' ? 'その他' : ''; if (t === 'date') return ymd(v); return v; };
   const aoa = [[`${y}年（${reiwa(y)}）成人式 予約一覧`], [`出力日 ${ymd(today())}　${list.length}名`], [], ['No.', ...TCOLS.map(f => f[1])], ...list.map((e, i) => [i + 1, ...TCOLS.map(([k]) => xv(k, e[k]))])];
   const ws = X.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 4 }, ...TCOLS.map(([k]) => ({ wch: k === 'memo' ? 30 : k === 'name' || k === 'kana' ? 14 : 11 }))];
@@ -537,6 +539,9 @@ function formView(e) {
     const val = v[k];
     if (t === 'menus') return `<div class="lbl">${l}<div class="chips">${MENUS.map(x => `<label class="chk"><input type="checkbox" name="f-menus" value="${x}" ${(val || []).includes(x) ? 'checked' : ''}>${x}</label>`).join('')}</div></div>`;
     if (t === 'venue') return `<label class="lbl">${l}<select class="field" id="f-${k}"><option value="">未定</option>${VENUES.map(x => `<option ${val === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>`;
+    if (t === 'staff') { const names = WHO.active().map(p => p.name); return `<label class="lbl">${l}<select class="field" id="f-${k}"><option value="">未選択</option>${names.map(n => `<option ${val === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}${val && !names.includes(val) ? `<option selected>${esc(val)}</option>` : ''}</select></label>`; }
+    if (t === 'route') return `<label class="lbl">${l}<select class="field" id="f-${k}" data-chg="route"><option value="">未選択</option><option value="self" ${val === 'self' ? 'selected' : ''}>自身の予約</option><option value="gofuku" ${val === 'gofuku' ? 'selected' : ''}>呉服屋さんの紹介</option><option value="other" ${val === 'other' ? 'selected' : ''}>その他</option></select></label>`;
+    if (t === 'gofuku') { const opts = [...new Set(S.entries.map(x => x.gofuku).filter(Boolean))]; return `<label class="lbl" id="w-gofuku" ${v.route === 'gofuku' ? '' : 'hidden'}>${l}<input class="field" id="f-${k}" list="gofuku-list" value="${esc(val ?? '')}" placeholder="例：〇〇呉服店"><datalist id="gofuku-list">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist></label>`; }
     if (t === 'visit') return `<label class="lbl">${l}<select class="field" id="f-${k}"><option value="">なし</option><option value="yes" ${val === 'yes' ? 'selected' : ''}>あり</option><option value="long" ${val === 'long' ? 'selected' : ''}>昔から通っている（常連）</option></select></label>`;
     if (t === 'maedori') return `<label class="lbl">${l}<select class="field" id="f-${k}"><option value="">未定</option><option value="yes" ${val === 'yes' ? 'selected' : ''}>する</option><option value="no" ${val === 'no' ? 'selected' : ''}>しない</option></select></label>`;
     if (t === 'bool') return `<label class="chk big"><input type="checkbox" id="f-${k}" ${val ? 'checked' : ''}>${l}</label>`;
@@ -548,7 +553,8 @@ function formView(e) {
   const note = e && !isApprover() ? '<div class="note">変更は承認者の承認後に反映されます。</div>' : '';
   return `<section class="card"><div class="card-head"><h3>${e ? '予約を変更' : '新しい予約'}</h3>${e ? '<button type="button" class="btn small" data-act="cancelEdit">やめる</button>' : ''}</div>${note}
     ${grp('基本', ['name', 'kana', 'year', 'reservedAt', 'menus', 'venue'])}
-    ${grp('連絡先', ['tel', 'mobile', 'line', 'booker'])}
+    ${grp('予約の受付', ['booker', 'route', 'gofuku'])}
+    ${grp('連絡先', ['tel', 'mobile', 'line'])}
     ${grp('お客様情報・優先度', ['birth', 'school', 'selfVisit', 'visitSince', 'parentVisited', 'tagOk', 'mark'])}
     ${grp('前撮り・打合せ', ['maedori', 'maedoriMeet', 'maedoriDate', 'lineJul', 'lineAug', 'meetDate'])}
     ${grp('', ['memo'])}
@@ -667,6 +673,7 @@ document.addEventListener('input', ev => {
   if (ev.target.dataset.inp === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
 });
 document.addEventListener('change', ev => {
+  if (ev.target.dataset.chg === 'route') { const w = $('w-gofuku'); if (w) w.hidden = ev.target.value !== 'gofuku'; }
   if (ev.target.dataset.chg === 'year') { S.year = Number(ev.target.value); render(); }
   if (ev.target.dataset.chg === 'birth') { const y = yearFromBirth(ev.target.value), yf = $('f-year'); if (y && yf && !yf.dataset.touched) yf.value = y; }
   if (ev.target.id === 'f-year') ev.target.dataset.touched = '1';
