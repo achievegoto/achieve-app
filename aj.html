@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2b45">
+<link rel="apple-touch-icon" href="aj-icon.png">
+<link rel="icon" href="aj-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aujua">
+<title>achieve Aujua カウンセリング</title>
+<link rel="manifest" href="aj.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:wght@500;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f1; --surface: #ffffff; --line: #e4e1da; --ink: #1c1f26; --muted: #6b6a66;
+  --accent: #1f2b45; --accent-ink: #ffffff; --accent-soft: #e8ebf2;
+  --gold: #9a7a48; --gold-soft: #f4ede1;
+  --good: #1f6b4a; --good-soft: #e3f2ea; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --font-body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-brand: "Cormorant Garamond", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121419; --surface: #1b1e25; --line: #2e323c; --ink: #eceae5; --muted: #a3a19b;
+  --accent: #b9c6e4; --accent-ink: #141a28; --accent-soft: #252c3b;
+  --gold: #d6b884; --gold-soft: #2f2a20;
+  --good: #7fd3ab; --good-soft: #1b3429; --warn: #eec26e; --warn-soft: #3a2e16;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121419; --surface: #1b1e25; --line: #2e323c; --ink: #eceae5; --muted: #a3a19b;
+  --accent: #b9c6e4; --accent-ink: #141a28; --accent-soft: #252c3b;
+  --gold: #d6b884; --gold-soft: #2f2a20;
+  --good: #7fd3ab; --good-soft: #1b3429; --warn: #eec26e; --warn-soft: #3a2e16;
+  color-scheme: dark }
+* { box-sizing: border-box }
+html { padding: env(safe-area-inset-top, 0px) 0 0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.wrap { max-width: 760px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 10px; }
+.brand { font-family: var(--font-brand); font-size: 24px; letter-spacing: .18em; color: var(--accent); display: flex; align-items: baseline; gap: 10px; }
+.brand small { font-family: var(--font-body); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h3 { margin: 0; font-size: 16px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.step-t { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
+.step-t i { font-style: normal; font-family: var(--font-brand); font-size: 20px; color: var(--gold); min-width: 1.2em; }
+.sub { font-size: 12px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; border: 1px solid var(--line); background: var(--surface); padding: 8px 13px; border-radius: 99px; font-size: 14px; color: var(--ink); text-align: left; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 500; padding-left: 34px; }
+.chip .no { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-size: 12px; display: grid; place-items: center; font-weight: 700; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; background: var(--bg); border: 1px solid var(--line); padding: 3px; border-radius: 10px; }
+.seg button { border: 0; background: transparent; padding: 8px 4px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.q { display: flex; flex-direction: column; gap: 6px; }
+.q > span { font-size: 12px; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 9px; font-weight: 500; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+.plan { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.plan-h { padding: 12px 16px; background: var(--accent); color: var(--accent-ink); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.plan-h b { font-size: 15px; } .plan-h span { font-size: 12px; opacity: .85; }
+.plan.alt .plan-h { background: var(--gold-soft); color: var(--ink); border-bottom: 1px solid var(--line); }
+.plan-b { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.why { font-size: 13px; background: var(--bg); border-radius: 9px; padding: 10px 12px; }
+.items { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 8px 10px; font-size: 14px; }
+.items dt { font-size: 11px; letter-spacing: .06em; color: var(--gold); font-weight: 700; padding-top: 2px; }
+.items dd { margin: 0; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.items dd small { color: var(--muted); font-size: 12px; }
+.rec { font-weight: 700; }
+.rec::after { content: "おすすめ"; font-size: 10px; font-weight: 700; color: var(--gold); border: 1px solid var(--gold); border-radius: 99px; padding: 0 6px; margin-left: 6px; vertical-align: 1px; }
+.salon { border-left: 3px solid var(--gold); padding: 4px 0 4px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.salon b { font-size: 14px; }
+.lcard { display: flex; flex-direction: column; gap: 10px; }
+.lname { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lname b { font-size: 17px; }
+.tag { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); white-space: nowrap; }
+.tag.s { background: var(--accent-soft); color: var(--accent); }
+.talk { position: relative; background: var(--gold-soft); border-radius: 12px; padding: 12px 14px 12px 40px; font-size: 14px; }
+.talk::before { content: "“"; position: absolute; left: 12px; top: 2px; font-family: var(--font-brand); font-size: 38px; color: var(--gold); line-height: 1; }
+.ing { display: flex; flex-direction: column; gap: 6px; }
+.ing div { display: grid; grid-template-columns: minmax(0, 9em) minmax(0, 1fr); gap: 2px 10px; font-size: 13px; padding: 8px 0; border-top: 1px dashed var(--line); }
+.ing b { font-size: 13px; } .ing span.r { display: block; font-size: 11px; color: var(--gold); font-weight: 500; }
+.tips { margin: 0; padding-left: 1.2em; font-size: 13px; }
+details.more > summary { cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 500; list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "＋ "; }
+details.more[open] > summary::before { content: "− "; }
+details.more[open] > summary { margin-bottom: 10px; }
+.sec { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 4px 0 -6px; }
+.diag { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 16px; width: 100%; text-align: left; border: 0; background: transparent; }
+.row + .row { border-top: 1px solid var(--line); }
+.ol { margin: 0; padding-left: 1.3em; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.memo { width: 100%; min-height: 160px; font-size: 13px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); resize: vertical; }
+.field { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
+label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.err { color: #b3261e; font-size: 13px; }
+.login { max-width: 420px; margin: 24px auto; }
+nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
+.tabs button { border: 0; background: transparent; padding: 15px 0; font-size: 14px; color: var(--muted); }
+.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; box-shadow: inset 0 2px 0 var(--gold); }
+#toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
+.foot { font-size: 11px; color: var(--muted); text-align: center; }
+@media (max-width: 420px) { .items { grid-template-columns: 1fr; gap: 2px; } .items dt { padding-top: 6px; } .ing div { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><div class="wrap head">
+  <div class="brand">Aujua<small>カウンセリング</small></div>
+  <button type="button" class="btn small" id="reset" data-act="reset" hidden>はじめから</button>
+</div></header>
+<main class="wrap" id="main"><div class="empty">読み込んでいます</div></main>
+<nav id="nav" hidden><div class="wrap tabs" id="tabs"></div></nav>
+<div id="toast" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+/* achieve Aujua カウンセリング
+   商品知識はFirestore aj_kb/v1 { json } に置き、ログインしたスタッフだけが読み込む（ページ自体には持たない）。
+   悩みを選ぶ → おすすめのライン・組み合わせ（複数案）と、理由・効果・成分・トークを表示。 */
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let toastT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+const S = { user: undefined, kb: null, err: '', tab: 'c', hair: [], scalp: [], aging: false, thick: 'normal', finish: 'soft', open: null };
+const L = id => S.kb.lines[id];
+const C = id => S.kb.concerns.find(c => c.id === id);
+const STEP4 = ['QU', 'FM', 'AQ', 'ST', 'RP'], STEP5 = ['DI', 'AL', 'IM', 'TS', 'EQ'];
+const W = { light: 0, mid: 1, heavy: 2 };
+
+/* ---------- 提案ロジック ---------- */
+function linesFor(ids) {
+  const out = [];
+  ids.forEach(id => { const c = C(id); (S.aging ? c.aging : c.young).forEach(l => { if (!out.includes(l)) out.push(l); }); });
+  return out;
+}
+/* アウトバスを質感の好みで選ぶ */
+function pickLi(lid) {
+  const li = (L(lid).items.li || []);
+  if (!li.length) return -1;
+  const want = S.finish === 'light' ? /さら|軽/ : S.finish === 'moist' ? /しっとり|まとま/ : /やわらか|うるお/;
+  const i = li.findIndex(x => want.test(x));
+  return i >= 0 ? i : 0;
+}
+function trPick(lid) { /* モイスト版があれば、しっとり好み or 硬毛でモイストを推す */
+  const tr = L(lid).items.tr || [];
+  const mi = tr.findIndex(x => /モイスト/.test(x));
+  if (mi >= 0 && (S.finish === 'moist' || S.thick === 'thick')) return mi;
+  return 0;
+}
+const nm = s => s.split('｜')[0];
+const pr = s => s.includes('｜') ? s.split('｜').slice(1).join('｜') : '';
+function itemHtml(s, rec) { return `<span class="${rec ? 'rec' : ''}">${esc(nm(s))}</span>${pr(s) ? `<small>${esc(pr(s))}</small>` : ''}`; }
+
+function salonFor(hairL, scalpL) {
+  if (!hairL.length && !scalpL.length) return null;
+  const out = [];
+  const aging = hairL.find(l => STEP5.includes(l)), seven = hairL.includes('IN') ? 'IN' : null;
+  const four = hairL.filter(l => STEP4.includes(l));
+  const ab = id => ({ QU: 'QU', FM: 'FM', AQ: 'AQ', ST: 'ST', RP: 'RP', DI: 'DI', AL: 'AL', IM: 'IM', TS: 'TS', EQ: 'EQ' }[id]);
+  if (seven) {
+    out.push({ t: '7STEP インメトリィ', d: 'くせ×ダメージのゆがみを整える、いちばん手厚いコース。乾かすだけでまとまる髪へ。' });
+  } else if (aging) {
+    const second = four[0];
+    let recipe = `1st〜5th：${L(aging).name}`, notes = [];
+    if (aging === 'IM' && hairL.includes('EQ')) { recipe = '1st IM ／ 2nd 根元EQ・中間〜毛先IM ／ 3rd IM ／ 4th 中間〜毛先IM・根元EQ ／ 5th IM'; notes.push('根元の立ち上がりもケアしたいときの組み合わせ。4thのチャージは根元をEQで。'); }
+    if (second) notes.push(`2つ目の悩み（${L(second).name}）は、3rd STEPの上から${L(second).name}の2nd STEPを重ね付け（合計量はレングスの規定量に）。`);
+    notes.push('手触りを変えたいときは、5thを4STEPの4thに置き換え（アクアヴィア・スムースはツルっと）。');
+    if (aging !== 'AL') notes.push('さらに保湿感・ツヤ・持ちがほしいときは、4th・5thをアルティールに。');
+    out.push({ t: `5STEP ${L(aging).name}`, d: recipe, n: notes });
+  } else if (four.length) {
+    const main = four[0], second = four[1];
+    let recipe = `1st〜4th：${L(main).name}`, notes = [];
+    if (main === 'QU' && (S.finish === 'moist' || hairL.includes('AQ'))) recipe = '1M〜4M：クエンチ（パサついて広がる髪をまとまりやすく）';
+    if (second) recipe = second === 'ST' ? `1st〜3rd：${L(main).name} ／ 4th：スムース（からまり対策）` : `1st：${L(second).name}（2つ目の悩み）／ 2nd〜4th：${L(main).name}`;
+    notes.push('仕上がりの質感を変えたいときは、4th STEPを組み替え。');
+    notes.push('さらに保湿感・ツヤ・持ちがほしいときは、3rd・4thをアルティールに（4thの前に補水となめし）。');
+    out.push({ t: `4STEP ${L(main).name}`, d: recipe, n: notes });
+  }
+  if (hairL.includes('EX')) out.push({ t: 'スペシャルケア（エクスシールド）', d: 'シャンプー前にクリアジェルで汚れを落とし、トリートメントの最後にエクスシールド＋でキューティクルを補強。' });
+  if (scalpL.length) out.push({ t: 'スカルプケア（スパオイル＋頭筋リリース）', d: 'サロントリートメントの途中に地肌マッサージ（約10分）を組み込む複合メニューも可。香りは4種類から気分で選べます。' });
+  return out;
+}
+
+function plans() {
+  const hairL = linesFor(S.hair), scalpL = linesFor(S.scalp);
+  const res = [];
+  const main = hairL[0], second = hairL.find(l => l !== main && !['EX', 'DL'].includes(l) && !['EX', 'DL'].includes(main)) || null;
+  const scalpMain = scalpL[0];
+  const extras = hairL.filter(l => ['EX', 'DL'].includes(l));
+  const coreHair = hairL.filter(l => !['EX', 'DL'].includes(l));
+  const m = coreHair[0];
+  // A: 単独ライン
+  if (m) {
+    const li = pickLi(m);
+    res.push({ k: 'A', t: `${L(m).name}でそろえる`, s: 'いちばん気になるお悩みに合わせた基本の組み合わせ', why: `${esc(C(S.hair[0]).label)}には${esc(L(m).name)}。${esc(L(m).catch)}。`,
+      rows: [['シャンプー', (L(m).items.sp || []).slice(0, 1).map(x => itemHtml(x))], ['トリートメント', (L(m).items.tr || []).map((x, i) => itemHtml(x, (L(m).items.tr.length > 1) && i === trPick(m)))],
+        ...(L(m).items.nt ? [['集中ケア', L(m).items.nt.map(x => itemHtml(x))]] : []), ['アウトバス', (L(m).items.li || []).map((x, i) => itemHtml(x, i === li))]], lines: [m] });
+  }
+  // B: 2つの悩みを掛け合わせ（シャンプー×トリートメント）
+  const m2 = coreHair[1];
+  if (m && m2) {
+    const heavierTR = W[L(m2).w] > W[L(m).w] ? m2 : m;
+    const softish = ['FM', 'RP', 'QU'].includes(m2) ? m2 : m;
+    const tr = S.finish === 'moist' ? heavierTR : S.finish === 'soft' ? softish : (W[L(m).w] <= W[L(m2).w] ? m : m2);
+    const sp = tr === m ? m2 : m;
+    res.push({ k: 'B', t: `${L(sp).name} シャンプー × ${L(tr).name} トリートメント`, s: 'お悩みが2つあるときの掛け合わせ', why: `①それぞれの悩みに合うライン（${esc(L(m).name)}・${esc(L(m2).name)}）を選び、②仕上がりの好み（${S.finish === 'light' ? 'さらさら' : S.finish === 'moist' ? 'しっとりまとまり' : 'やわらか'}）を優先したいラインをトリートメントに。逆の組み合わせ（${esc(L(tr).name)} SP × ${esc(L(sp).name)} TR）もOK。`,
+      rows: [['シャンプー', (L(sp).items.sp || []).slice(0, 1).map(x => itemHtml(x))], ['トリートメント', (L(tr).items.tr || []).slice(0, 1).map(x => itemHtml(x, true))], ['アウトバス', [L(tr), L(sp)].map(x => x.items.li && x.items.li[pickLi(x === L(tr) ? tr : sp)]).filter(Boolean).slice(0, 2).map((x, i) => itemHtml(x, i === 0))]], lines: [m, m2] });
+  }
+  // C: 地肌 × 髪
+  if (scalpMain) {
+    const h = m;
+    const sl = L(scalpMain);
+    res.push({ k: 'C', t: h ? `${sl.name} シャンプー × ${L(h).name} トリートメント` : `${sl.name}で地肌ケア`, s: h ? '地肌のお悩み＋髪のお悩みがあるとき' : '地肌のお悩みに合わせた基本の組み合わせ',
+      why: h ? `シャンプーは地肌の悩み（${esc(C(S.scalp[0]).label)}）に合わせて${esc(sl.name)}、トリートメントは髪の悩みに合わせて${esc(L(h).name)}。地肌用ローションで毎日の地肌ケアを。` : `${esc(C(S.scalp[0]).label)}には${esc(sl.name)}。${esc(sl.catch)}。`,
+      rows: [['シャンプー', (sl.items.sp || []).map((x, i) => itemHtml(x, i === 0))], ['トリートメント', h ? (L(h).items.tr || []).slice(0, 1).map(x => itemHtml(x, true)) : []], ['地肌用マスク', (sl.items.tr || []).map(x => itemHtml(x))], ['地肌用ローション', (sl.items.li || []).map(x => itemHtml(x, true))], ...(h && L(h).items.li ? [['アウトバス', [itemHtml(L(h).items.li[pickLi(h)])]]] : [])].filter(r => r[1].length), lines: h ? [scalpMain, h] : [scalpMain] });
+  }
+  // D: 髪質に合わせた質感調整（細い髪の悩み × 硬毛・多毛 など）
+  if (m === 'ST' && S.thick === 'thick') {
+    res.push({ k: 'D', t: 'スムース シャンプー × アクアヴィア モイスト トリートメント', s: '硬毛・多毛でスムースだと軽すぎるとき', why: 'お悩み（からまり）にはシャンプーでスムース、仕上がりの重さは髪質に合わせてトリートメントで調整します。',
+      rows: [['シャンプー', [itemHtml(L('ST').items.sp[0])]], ['トリートメント', [itemHtml(L('AQ').items.tr[1], true)]], ['アウトバス', [itemHtml(L('AQ').items.li[1])]]], lines: ['ST', 'AQ'] });
+  } else if (m && S.thick === 'fine' && W[L(m).w] === 2) {
+    res.push({ k: 'D', t: `${L(m).name}を軽めに使う`, s: '細い髪で重く感じるとき', why: `シャンプー・トリートメントは${esc(L(m).name)}のまま、トリートメントは毛先中心・少なめに。アウトバスは軽い方（セラム）を。`,
+      rows: [['アウトバス', (L(m).items.li || []).map((x, i) => itemHtml(x, i === 0))]], lines: [m] });
+  }
+  // 紫外線・ポリューションは＋α
+  extras.forEach(e => res.push({ k: 'E', t: `＋ ${L(e).name}`, s: '普段のケアにプラス', why: esc(L(e).catch) + '。', rows: [['アイテム', [...(L(e).items.sp || []), ...(L(e).items.li || [])].map((x, i) => itemHtml(x, i === 0))]], lines: [e] }));
+  return { res, salon: salonFor(hairL, scalpL), lines: [...new Set([...coreHair.slice(0, 2), ...extras, ...scalpL.slice(0, 1)])] };
+}
+
+/* ---------- 画面 ---------- */
+function render() {
+  const m = $('main');
+  if (S.user === undefined) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
+  if (!S.user) { $('nav').hidden = true; m.innerHTML = loginView(); return; }
+  if (S.err) { m.innerHTML = `<div class="card"><div class="err">${esc(S.err)}</div></div>`; return; }
+  if (!S.kb) { m.innerHTML = '<div class="empty">商品データを読み込んでいます</div>'; return; }
+  $('nav').hidden = false;
+  $('reset').hidden = S.tab !== 'c' || !(S.hair.length || S.scalp.length);
+  $('tabs').innerHTML = [['c', 'カウンセリング'], ['l', 'ライン図鑑'], ['f', '進め方']].map(([id, l]) => `<button type="button" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}</button>`).join('');
+  m.innerHTML = S.tab === 'l' ? libView() : S.tab === 'f' ? flowView() : counselView();
+}
+function loginView() {
+  return `<form class="card login" id="login-form"><h3>ログイン</h3><div class="sub">在庫アプリと同じアカウントでログインします。</div>
+    <label class="lbl">メールアドレス<input class="field" id="lg-email" type="email" autocomplete="username" required></label>
+    <label class="lbl">パスワード<input class="field" id="lg-pass" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lg-err"></div><button class="btn primary">ログイン</button></form>`;
+}
+const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-act="set" data-k="${key}" data-id="${v}" aria-pressed="${String(S[key]) === v}">${l}</button>`).join('')}</div>`;
+function chipList(area) {
+  const sel = S[area];
+  return `<div class="chips">${S.kb.concerns.filter(c => c.area === area).map(c => { const i = sel.indexOf(c.id); return `<button type="button" class="chip" data-act="pick" data-k="${area}" data-id="${c.id}" aria-pressed="${i >= 0}">${i >= 0 ? `<span class="no">${i + 1}</span>` : ''}${esc(c.label)}</button>`; }).join('')}</div>`;
+}
+function counselView() {
+  const top = `<section class="card">
+      <div class="step-t"><i>1</i>お客さまのこと</div>
+      <div class="q"><span>年齢による変化（ハリ・コシ、乾燥、うねり）が気になり始めている？（目安40代〜）</span>${seg('aging', [['false', 'いいえ'], ['true', 'はい']])}</div>
+      <div class="q"><span>髪の太さ・量</span>${seg('thick', [['fine', '細い・少ない'], ['normal', 'ふつう'], ['thick', '太い・多い']])}</div>
+      <div class="q"><span>なりたい仕上がり</span>${seg('finish', [['light', 'さらさら軽く'], ['soft', 'やわらか'], ['moist', 'しっとりまとまる']])}</div>
+    </section>
+    <section class="card"><div class="step-t"><i>2</i>髪のお悩み</div><div class="sub">気になる順にタップ（番号＝優先順位）。もう一度押すと外れます。</div>${chipList('hair')}</section>
+    <section class="card"><div class="step-t"><i>3</i>地肌のお悩み</div>${chipList('scalp')}</section>`;
+  if (!S.hair.length && !S.scalp.length) return top + `<div class="empty">お悩みを選ぶと、おすすめの組み合わせが出ます。</div>`;
+  const p = plans();
+  const diag = [...S.hair, ...S.scalp].map(id => C(id)).filter(c => c.sign).map(c => `<span>・${esc(c.label)}：${esc(c.sign)}</span>`).join('');
+  const planHtml = p.res.map((x, i) => `<section class="plan${i ? ' alt' : ''}"><div class="plan-h"><b>${i === 0 ? 'おすすめ' : '案' + (i + 1)}｜${esc(x.t)}</b><span>${esc(x.s)}</span></div>
+      <div class="plan-b"><div class="why">${x.why}</div><dl class="items">${x.rows.map(([k, v]) => `<dt>${k}</dt><dd>${v.join('')}</dd>`).join('')}</dl></div></section>`).join('');
+  const salon = p.salon && p.salon.length ? `<section class="card"><div class="step-t"><i>4</i>サロントリートメント</div>${p.salon.map(s => `<div class="salon"><b>${esc(s.t)}</b><span>${esc(s.d)}</span>${(s.n || []).map(n => `<span class="sub">・${esc(n)}</span>`).join('')}</div>`).join('')}</section>` : '';
+  const talk = `<div class="sec">お客さまへの説明（なぜこのアイテム？）</div>` + p.lines.map(id => lineCard(id, true)).join('');
+  return top + `<div class="sec">ご提案</div>` + (diag ? `<div class="diag"><b>診断で確かめるポイント</b>${diag}</div>` : '') + planHtml + salon + talk +
+    `<section class="card"><div class="card-head"><h3>お客さま用メモ</h3><button type="button" class="btn small" data-act="copy">コピー</button></div><textarea class="memo" id="memo" readonly>${esc(memoText(p))}</textarea><div class="sub">LINEなどでお客さまに送るときに使えます。</div></section>`;
+}
+function lineCard(id, compact) {
+  const l = L(id);
+  const ing = l.ings.map(g => `<div><b>${esc(g.n)}<span class="r">${esc(g.r)}</span></b><span>${esc(g.d)}</span></div>`).join('');
+  const all = Object.entries({ sp: 'シャンプー', tr: l.cat === 'scalp' ? '地肌用マスク' : 'トリートメント', nt: '集中ケア', li: l.cat === 'scalp' ? '地肌用ローション' : 'アウトバス' }).filter(([k]) => l.items[k]).map(([k, n]) => `<dt>${n}</dt><dd>${l.items[k].map(x => itemHtml(x)).join('')}</dd>`).join('');
+  return `<section class="card lcard"><div class="lname"><b>${esc(l.name)}</b><span class="tag${l.cat === 'scalp' ? ' s' : ''}">${l.cat === 'scalp' ? 'スカルプケア' : l.step === 'special' ? 'スペシャル' : l.step}</span>${l.aging ? '<span class="tag">エイジング</span>' : ''}</div>
+    <div>${esc(l.catch)}</div>
+    <div class="talk">${esc(l.talk)}</div>
+    <div class="sub"><b>原因：</b>${esc(l.cause)}<br><b>はたらき：</b>${esc(l.mech)}</div>
+    <div class="ing">${ing}</div>
+    ${l.tips.length ? `<div><div class="sub"><b>おうちでのアドバイス</b></div><ul class="tips">${l.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+    <details class="more"${compact ? '' : ' open'}><summary>アイテムと価格</summary><dl class="items">${all}</dl>${l.salon ? `<div class="sub" style="margin-top:8px">サロン：${esc(l.salon)}</div>` : ''}${l.scent ? `<div class="sub">香り：${esc(l.scent)}イメージ</div>` : ''}</details></section>`;
+}
+function memoText(p) {
+  const out = ['本日のおすすめホームケア（オージュア）'];
+  p.res.slice(0, 2).forEach((x, i) => { out.push(''); out.push(`【${i === 0 ? 'おすすめ' : '案2'}】${x.t}`); x.rows.forEach(([k, v]) => { const t = v.map(h => h.replace(/<small>.*?<\/small>/g, '').replace(/<[^>]+>/g, '')).join('／'); if (t) out.push(`・${k}：${t}`); }); });
+  const tips = [...new Set(p.lines.flatMap(id => L(id).tips))];
+  if (tips.length) { out.push(''); out.push('【おうちでのポイント】'); tips.forEach(t => out.push('・' + t)); }
+  return out.join('\n');
+}
+function libView() {
+  if (S.open) return `<button type="button" class="btn small" data-act="back" style="align-self:flex-start">← 一覧へ</button>` + lineCard(S.open, false);
+  const grp = (t, ids) => `<div class="sec">${t}</div><div class="list">${ids.map(id => `<button type="button" class="row" data-act="open" data-id="${id}"><span><b>${esc(L(id).name)}</b><br><span class="sub">${esc(L(id).catch)}</span></span><span class="sub">›</span></button>`).join('')}</div>`;
+  const ids = Object.keys(S.kb.lines);
+  const common = S.kb.common.map(g => `<div><b>${esc(g.n)}<span class="r">${esc(g.w)}</span></b><span>${esc(g.d)}</span></div>`).join('');
+  return grp('ヘアケア（4STEP）', ids.filter(i => STEP4.includes(i))) + grp('エイジングヘアケア（5STEP）', ids.filter(i => STEP5.includes(i))) + grp('7STEP', ['IN']) + grp('スペシャル', ['EX', 'DL']) + grp('スカルプケア', ids.filter(i => L(i).cat === 'scalp')) +
+    `<section class="card"><h3>全ラインに共通の成分</h3><div class="ing">${common}</div></section>` +
+    `<section class="card"><h3>正しい使い方（お客さまに伝える）</h3><dl class="items">${S.kb.homeuse.map(h => `<dt>${esc(h.n)}</dt><dd>${esc(h.d)}</dd>`).join('')}</dl></section>` +
+    `<div class="foot">価格は税抜・資料（${esc(S.kb.version)}版）時点のものです。</div>`;
+}
+function flowView() {
+  const f = S.kb.flow;
+  const box = (t, arr) => `<section class="card"><h3>${t}</h3><ol class="ol">${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ol></section>`;
+  return box('① 悩みを聞く（ヒアリング）', f.hearing) +
+    `<section class="card"><h3>質問のコツ</h3><dl class="items">${f.questions.map(q => `<dt>${esc(q.t)}</dt><dd>${esc(q.e)}</dd>`).join('')}</dl></section>` +
+    box('② 提案する', f.propose) + box('③ 不安を解消する', f.worry) + box('④ 決めていただく', f.close) + box('⑤ ホームケアの提案（仕上げのとき）', f.home) + box('ソムリエの心がまえ', f.mind);
+}
+
+/* ---------- 操作 ---------- */
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-act]'); if (!el) return;
+  const { act, id, k } = el.dataset;
+  if (act === 'tab') { S.tab = id; S.open = null; render(); window.scrollTo(0, 0); }
+  if (act === 'set') { S[k] = id === 'true' ? true : id === 'false' ? false : id; render(); }
+  if (act === 'pick') { const a = S[k], i = a.indexOf(id); i >= 0 ? a.splice(i, 1) : a.push(id); render(); }
+  if (act === 'reset') { S.hair = []; S.scalp = []; S.aging = false; S.thick = 'normal'; S.finish = 'soft'; render(); window.scrollTo(0, 0); }
+  if (act === 'open') { S.open = id; render(); window.scrollTo(0, 0); }
+  if (act === 'back') { S.open = null; render(); }
+  if (act === 'copy') { const t = $('memo'); try { await navigator.clipboard.writeText(t.value); toast('コピーしました'); } catch (e) { t.focus(); t.select(); toast('選択された文章をコピーしてください'); } }
+});
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'login-form') return; ev.preventDefault();
+  try { await firebase.auth().signInWithEmailAndPassword($('lg-email').value.trim(), $('lg-pass').value); } catch (e) { $('lg-err').textContent = 'メールアドレスかパスワードが違います'; }
+});
+(function init() {
+  if (typeof firebaseConfig === 'undefined' || !window.firebase) { $('main').innerHTML = '<div class="empty">設定ファイル（config.js）が読み込めません。</div>'; return; }
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  firebase.auth().onAuthStateChanged(async u => {
+    S.user = u || null; render();
+    if (u && !S.kb) {
+      try { const d = await db.doc('aj_kb/v1').get(); if (!d.exists) throw new Error('商品データがまだありません'); S.kb = JSON.parse(d.data().json); }
+      catch (e) { S.err = '商品データを読み込めません：' + e.message; }
+      render();
+    }
+  });
+})();
+</script>
+</body>
+</html>
