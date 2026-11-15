@@ -183,6 +183,8 @@ body.is-live { padding-top: 36vh; }
 .who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
 details.ocard > summary { list-style: none; cursor: pointer; margin: -2px 0; align-items: center; display: flex; }
 details.ocard > summary h3 { min-width: 0; }
+.opick { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.opick select { font-weight: 600; color: var(--text, inherit); font-size: 15px; }
 details.ocard { display: block; } details.ocard[open] > * + * { margin-top: 12px; }
 details.ocard > summary::-webkit-details-marker { display: none; }
 details.ocard:not([open]) { gap: 0; }
@@ -315,11 +317,11 @@ function gotoText() {
   const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).join('\n'));
   return `後藤さん\n発注お願いします。\n${st.full}\n\n${parts.join('\n\n')}`;
 }
-function gotoCard() {
+function gotoCard(force) {
   const g = gotoIds(); if (g.length < 2) return '';
   const total = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).reduce((b, r) => b + r.qty * num(r.it.price), 0), 0);
   const n = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).length, 0);
-  return `<details class="card ocard" data-did="__goto" ${(S.oOpen ||= new Set()).has('__goto') ? 'open' : ''}>
+  return `<details class="card ocard" data-did="__goto" ${force || (S.oOpen ||= new Set()).has('__goto') ? 'open' : ''}>
     <summary class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="osum"><span class="ocnt">${n}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     <div class="sub">${g.map(did => esc(dealerOf(did).name)).join('・')} の ${g.length} 件を1つの文章にしています。下のカードで数量を変えると、ここにも反映されます。</div>
     <textarea class="field msg" id="msg-__goto" readonly aria-label="後藤さん宛てのまとめた発注文">${esc(gotoText())}</textarea>
@@ -800,16 +802,24 @@ function viewOrder() {
   let body = '';
   if (unassigned.length) body += `<div class="note">ディーラーが未設定の商品が ${unassigned.length} 点あります。「商品」タブで設定すると発注文に入ります。</div>`;
   if (!ids.length) body += `<div class="card"><div class="empty">${esc(st.full)}に発注が必要な商品はありません。</div></div>`;
-  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + gotoCard() + ids.map(orderCard).join('') + extra;
+  /* ディーラーを選ぶプルダウン：選ぶとそのディーラーだけ開いて表示 */
+  const g = gotoIds().length >= 2;
+  const opts = (g ? ['__goto'] : []).concat(ids);
+  const pick = opts.includes(S.oPick) ? S.oPick : '';
+  const sumOf = did => { const rs = did === '__goto' ? gotoIds().flatMap(x => linesFor(x)) : linesFor(did); const a = rs.filter(r => r.qty > 0); return `${a.length}品・${yen(a.reduce((t, r) => t + r.qty * num(r.it.price), 0))}`; };
+  const nameOf = did => did === '__goto' ? '後藤さん宛て（まとめて）' : dealerOf(did).name;
+  const sel = opts.length ? `<label class="lbl opick">ディーラーを選ぶ<select class="field" data-chg="oPick" aria-label="ディーラーを選ぶ"><option value="">すべて表示（${opts.length}件）</option>${opts.map(did => `<option value="${did}" ${pick === did ? 'selected' : ''}>${esc(nameOf(did))}（${sumOf(did)}）</option>`).join('')}</select></label>` : '';
+  const cards = pick ? (pick === '__goto' ? gotoCard(true) : orderCard(pick, true)) : gotoCard() + ids.map(did => orderCard(did)).join('');
+  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + sel + cards + extra;
 }
-function orderCard(did) {
+function orderCard(did, force) {
   const d = dealerOf(did), rows = linesFor(did);
   const active = rows.filter(r => r.qty > 0);
   const xf = did === XFER;
   const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
   const others = S.items.filter(i => (xf ? tonariFree(i.id) > 0 : i.dealerId === did) && !rows.some(r => r.it.id === i.id));
   const dis = S.readOnly || !active.length ? 'disabled' : '';
-  const open = (S.oOpen ||= new Set()).has(did);
+  const open = force || (S.oOpen ||= new Set()).has(did);
   return `<details class="card ocard" data-did="${did}" ${open ? 'open' : ''}>
     <summary class="card-head"><h3>${esc(d.name)}</h3><span class="osum"><span class="ocnt">${active.length}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
@@ -1194,6 +1204,7 @@ document.addEventListener('change', ev => {
   const { id, did } = el.dataset;
   if (c === 'qty') { setQty(S.store, id, num(el.value)); el.blur(); render(); }
   if (c === 'oqty') { bumpDraft(did, id, num(el.value)); el.blur(); render(); }
+  if (c === 'oPick') { S.oPick = el.value; el.blur(); render(); window.scrollTo(0, 0); return; }
   if (c === 'addLine' && el.value) { bumpDraft(did, el.value, 1); el.value = ''; el.blur(); render(); }
   if (c === 'addOther' && el.value) { const [d, i] = el.value.split('|'); bumpDraft(d, i, 1); el.value = ''; el.blur(); render(); }
   if (c === 'scanItem') { S.scan.rows[Number(id)].id = el.value; render(); return; }
