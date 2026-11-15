@@ -135,7 +135,9 @@ table.mx .rank { font-size: 10px; padding: 0 6px; }
 .ph.wait { font-size: 11px; color: var(--muted); text-align: center; cursor: default; }
 .pv { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .pv img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; border-radius: 8px; }
-.seg2.ncat { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ncat small { margin-left: 4px; font-size: 11px; opacity: .75; }
+.seg2.ncat { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sheet > * { flex-shrink: 0; }
+.seg2.ncat button { padding: 9px 2px; font-size: 14px; } .ncat small { margin-left: 4px; font-size: 11px; opacity: .75; }
 .nlist { display: flex; flex-direction: column; gap: 8px; }
 .nitem, .nnew { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
 .nnew { border-style: dashed; }
