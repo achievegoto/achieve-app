@@ -135,6 +135,15 @@ table.mx .rank { font-size: 10px; padding: 0 6px; }
 .ph.wait { font-size: 11px; color: var(--muted); text-align: center; cursor: default; }
 .pv { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .pv img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; border-radius: 8px; }
+.seg2.ncat { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ncat small { margin-left: 4px; font-size: 11px; opacity: .75; }
+.nlist { display: flex; flex-direction: column; gap: 8px; }
+.nitem, .nnew { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.nnew { border-style: dashed; }
+.nh { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; } .nh b { color: var(--fg, inherit); font-weight: 600; }
+.nh .field { width: auto; padding: 4px 8px; font-size: 13px; }
+.nbtn { margin-left: auto; display: flex; gap: 10px; }
+.lnk { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; } .lnk.danger { color: var(--bad, #c0392b); }
+.nt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; }
 .pv-bar { display: flex; gap: 10px; align-items: center; color: #ddd; font-size: 12px; flex-wrap: wrap; justify-content: center; }
 .crit { list-style: none; padding: 0; margin: -6px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .crit li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
@@ -503,7 +512,7 @@ function listView() {
     const pend = pendingOf(e.id).length;
     const steps = [['前撮り', e.maedori === 'yes' ? 'on' : e.maedori === 'no' ? 'off' : ''], ['7月LINE', e.lineJul ? 'on' : ''], ['8月LINE', e.lineAug ? 'on' : ''], ['打合せ', e.meetDate ? 'on' : '']];
     return `<button type="button" class="row ent" data-act="open" data-id="${e.id}">
-      <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
+      <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.notes > 0 ? ` <span class="pill p-std">📝${e.notes}</span>` : ''}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
         <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}${e.route === 'gofuku' ? `<span>紹介：${esc(e.gofuku || '呉服屋さん')}</span>` : e.route === 'parent' ? '<span>親の紹介</span>' : ''}${e.booker ? `<span>受付 ${esc(e.booker)}</span>` : ''}</div>
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
@@ -540,11 +549,16 @@ async function exportXlsx() {
 }
 
 /* ---- 写真（Firestoreに圧縮して保存：1枚1ドキュメント） ---- */
-let photoUnsub = null, photoFor = null;
+let photoUnsub = null, noteUnsub = null, photoFor = null;
+/* 打ち合わせ記録の区分 */
+const NCATS = [['hair', 'ヘアセット'], ['make', 'メイク'], ['kitsuke', '着付け']];
 function watchPhotos(id) {
   if (photoFor === id) return;
-  if (photoUnsub) photoUnsub(); photoUnsub = null; photoFor = id; S.photos = []; S.photoLoading = !!id;
+  if (photoUnsub) photoUnsub(); if (noteUnsub) noteUnsub(); photoUnsub = noteUnsub = null; photoFor = id; S.photos = []; S.notes = []; S.photoLoading = !!id; S.noteEdit = null;
   if (!id) return;
+  noteUnsub = db.collection('sk_notes').where('entryId', '==', id).onSnapshot(s => {
+    S.notes = s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.at - b.at); renderSheet();
+  }, e => toast('打ち合わせ記録を読み込めません：' + e.message));
   photoUnsub = db.collection('sk_photos').where('entryId', '==', id).onSnapshot(s => {
     S.photos = s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.at - b.at); S.photoLoading = false; renderSheet();
   }, e => { S.photoLoading = false; toast('写真を読み込めません：' + e.message); renderSheet(); });
@@ -557,22 +571,22 @@ function shrink(file, max, q) {
     img.src = url;
   });
 }
-async function addPhotos(files) {
+async function addPhotos(files, cat) {
   const id = S.open; if (!id || !files.length) return;
-  const m = me(); let n = 0; S.uploading = files.length; renderSheet();
+  const m = me(); let n = 0; S.uploading = files.length; S.upCat = cat || ''; renderSheet();
   for (const f of files) {
     try {
       let data = await shrink(f, 1600, .75); if (data.length > 900000) data = await shrink(f, 1200, .6); if (data.length > 900000) data = await shrink(f, 900, .5);
       const thumb = await shrink(f, 320, .7);
-      await db.collection('sk_photos').add({ entryId: id, data, thumb, at: Date.now(), by: m.id, byName: m.name });
+      await db.collection('sk_photos').add(clean({ entryId: id, cat: cat || undefined, data, thumb, at: Date.now(), by: m.id, byName: m.name }));
       await db.doc('sk_entries/' + id).update({ photos: firebase.firestore.FieldValue.increment(1) });
       n++;
     } catch (e) { toast('写真を保存できませんでした：' + e.message); }
     S.uploading--; renderSheet();
   }
-  S.uploading = 0; if (n) toast(`写真を${n}枚追加しました`); renderSheet();
+  S.uploading = 0; S.upCat = ''; if (n) toast(`写真を${n}枚追加しました`); renderSheet();
 }
-const delPhotosOf = async id => { const s = await db.collection('sk_photos').where('entryId', '==', id).get(); const b = db.batch(); s.docs.forEach(d => b.delete(d.ref)); if (s.size) await b.commit(); };
+const delPhotosOf = async id => { for (const c of ['sk_photos', 'sk_notes']) { const s = await db.collection(c).where('entryId', '==', id).get(); const b = db.batch(); s.docs.forEach(d => b.delete(d.ref)); if (s.size) await b.commit(); } };
 const canDelPhoto = p => isApprover() || (WHO.me && p.by === WHO.me.id);
 
 /* ---- 詳細 ---- */
@@ -581,10 +595,25 @@ function renderSheet() {
   if (!e) { box.innerHTML = ''; document.body.style.overflow = ''; watchPhotos(null); S.viewPhoto = null; return; }
   watchPhotos(e.id);
   const keep = box.querySelector('.sheet')?.scrollTop || 0;
-  const ph = S.photos || [], pv = S.viewPhoto && ph.find(p => p.id === S.viewPhoto);
+  /* 入力途中の文字を再描画で消さない */
+  const draft = {}; ['n-text', 'n-date', 'n-edit'].forEach(k => { const el = $(k); if (el) draft[k] = el.value; }); const focusId = document.activeElement?.id;
+  const allPh = S.photos || [], ph = allPh.filter(p => !p.cat), pv = S.viewPhoto && allPh.find(p => p.id === S.viewPhoto);
+  const nc = S.noteCat || 'hair', notes = (S.notes || []).filter(n => n.cat === nc), cph = allPh.filter(p => p.cat === nc);
+  const cntOf = c => (S.notes || []).filter(n => n.cat === c).length + allPh.filter(p => p.cat === c).length;
+  const thumb = p => `<button type="button" class="ph" data-act="pv" data-id="${p.id}" aria-label="写真を開く"><img src="${p.thumb || p.data}" alt=""></button>`;
+  const noteSec = `<div class="sec-t">打ち合わせ記録</div>
+    <div class="seg2 ncat">${NCATS.map(([c, l]) => `<button type="button" data-act="ncat" data-id="${c}" aria-pressed="${nc === c}">${l}${cntOf(c) ? `<small>${cntOf(c)}</small>` : ''}</button>`).join('')}</div>
+    <div class="nlist">${notes.map(n => S.noteEdit === n.id
+      ? `<div class="nitem"><div class="nh"><input class="field" id="n-date" type="date" value="${esc(n.date || '')}"></div><textarea class="field" id="n-edit">${esc(n.text || '')}</textarea>
+          <div class="actions"><button type="button" class="btn small primary" data-act="noteSave" data-id="${n.id}">保存</button><button type="button" class="btn small" data-act="noteEditCancel">やめる</button></div></div>`
+      : `<div class="nitem"><div class="nh"><b>${n.date ? md(n.date) : ''}</b><span>${esc(n.byName || '')}</span>${canDelPhoto(n) ? `<span class="nbtn"><button type="button" class="lnk" data-act="noteEdit" data-id="${n.id}">編集</button><button type="button" class="lnk danger" data-act="noteDel" data-id="${n.id}">${S.confirm === 'nt-' + n.id ? '本当に削除' : '削除'}</button></span>` : ''}</div><div class="nt">${esc(n.text || '')}</div></div>`).join('') || `<div class="sub">${NCATS.find(x => x[0] === nc)[1]}の記録はまだありません</div>`}</div>
+    <div class="phgrid">${cph.map(thumb).join('')}${S.uploading && S.upCat === nc ? `<div class="ph wait">保存中…<br>残り${S.uploading}枚</div>` : ''}<label class="ph add">＋<span>${NCATS.find(x => x[0] === nc)[1]}の写真</span><input type="file" accept="image/*" multiple hidden data-chg="photo" data-cat="${nc}"></label></div>
+    ${S.noteEdit ? '' : `<div class="nnew"><div class="nh"><label class="sub">打合せ日 <input class="field" id="n-date" type="date" value="${today()}"></label></div>
+      <textarea class="field" id="n-text" placeholder="${nc === 'hair' ? '例：ハーフアップ、前髪は流す、髪飾り持ち込み' : nc === 'make' ? '例：ナチュラル、赤リップ希望、まつエク済み' : '例：振袖は〇〇で受け取り、帯結びはふくら雀'}"></textarea>
+      <div class="actions"><button type="button" class="btn small primary" data-act="noteAdd">記録する</button></div></div>`}`;
   const photoSec = `<div class="sec-t">写真${ph.length ? `（${ph.length}枚）` : ''}</div>
     <div class="phgrid">${ph.map(p => `<button type="button" class="ph" data-act="pv" data-id="${p.id}" aria-label="写真を開く"><img src="${p.thumb || p.data}" alt=""></button>`).join('')}
-      ${S.uploading ? `<div class="ph wait">保存中…<br>残り${S.uploading}枚</div>` : ''}
+      ${S.uploading && !S.upCat ? `<div class="ph wait">保存中…<br>残り${S.uploading}枚</div>` : ''}
       <label class="ph add">＋<span>写真を追加</span><input type="file" accept="image/*" multiple hidden data-chg="photo"></label></div>
     ${S.photoLoading ? '<div class="sub">写真を読み込んでいます</div>' : ''}`;
   const pend = pendingOf(e.id);
@@ -593,6 +622,7 @@ function renderSheet() {
     <button type="button" class="btn small x" data-act="close" aria-label="閉じる">✕</button>
     <div><div class="sub">${e.year}年 成人式</div><h3>${esc(e.name)}</h3></div>
     ${pend.length ? `<div class="note">変更の申請が${pend.length}件あります（承認待ち）。</div>` : ''}
+    ${noteSec}
     ${photoSec}
     ${kv}
     <div class="sub">登録：${esc(e.createdByName || '')} ${e.createdAt ? new Date(e.createdAt).toLocaleDateString('ja-JP') : ''}${e.updatedByName ? ` ／ 最終変更：${esc(e.updatedByName)} ${new Date(e.updatedAt).toLocaleDateString('ja-JP')}` : ''}</div>
@@ -603,6 +633,7 @@ function renderSheet() {
     <div class="pv-bar"><span>${esc(pv.byName || '')} ${new Date(pv.at).toLocaleDateString('ja-JP')}</span>
       ${canDelPhoto(pv) ? `<button type="button" class="btn small danger" data-act="pvDel" data-id="${pv.id}">${S.confirm === 'ph-' + pv.id ? '本当に削除' : '削除'}</button>` : ''}
       <button type="button" class="btn small" data-act="pvClose">閉じる</button></div></div>` : ''}`;
+  Object.entries(draft).forEach(([k, v]) => { const el = $(k); if (el && !(k === 'n-date' && !v)) el.value = v; }); if (focusId && $(focusId)) $(focusId).focus();
   const sh = box.querySelector('.sheet'); if (sh) sh.scrollTop = keep;
   document.body.style.overflow = 'hidden';
 }
@@ -688,6 +719,29 @@ document.addEventListener('click', async ev => {
       case 'view': S.view = id; try { localStorage.setItem('sk.view', id); } catch (x) {} render(); break;
       case 'xlsx': if (isApprover()) await exportXlsx(); break;
       case 'open': S.open = id; S.confirm = ''; S.viewPhoto = null; renderSheet(); break;
+      case 'ncat': if ($('n-text')) $('n-text').value = ''; S.noteCat = id; S.noteEdit = null; S.confirm = ''; renderSheet(); break;
+      case 'noteAdd': {
+        const t = $('n-text').value.trim(); if (!t) { toast('内容を入れてください'); break; }
+        const m = me(), eid = S.open;
+        await db.collection('sk_notes').add({ entryId: eid, cat: S.noteCat || 'hair', text: t, date: $('n-date').value || today(), at: Date.now(), by: m.id, byName: m.name });
+        await db.doc('sk_entries/' + eid).update({ notes: firebase.firestore.FieldValue.increment(1) }).catch(() => {});
+        $('n-text').value = ''; toast('記録しました'); break;
+      }
+      case 'noteEdit': S.noteEdit = id; S.confirm = ''; renderSheet(); break;
+      case 'noteEditCancel': S.noteEdit = null; renderSheet(); break;
+      case 'noteSave': {
+        const n = (S.notes || []).find(x => x.id === id); if (!n || !canDelPhoto(n)) break;
+        const t = $('n-edit').value.trim(); if (!t) { toast('内容を入れてください'); break; }
+        await db.doc('sk_notes/' + id).update({ text: t, date: $('n-date').value || n.date || '', editedAt: Date.now() });
+        S.noteEdit = null; toast('保存しました'); renderSheet(); break;
+      }
+      case 'noteDel': {
+        const n = (S.notes || []).find(x => x.id === id); if (!n || !canDelPhoto(n)) break;
+        if (S.confirm !== 'nt-' + id) { S.confirm = 'nt-' + id; renderSheet(); break; }
+        await db.doc('sk_notes/' + id).delete();
+        await db.doc('sk_entries/' + n.entryId).update({ notes: firebase.firestore.FieldValue.increment(-1) }).catch(() => {});
+        S.confirm = ''; toast('削除しました'); break;
+      }
       case 'pv': S.viewPhoto = id; S.confirm = ''; renderSheet(); break;
       case 'pvClose': S.viewPhoto = null; S.confirm = ''; renderSheet(); break;
       case 'pvDel': {
@@ -761,7 +815,7 @@ document.addEventListener('input', ev => {
   if (ev.target.dataset.inp === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
 });
 document.addEventListener('change', ev => {
-  if (ev.target.dataset.chg === 'photo') { const fs = [...ev.target.files]; ev.target.value = ''; addPhotos(fs); return; }
+  if (ev.target.dataset.chg === 'photo') { const fs = [...ev.target.files], c = ev.target.dataset.cat; ev.target.value = ''; addPhotos(fs, c); return; }
   if (ev.target.dataset.chg === 'filter') { S.filter = ev.target.value; render(); }
   if (ev.target.dataset.chg === 'gofukuSel') { const x = $('f-gofukuX'); if (x) x.hidden = ev.target.value !== '__x'; }
   if (ev.target.dataset.chg === 'route') { const w = $('w-gofuku'); if (w) w.hidden = ev.target.value !== 'gofuku'; }
