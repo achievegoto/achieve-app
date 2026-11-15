@@ -306,11 +306,13 @@ function linesFor(did) {
   }
   return rows;
 }
+/* 単位が「50個」のように数字で始まると「× 2」と続けて「250個」に見えるので、括弧で区切る */
+const uTxt = u => !u ? '' : /^[0-9０-９]/.test(u) ? `（${u}）` : u;
 const isGoto = d => !!d && !d.url && (d.id === 'other-goto' || /後藤/.test(d.name));
 const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).filter(did => linesFor(did).some(r => r.qty > 0));
 function gotoText() {
   const st = storeOf(S.store);
-  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${r.it.unit || ''}`).join('\n'));
+  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).join('\n'));
   return `後藤さん\n発注お願いします。\n${st.full}\n\n${parts.join('\n\n')}`;
 }
 function gotoCard() {
@@ -328,7 +330,7 @@ function gotoCard() {
 }
 function lineText(did) {
   const d = dealerOf(did), st = storeOf(S.store);
-  const body = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${r.it.unit || ''}`).join('\n');
+  const body = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).join('\n');
   if (d && d.id === XFER) return `後藤さん\nTONARIの在庫から移動お願いします。\n${st.full}\n\n${body}`;
   if (d && (d.id === 'other-goto' || /後藤/.test(d.name))) return `後藤さん\n発注お願いします。\n${st.full}\n\n${body}`;
   return `${d ? d.name : ''} ご担当者様\nいつもお世話になっております。\n${st.full}です。\n下記の発注をお願いいたします。\n\n${body}\n\n納品先：${st.full}\n納期が分かりましたらご連絡ください。\nよろしくお願いいたします。`;
@@ -781,7 +783,7 @@ function pillOf(it) {
 function stockRow(it) {
   const q = qtyOf(S.store, it.id), dis = S.readOnly || !S.unlocked ? 'disabled' : '';
   return `<div class="row"><div><div class="name">${esc(it.name)}</div>
-    <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(it.unit)}</span>`}</div></div>
+    <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(uTxt(it.unit))}</span>`}</div></div>
     <div class="stepper${S.unlocked ? '' : ' locked'}">
       <button type="button" id="m-${it.id}" data-act="dec" data-id="${it.id}" aria-label="${esc(it.name)}を1減らす" ${dis}>−</button>
       <input id="q-${it.id}" type="number" min="0" inputmode="numeric" value="${q}" data-chg="qty" data-id="${it.id}" aria-label="${esc(it.name)}の在庫数" ${dis}>
@@ -812,7 +814,7 @@ function orderCard(did) {
     <summary class="card-head"><h3>${esc(d.name)}</h3><span class="osum"><span class="ocnt">${active.length}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
-      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div></div>
+      <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(uTxt(r.it.unit))}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div></div>
       <div class="stepper${S.unlocked ? '' : ' locked'}">
         <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす" ${S.unlocked ? '' : 'disabled'}>−</button>
         <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
@@ -848,7 +850,7 @@ function addPicker() {
       const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
       const inDraft = did && draftValue(did, it.id) > 0;
       return `<div class="row"><div><div class="name">${esc(it.name)}</div>
-        <div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 ${qtyOf(S.store, it.id)}${esc(it.unit)}</span></div></div>
+        <div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 ${qtyOf(S.store, it.id)}${esc(uTxt(it.unit))}</span></div></div>
         ${!did ? '<span class="pill sample">追加不可</span>' : inDraft ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small primary" id="pick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 追加</button>`}
       </div>`;
     }).join('')}</div>${hits.length > shown.length ? `<div class="sub">ほか ${hits.length - shown.length} 件。名前で絞り込んでください。</div>` : ''}` : '<div class="empty">条件に合う商品はありません。</div>';
@@ -953,7 +955,7 @@ async function exportTana(scope) {
 }
 function orderRow(o) {
   const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
-  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${l.unit || ''}`).join('、');
+  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${uTxt(l.unit)}`).join('、');
   const ctl = !open || S.readOnly ? '' : S.confirm === cKey
     ? `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">取り消す</button><button type="button" class="btn small" id="cn-${o.id}" data-act="confirmNo">戻る</button>`
     : `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">入荷済みにする</button><button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">取消</button>`;
