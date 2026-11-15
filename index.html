@@ -181,6 +181,13 @@ body.is-live { padding-top: 36vh; }
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .who { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
 .who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
+details.ocard > summary { list-style: none; cursor: pointer; margin: -2px 0; }
+details.ocard > summary::-webkit-details-marker { display: none; }
+details.ocard:not([open]) { gap: 0; }
+.osum { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.ocnt { font-size: 12px; color: var(--muted); }
+.chev { width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin: 0 4px 4px; transition: transform .15s; }
+details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 </style>
 
 <header><div class="wrap head">
@@ -797,8 +804,9 @@ function orderCard(did) {
   const total = active.reduce((a, r) => a + r.qty * num(r.it.price), 0);
   const others = S.items.filter(i => (xf ? tonariFree(i.id) > 0 : i.dealerId === did) && !rows.some(r => r.it.id === i.id));
   const dis = S.readOnly || !active.length ? 'disabled' : '';
-  return `<section class="card">
-    <div class="card-head"><h3>${esc(d.name)}</h3><span class="amount">${yen(total)}</span></div>
+  const open = (S.oOpen ||= new Set()).has(did);
+  return `<details class="card ocard" data-did="${did}" ${open ? 'open' : ''}>
+    <summary class="card-head"><h3>${esc(d.name)}</h3><span class="osum"><span class="ocnt">${active.length}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
       <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(r.it.unit)}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div></div>
@@ -816,9 +824,11 @@ function orderCard(did) {
     <div class="actions">
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${active.length ? '' : 'disabled'}>発注文をコピー</button>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? '移動をお願いしたので依頼済みにする' : 'LINEで送ったので発注済みにする'}</button>
-    </div>`}</section>`;
+    </div>`}</details>`;
 }
 
+/* 発注カードの開閉を覚えておく（再描画で閉じないように） */
+document.addEventListener('toggle', ev => { const el = ev.target; if (!el.matches || !el.matches('details.ocard')) return; const s = (S.oOpen ||= new Set()); el.open ? s.add(el.dataset.did) : s.delete(el.dataset.did); }, true);
 function catGroups(list, fn) {
   const g = {};
   list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
