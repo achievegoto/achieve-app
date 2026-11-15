@@ -541,7 +541,7 @@ function personView() {
   return `<div class="ptop">${sel}${mnav('ym')}</div>${hero}
     <div class="tiles">${tiles}</div>
     <section class="card"><div class="card-head"><h3>${mk[1]}の推移</h3><span class="sub">直近12か月</span></div>${metricChips}${chart(p.id, ym, mk[0], mk[2])}</section>
-    ${ag ? compare(ag[0], ym, mk) : ''}
+    ${ag && WHO.isOwner() ? compare(ag[0], ym, mk) : ''}
     <section class="card"><details><summary class="card-head" style="cursor:pointer"><h3>月ごとの数字</h3><span class="sub">開く</span></summary>
     <div class="tbl-wrap"><table class="rep mlist"><thead><tr><th></th><th>総売上</th><th>昨対</th><th>指名技術</th><th>昨対</th><th>フリー技術</th><th>店販売上</th><th>客数</th><th>客単価</th><th>次予率</th><th>新規</th></tr></thead><tbody>${list}</tbody></table></div></details></section>`;
 }
