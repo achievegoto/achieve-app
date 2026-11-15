@@ -137,6 +137,8 @@ table.mx .rank { font-size: 10px; padding: 0 6px; }
 .pv img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; border-radius: 8px; }
 .seg2.ncat { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .sheet > * { flex-shrink: 0; }
+.seg2.ncat button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.nstaff { font-size: 13px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; } .nstaff .sub { font-size: 11px; }
 .seg2.ncat button { padding: 9px 2px; font-size: 14px; } .ncat small { margin-left: 4px; font-size: 11px; opacity: .75; }
 .nlist { display: flex; flex-direction: column; gap: 8px; }
 .nitem, .nnew { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
@@ -415,6 +417,7 @@ const routeName = v => (ROUTES.find(r => r[0] === v) || [])[1] || '';
 const SECTIONS = [
   ['基本', [['name', '名前', 'text'], ['kana', 'ふりがな', 'text'], ['year', '成人式の年', 'year'], ['menus', 'メニュー', 'menus'], ['venue', '会場', 'venue']]],
   ['予約の受付', [['reservedAt', '予約日', 'date'], ['booker', '予約を受けたスタッフ', 'staff'], ['route', '予約のきっかけ', 'route'], ['gofuku', '呉服屋さん', 'gofuku']]],
+  ['担当', [['stHair', 'ヘアセット担当', 'staff'], ['stMake', 'メイク担当', 'staff'], ['stKitsuke', '着付け担当', 'staff']]],
   ['連絡先', [['tel', '自宅・保護者の電話', 'tel'], ['mobile', '本人の携帯', 'tel'], ['line', 'LINEつながり', 'bool']]],
   ['お客様情報・優先度', [['birth', '生年月日', 'date'], ['school', '出身中学', 'text'], ['selfVisit', '本人のachieve来店歴', 'visit'], ['visitSince', '通い始め（いつ頃から）', 'text'], ['parentVisited', '保護者の来店歴あり', 'bool']]],
   ['前撮り・当日までの流れ', [['maedori', '前撮り', 'maedori'], ['maedoriMeet', '前撮り打合せ日', 'date'], ['maedoriDate', '前撮り日', 'date'], ['lineJul', '7月スケジュールLINE', 'bool'], ['lineAug', '8月打合せLINE', 'bool'], ['meetDate', '打合せ日', 'date'], ['tagOk', 'タブ付けOK', 'bool']]],
@@ -476,11 +479,13 @@ function years() {
   const ys = new Set(S.entries.map(e => Number(e.year)).filter(Boolean)); ys.add(defaultYear());
   return [...ys].sort((a, b) => a - b);
 }
-const FILTERS = [['', 'すべて'], ['prio', '★ 優先（来店歴あり）'], ['r:self', '自身の予約'], ['r:parent', '親の紹介'], ['r:gofuku', '呉服屋さんの紹介（全部）'], ...GOFUKU.map(g => ['g:' + g, '└ ' + g]), ['maedoriUndecided', '前撮り未定'], ['maedoriYes', '前撮りする'], ['noLineJul', '7月LINE未'], ['noLineAug', '8月LINE未'], ['noMeet', '打合せ日未定'], ['pending', '申請中']];
+const FILTERS = [['', 'すべて'], ['mine', '自分の担当'], ['noStaff', '担当が決まっていない'], ['prio', '★ 優先（来店歴あり）'], ['r:self', '自身の予約'], ['r:parent', '親の紹介'], ['r:gofuku', '呉服屋さんの紹介（全部）'], ...GOFUKU.map(g => ['g:' + g, '└ ' + g]), ['maedoriUndecided', '前撮り未定'], ['maedoriYes', '前撮りする'], ['noLineJul', '7月LINE未'], ['noLineAug', '8月LINE未'], ['noMeet', '打合せ日未定'], ['pending', '申請中']];
 function passFilter(e) {
   if (S.filter.startsWith('r:')) return e.route === S.filter.slice(2);
   if (S.filter.startsWith('g:')) return e.route === 'gofuku' && e.gofuku === S.filter.slice(2);
   switch (S.filter) {
+    case 'mine': return !!WHO.me && [e.stHair, e.stMake, e.stKitsuke].includes(WHO.me.name);
+    case 'noStaff': return (e.menus || []).some(m => (m === 'セット' && !e.stHair) || (m === 'メイク' && !e.stMake) || (m === '着付け' && !e.stKitsuke));
     case 'prio': return e.selfVisit === 'long' || e.selfVisit === 'yes';
     case 'maedoriUndecided': return !e.maedori;
     case 'maedoriYes': return e.maedori === 'yes';
@@ -495,7 +500,7 @@ function listView() {
   const y = S.year || defaultYear();
   const all = S.entries.filter(e => Number(e.year) === y);
   const q = S.q.trim().toLowerCase();
-  const list = all.filter(e => (!S.venue || e.venue === S.venue) && passFilter(e) && (!q || [e.name, e.kana, e.school, e.booker, e.gofuku, e.tel, e.mobile].join(' ').toLowerCase().includes(q)))
+  const list = all.filter(e => (!S.venue || e.venue === S.venue) && passFilter(e) && (!q || [e.name, e.kana, e.school, e.booker, e.gofuku, e.tel, e.mobile, e.stHair, e.stMake, e.stKitsuke].join(' ').toLowerCase().includes(q)))
     .sort((a, b) => (S.sort === 'prio' ? prio(b) - prio(a) : 0) || (a.kana || a.name || '').localeCompare(b.kana || b.name || '', 'ja'));
   const cnt = k => all.filter(e => (e.menus || []).includes(k)).length;
   const cap = Number((S.settings.cap || {})[y]) || 0, left = cap - all.length;
@@ -516,6 +521,7 @@ function listView() {
     return `<button type="button" class="row ent" data-act="open" data-id="${e.id}">
       <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.notes > 0 ? ` <span class="pill p-std">📝${e.notes}</span>` : ''}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
         <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}${e.route === 'gofuku' ? `<span>紹介：${esc(e.gofuku || '呉服屋さん')}</span>` : e.route === 'parent' ? '<span>親の紹介</span>' : ''}${e.booker ? `<span>受付 ${esc(e.booker)}</span>` : ''}</div>
+        ${e.stHair || e.stMake || e.stKitsuke ? `<div class="sub">${[['ヘア', e.stHair], ['メイク', e.stMake], ['着付', e.stKitsuke]].filter(x => x[1]).map(([l, n]) => `<span>${l}：${esc(n)}</span>`).join('')}</div>` : ''}
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
   }).join('');
@@ -553,7 +559,7 @@ async function exportXlsx() {
 /* ---- 写真（Firestoreに圧縮して保存：1枚1ドキュメント） ---- */
 let photoUnsub = null, noteUnsub = null, photoFor = null;
 /* 打ち合わせ記録の区分 */
-const NCATS = [['hair', 'ヘアセット'], ['make', 'メイク'], ['kitsuke', '着付け']];
+const NCATS = [['hair', 'ヘアセット', 'stHair'], ['make', 'メイク', 'stMake'], ['kitsuke', '着付け', 'stKitsuke']];
 function watchPhotos(id) {
   if (photoFor === id) return;
   if (photoUnsub) photoUnsub(); if (noteUnsub) noteUnsub(); photoUnsub = noteUnsub = null; photoFor = id; S.photos = []; S.notes = []; S.photoLoading = !!id; S.noteEdit = null;
@@ -604,7 +610,8 @@ function renderSheet() {
   const cntOf = c => (S.notes || []).filter(n => n.cat === c).length + allPh.filter(p => p.cat === c).length;
   const thumb = p => `<button type="button" class="ph" data-act="pv" data-id="${p.id}" aria-label="写真を開く"><img src="${p.thumb || p.data}" alt=""></button>`;
   const noteSec = `<div class="sec-t">打ち合わせ記録</div>
-    <div class="seg2 ncat">${NCATS.map(([c, l]) => `<button type="button" data-act="ncat" data-id="${c}" aria-pressed="${nc === c}">${l}${cntOf(c) ? `<small>${cntOf(c)}</small>` : ''}</button>`).join('')}</div>
+    <div class="seg2 ncat">${NCATS.map(([c, l, f]) => `<button type="button" data-act="ncat" data-id="${c}" aria-pressed="${nc === c}">${l}${cntOf(c) ? `<small>${cntOf(c)}</small>` : ''}</button>`).join('')}</div>
+    <div class="nstaff">担当：<b>${esc(e[NCATS.find(x => x[0] === nc)[2]] || '未定')}</b><span class="sub">（「${isApprover() ? '変更する' : '変更を申請する'}」から設定）</span></div>
     <div class="nlist">${notes.map(n => S.noteEdit === n.id
       ? `<div class="nitem"><div class="nh"><input class="field" id="n-date" type="date" value="${esc(n.date || '')}"></div><textarea class="field" id="n-edit">${esc(n.text || '')}</textarea>
           <div class="actions"><button type="button" class="btn small primary" data-act="noteSave" data-id="${n.id}">保存</button><button type="button" class="btn small" data-act="noteEditCancel">やめる</button></div></div>`
