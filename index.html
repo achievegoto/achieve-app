@@ -181,7 +181,9 @@ body.is-live { padding-top: 36vh; }
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .who { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
 .who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
-details.ocard > summary { list-style: none; cursor: pointer; margin: -2px 0; }
+details.ocard > summary { list-style: none; cursor: pointer; margin: -2px 0; align-items: center; display: flex; }
+details.ocard > summary h3 { min-width: 0; }
+details.ocard { display: block; } details.ocard[open] > * + * { margin-top: 12px; }
 details.ocard > summary::-webkit-details-marker { display: none; }
 details.ocard:not([open]) { gap: 0; }
 .osum { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -314,14 +316,15 @@ function gotoText() {
 function gotoCard() {
   const g = gotoIds(); if (g.length < 2) return '';
   const total = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).reduce((b, r) => b + r.qty * num(r.it.price), 0), 0);
-  return `<section class="card">
-    <div class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="amount">${yen(total)}</span></div>
+  const n = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).length, 0);
+  return `<details class="card ocard" data-did="__goto" ${(S.oOpen ||= new Set()).has('__goto') ? 'open' : ''}>
+    <summary class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="osum"><span class="ocnt">${n}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     <div class="sub">${g.map(did => esc(dealerOf(did).name)).join('・')} の ${g.length} 件を1つの文章にしています。下のカードで数量を変えると、ここにも反映されます。</div>
     <textarea class="field msg" id="msg-__goto" readonly aria-label="後藤さん宛てのまとめた発注文">${esc(gotoText())}</textarea>
     <div class="actions">
       <button type="button" class="btn primary" id="copy-__goto" data-act="copy" data-did="__goto">まとめてコピー</button>
       <button type="button" class="btn" id="done-__goto" data-act="placedGoto" ${S.readOnly ? 'disabled' : ''}>LINEで送ったので全部発注済みにする</button>
-    </div></section>`;
+    </div></details>`;
 }
 function lineText(did) {
   const d = dealerOf(did), st = storeOf(S.store);
