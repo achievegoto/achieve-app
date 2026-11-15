@@ -780,7 +780,8 @@ function stockRow(it) {
 }
 
 function viewOrder() {
-  const ids = (S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id)).filter(did => linesFor(did).length);
+  const top = S.dealers.filter(d => /TOPY/i.test(d.name)).map(d => d.id); /* TOPYを一番上に */
+  const ids = top.concat(S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id).filter(id => !top.includes(id))).filter(did => linesFor(did).length);
   const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
   const st = storeOf(S.store);
   const extra = S.readOnly ? '' : addPicker();
