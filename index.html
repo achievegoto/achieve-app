@@ -328,14 +328,18 @@ const isGoto = d => !!d && !d.url && (d.id === 'other-goto' || /後藤/.test(d.n
 const extraOf = did => ((S.draftExtra || {})[draftKey(did)] || '');
 const extraLines = did => extraOf(did).split('\n').map(x => x.trim()).filter(Boolean).map(x => /^[・\-]/.test(x) ? x : '・' + x);
 const bodyOf = did => linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name} × ${r.qty}${uTxt(r.it.unit)}`).concat(extraLines(did)).join('\n');
-const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).filter(did => linesFor(did).some(r => r.qty > 0) || extraLines(did).length);
+/* 後藤さんへLINEで送るもの（後藤発注のディーラー＋TONARIからの移動）はすべて1つの文章にまとめる */
+const isGotoDid = did => did === XFER ? S.store !== 'tonari' : isGoto(dealerOf(did));
+const gotoIds = () => S.dealers.filter(isGoto).map(d => d.id).concat(S.store === 'tonari' ? [] : [XFER]).filter(did => linesFor(did).some(r => r.qty > 0) || extraLines(did).length);
 function gotoText() {
   const st = storeOf(S.store);
-  const parts = gotoIds().map(did => `【${dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + bodyOf(did));
-  return `後藤さん\n発注お願いします。\n${st.full}\n\n${parts.join('\n\n')}`;
+  const g = gotoIds();
+  const parts = g.map(did => `【${did === XFER ? 'TONARIの在庫から移動' : dealerOf(did).name.replace(/[（(]後藤[）)]/g, '').trim()}】\n` + bodyOf(did));
+  const head = g.includes(XFER) ? (g.length > 1 ? '発注とTONARIからの移動お願いします。' : 'TONARIの在庫から移動お願いします。') : '発注お願いします。';
+  return `後藤さん\n${head}\n${st.full}\n\n${parts.join('\n\n')}`;
 }
 function gotoCard(force) {
-  const g = gotoIds(); if (g.length < 2) return '';
+  const g = gotoIds(); if (!g.length) return '';
   const total = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).reduce((b, r) => b + r.qty * num(r.it.price), 0), 0);
   const n = g.reduce((a, did) => a + linesFor(did).filter(r => r.qty > 0).length + extraLines(did).length, 0);
   return `<details class="card ocard" data-did="__goto" ${force || (S.oOpen ||= new Set()).has('__goto') ? 'open' : ''}>
@@ -853,7 +857,7 @@ function viewOrder() {
   if (unassigned.length) body += `<div class="note">ディーラーが未設定の商品が ${unassigned.length} 点あります。「商品」タブで設定すると発注文に入ります。</div>`;
   if (!ids.length) body += `<div class="card"><div class="empty">${esc(st.full)}に発注が必要な商品はありません。</div></div>`;
   /* ディーラーを選ぶプルダウン：選ぶとそのディーラーだけ開いて表示 */
-  const g = gotoIds().length >= 2;
+  const g = gotoIds().length >= 1;
   const opts = (g ? ['__goto'] : []).concat(ids);
   const pick = opts.includes(S.oPick) ? S.oPick : '';
   const sumOf = did => { const rs = did === '__goto' ? gotoIds().flatMap(x => linesFor(x)) : linesFor(did); const a = rs.filter(r => r.qty > 0); const xn = did === '__goto' ? gotoIds().reduce((t, x) => t + extraLines(x).length, 0) : extraLines(did).length; return `${a.length}品${xn ? `＋手打ち${xn}` : ''}・${yen(a.reduce((t, r) => t + r.qty * num(r.it.price), 0))}`; };
@@ -891,7 +895,7 @@ function orderCard(did, force) {
     <div class="actions">
       <a class="btn primary" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
-    </div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
+    </div>` : isGotoDid(did) ? `<div class="sub gonote">後藤さんへのLINEは、一番上の「後藤さん宛て（まとめて）」に1つの文章でまとまっています。そこでコピー・発注済みにしてください。</div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
     <div class="actions">
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>発注文をコピー</button>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? '移動をお願いしたので依頼済みにする' : 'LINEで送ったので発注済みにする'}</button>
