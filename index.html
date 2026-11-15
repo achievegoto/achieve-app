@@ -197,6 +197,14 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .lnk { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .xlbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .xtra { min-height: 64px; font-size: 14px; }
+.due { background: #fff1f0; border: 2px solid #e5484d; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; color: #7a1418; }
+.due-h { font-weight: 700; font-size: 15px; } .due-b { font-size: 13px; }
+.due-s { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; } .due-s b { font-size: 13px; margin-right: 2px; }
+.due-s span { background: #fff; border: 1px solid #f3b3b5; border-radius: 99px; padding: 2px 8px; }
+.due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
+.due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.due.in .due-btn { display: none; } .due-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 
 <header><div class="wrap head">
@@ -435,12 +443,43 @@ function render() {
   if (S.failed) { m.innerHTML = `<div class="empty">${esc(S.failed)}</div>`; return; }
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
   const a = document.activeElement, fid = a && a.id;
-  m.innerHTML = notes() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
+  m.innerHTML = notes() + dueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
   S.dirty = false;
 }
+/* ---- 日曜19時の発注締め：発注済みになっていない発注があれば警告 ---- */
+const DUE_STORES = ['hair', 'liss', 'till'];
+function dueWindow() { const d = new Date(), w = d.getDay(); return (w === 0 && d.getHours() >= 19) || w === 1; } /* 日曜19:00〜月曜いっぱい */
+function pendingOf(store) {
+  const prev = S.store; S.store = store;
+  try { return [XFER].concat(S.dealers.map(d => d.id)).filter(did => dealerOf(did) && (linesFor(did).some(r => r.qty > 0) || extraLines(did).length)).map(did => dealerOf(did).name); }
+  finally { S.store = prev; }
+}
+function dueList() {
+  if (!dueWindow() || S.store === 'tonari' && !WHO.isOwner()) return [];
+  const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
+  return stores.map(st => ({ st, names: pendingOf(st) })).filter(x => x.names.length);
+}
+function dueBanner() {
+  const L = dueList(); if (!L.length) return '';
+  const html = `<section class="due"><div class="due-h">⚠️ 日曜19時の発注締めを過ぎています</div>
+    <div class="due-b">まだ「発注済み」になっていない発注があります。</div>
+    ${L.map(x => `<div class="due-s"><b>${esc(storeOf(x.st).short)}</b>${x.names.map(n => `<span>${esc(n)}</span>`).join('')}</div>`).join('')}
+    ${S.tab !== 'order' ? `<button type="button" class="btn due-btn" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button>` : ''}</section>`;
+  /* 1日1回（店舗ごと）ポップアップでも知らせる */
+  const key = 'dueShown:' + new Date().toDateString() + ':' + L.map(x => x.st).join(',');
+  let shown = false; try { shown = localStorage.getItem(key) === '1'; } catch (e) {}
+  if (!shown && !document.getElementById('due-pop')) {
+    try { localStorage.setItem(key, '1'); } catch (e) {}
+    setTimeout(() => { const d = document.createElement('div'); d.id = 'due-pop'; d.className = 'due-pop';
+      d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true">${html.replace('<section class="due">', '<div class="due in">').replace(/<\/section>$/, '</div>')}<div class="due-acts"><button type="button" class="btn primary" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button><button type="button" class="btn" data-act="closeDue">あとで</button></div></div>`;
+      document.body.appendChild(d); }, 300);
+  }
+  return html;
+}
+setInterval(() => { const w = dueWindow(); if (w !== S.dueW) { S.dueW = w; scheduleRender(); } }, 60000);
 function scheduleRender() {
   if (S.holdUntil && Date.now() < S.holdUntil) { clearTimeout(S.holdT); S.holdT = setTimeout(scheduleRender, S.holdUntil - Date.now() + 50); return; }
   const a = document.activeElement;
@@ -1184,6 +1223,8 @@ document.addEventListener('click', async ev => {
     case 'onlyShort': S.onlyShort = !S.onlyShort; render(); break;
     case 'cat': { const nb = b.dataset.big || ''; S.cat = S.big === nb && S.cat === id ? '' : id; S.big = nb; render(); break; }
     case 'big': S.big = S.big === id ? '' : id; S.cat = ''; render(); break;
+    case 'goDue': { const p = $('due-pop'); if (p) p.remove(); if (id && id !== S.store) { S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} } S.tab = 'order'; S.oPick = ''; render(); window.scrollTo(0, 0); break; }
+    case 'closeDue': { const p = $('due-pop'); if (p) p.remove(); break; }
     case 'oreset': resetDraft(did, id); render(); break;
     case 'oinc': armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
     case 'odec': armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
