@@ -316,6 +316,13 @@ table.mlist td.tot { font-weight: 600; }
 .hero { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #b5762e)); color: #fff; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
 .hero-n b { font-family: var(--font-num); font-size: 40px; font-weight: 500; line-height: 1; } .hero-n span { margin-left: 4px; font-size: 14px; }
 .hero-s { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: rgba(255,255,255,.92); }
+.hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hero-cap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: rgba(255,255,255,.85); }
+.hero-cap b { font-family: var(--font-num); font-size: 28px; font-weight: 500; line-height: 1; color: #fff; } .hero-cap b small { font-size: 13px; margin-left: 2px; }
+.hero-cap b.full { font-size: 20px; color: #ffd6dc; }
+.capbar { height: 6px; border-radius: 99px; background: rgba(255,255,255,.25); overflow: hidden; } .capbar i { display: block; height: 100%; background: #fff; border-radius: 99px; }
+.capbtn { align-self: flex-start; background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.capedit { display: flex; gap: 8px; align-items: center; } .capedit .field { max-width: 120px; background: #fff; color: #222; }
 .yearbar select { font-weight: 700; }
 .row.ent { align-items: start; }
 .steps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -472,12 +479,13 @@ function listView() {
   const list = all.filter(e => (!S.venue || e.venue === S.venue) && passFilter(e) && (!q || [e.name, e.kana, e.school, e.booker, e.gofuku, e.tel, e.mobile].join(' ').toLowerCase().includes(q)))
     .sort((a, b) => (S.sort === 'prio' ? prio(b) - prio(a) : 0) || (a.kana || a.name || '').localeCompare(b.kana || b.name || '', 'ja'));
   const cnt = k => all.filter(e => (e.menus || []).includes(k)).length;
-  const venueCnt = v => all.filter(e => e.venue === v).length;
+  const cap = Number((S.settings.cap || {})[y]) || 0, left = cap - all.length;
   const head = `<div class="yearbar"><select class="field" data-chg="year" aria-label="成人式の年">${years().map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${v}年 成人式（${reiwa(v)}）</option>`).join('')}</select></div>
-    <section class="hero"><div class="hero-n"><b>${all.length}</b><span>名</span></div>
-      <div class="hero-s"><span>セット ${cnt('セット')}</span><span>着付け ${cnt('着付け')}</span><span>メイク ${cnt('メイク')}</span><span>前撮り ${all.filter(e => e.maedori === 'yes').length}</span><span>★常連 ${all.filter(e => e.selfVisit === 'long').length}</span></div>
-      <div class="hero-s">${ROUTES.slice(0, 3).map(([k, l]) => `<span>${l.replace('の予約', '').replace('さんの紹介', '紹介')} ${all.filter(e => e.route === k).length}</span>`).join('')}${GOFUKU.map(g => `<span>${g} ${all.filter(e => e.route === 'gofuku' && e.gofuku === g).length}</span>`).join('')}</div>
-      <div class="hero-s">${VENUES.map(v => `<span>${v} ${venueCnt(v)}</span>`).join('')}</div></section>
+    <section class="hero"><div class="hero-row"><div class="hero-n"><b>${all.length}</b><span>名</span></div>
+        ${cap ? `<div class="hero-cap"><span>受付可能 残り</span><b class="${left <= 0 ? 'full' : ''}">${left <= 0 ? '満員' : left + '<small>名</small>'}</b><span>最大 ${cap}名</span></div>` : ''}</div>
+      ${cap ? `<div class="capbar"><i style="width:${Math.min(100, all.length / cap * 100)}%"></i></div>` : ''}
+      <div class="hero-s"><span>セット ${cnt('セット')}</span><span>着付け ${cnt('着付け')}</span><span>メイク ${cnt('メイク')}</span></div>
+      ${WHO.isOwner() ? (S.capEdit ? `<div class="capedit"><input class="field" id="cap-in" type="number" inputmode="numeric" min="0" value="${cap || ''}" placeholder="最大人数" aria-label="最大人数"><button type="button" class="btn small" data-act="capSave">保存</button><button type="button" class="btn small ghost" data-act="capEdit">やめる</button></div>` : `<button type="button" class="capbtn" data-act="capEdit">${cap ? '最大人数を変更' : '＋ 最大人数を設定'}</button>`) : ''}</section>
     <input class="field" id="q" type="search" placeholder="名前・中学・電話で探す" value="${esc(S.q)}" data-inp="q" aria-label="探す">
     <div class="chips">${['', ...VENUES].map(v => `<button type="button" class="chip" data-act="venue" data-id="${v}" aria-pressed="${S.venue === v}">${v || '全会場'}</button>`).join('')}</div>
     <label class="lbl">絞り込み<select class="field" data-chg="filter">${FILTERS.map(([id, l]) => `<option value="${id}" ${S.filter === id ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -559,7 +567,8 @@ function formView(e) {
     return `<label class="lbl">${l}<input class="field" id="f-${k}" type="${t === 'date' ? 'date' : t === 'tel' ? 'tel' : 'text'}" ${t === 'tel' ? 'inputmode="tel"' : ''} value="${esc(val ?? '')}" ${k === 'birth' ? 'data-chg="birth"' : ''}></label>`;
   };
   const grp = ([title, fs]) => `<div class="fgrp"><div class="sec-t">${title}</div><div class="fgrid">${fs.map(fld).join('')}</div></div>`;
-  const note = e && !isApprover() ? '<div class="note">変更は承認者の承認後に反映されます。</div>' : '';
+  const capY = Number((S.settings.cap || {})[v.year]) || 0, nY = S.entries.filter(x => Number(x.year) === Number(v.year)).length;
+  const note = (e && !isApprover() ? '<div class="note">変更は承認者の承認後に反映されます。</div>' : '') + (!e && capY && nY >= capY ? `<div class="note">${v.year}年は最大${capY}名に達しています（満員）。</div>` : '');
   return `<section class="card"><div class="card-head"><h3>${e ? '予約を変更' : '新しい予約'}</h3>${e ? '<button type="button" class="btn small" data-act="cancelEdit">やめる</button>' : ''}</div>${note}
     ${SECTIONS.map(grp).join('')}
     <div class="err" id="f-err"></div>
@@ -666,6 +675,13 @@ document.addEventListener('click', async ev => {
         toast(a === 'approve' ? '承認して反映しました' : '却下しました'); break;
       }
       case 'withdraw': await db.doc('sk_req/' + id).update({ status: 'withdrawn', doneAt: Date.now() }); toast('取り下げました'); break;
+      case 'capEdit': if (WHO.isOwner()) { S.capEdit = !S.capEdit; render(); } break;
+      case 'capSave': {
+        if (!WHO.isOwner()) break;
+        const n = Math.max(0, Math.floor(Number($('cap-in').value) || 0)), y = S.year || defaultYear();
+        await db.doc('sk_settings/main').set({ cap: { [y]: n || firebase.firestore.FieldValue.delete() } }, { merge: true });
+        S.capEdit = false; toast(n ? `最大${n}名にしました` : '最大人数を解除しました'); break;
+      }
       case 'toggleAppr': {
         if (!WHO.isOwner()) break;
         const list = approvers().slice(), i = list.indexOf(id); i >= 0 ? list.splice(i, 1) : list.push(id);
