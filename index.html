@@ -464,8 +464,8 @@ function dueList() {
 }
 function dueBanner() {
   const L = dueList(); if (!L.length) return '';
-  const html = `<section class="due"><div class="due-h">⚠️ 日曜18:30の発注締めを過ぎています</div>
-    <div class="due-b">まだ「発注済み」になっていない発注があります。</div>
+  const html = `<section class="due"><div class="due-h">⚠️ 発注確認ができていません</div>
+    <div class="due-b">日曜18:30の締めを過ぎても「発注済み」になっていない発注があります。確認して発注してください。</div>
     ${L.map(x => `<div class="due-s"><b>${esc(storeOf(x.st).short)}</b>${x.names.map(n => `<span>${esc(n)}</span>`).join('')}</div>`).join('')}
     ${S.tab !== 'order' ? `<button type="button" class="btn due-btn" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button>` : ''}</section>`;
   /* 1日1回（店舗ごと）ポップアップでも知らせる */
