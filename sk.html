@@ -330,6 +330,19 @@ label.chk.big { padding: 10px 12px; }
 .df { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .dk { color: var(--muted); min-width: 8em; } .dv.old { text-decoration: line-through; color: var(--muted); } .dv.new { font-weight: 700; color: var(--accent); }
 .note.info { background: var(--info-soft); color: var(--info); }
+.vbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg2 { display: inline-grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg2 button { border: 0; background: var(--surface); padding: 6px 14px; font-size: 13px; color: var(--muted); }
+.seg2 button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; max-height: 70vh; }
+table.sk { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 100%; }
+table.sk th, table.sk td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+table.sk thead th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 500; z-index: 2; }
+table.sk td.nm, table.sk th:nth-child(2) { position: sticky; left: 0; background: var(--surface); font-weight: 700; z-index: 1; }
+table.sk thead th:nth-child(2) { z-index: 3; background: var(--bg); }
+table.sk td.memo { white-space: normal; min-width: 14em; }
+table.sk tr.click { cursor: pointer; } table.sk tr.click:hover td { background: var(--bg); }
+.dim { color: var(--line); }
 .sw { color: var(--muted); font-size: 12px; }
 </style>
 </head>
@@ -387,7 +400,7 @@ const fmtVal = (k, v) => {
 const yearFromBirth = b => { if (!b) return null; const [y, m] = b.split('-').map(Number); return m <= 3 ? y + 20 : y + 21; };
 const defaultYear = () => { const d = new Date(); return d.getMonth() >= 1 ? d.getFullYear() + 1 : d.getFullYear(); };
 
-const S = { user: undefined, ready: new Set(), entries: [], reqs: [], settings: {}, err: '', tab: 'list', year: null, q: '', venue: '', filter: '', open: null, edit: null, confirm: '' };
+const S = { user: undefined, ready: new Set(), entries: [], reqs: [], settings: {}, err: '', tab: 'list', view: (()=>{try{return localStorage.getItem('sk.view')||'card'}catch(e){return 'card'}})(), year: null, q: '', venue: '', filter: '', open: null, edit: null, confirm: '' };
 const approvers = () => S.settings.approvers || [];
 const isApprover = () => !!WHO.me && (WHO.isOwner() || approvers().includes(WHO.me.id));
 const pendingOf = id => S.reqs.filter(r => r.entryId === id && r.status === 'pending');
@@ -449,7 +462,9 @@ function listView() {
       <div class="hero-s">${VENUES.map(v => `<span>${v} ${venueCnt(v)}</span>`).join('')}</div></section>
     <input class="field" id="q" type="search" placeholder="名前・中学・電話で探す" value="${esc(S.q)}" data-inp="q" aria-label="探す">
     <div class="chips">${['', ...VENUES].map(v => `<button type="button" class="chip" data-act="venue" data-id="${v}" aria-pressed="${S.venue === v}">${v || '全会場'}</button>`).join('')}</div>
-    <div class="chips">${FILTERS.map(([id, l]) => `<button type="button" class="chip" data-act="filter" data-id="${id}" aria-pressed="${S.filter === id}">${l}</button>`).join('')}</div>`;
+    <div class="chips">${FILTERS.map(([id, l]) => `<button type="button" class="chip" data-act="filter" data-id="${id}" aria-pressed="${S.filter === id}">${l}</button>`).join('')}</div>
+    <div class="vbar"><div class="seg2"><button type="button" data-act="view" data-id="card" aria-pressed="${S.view !== 'table'}">カード</button><button type="button" data-act="view" data-id="table" aria-pressed="${S.view === 'table'}">一覧表</button></div>
+    ${isApprover() ? `<button type="button" class="btn small" data-act="xlsx">📥 Excel（表示中の${list.length}名）</button>` : ''}</div>`;
   const rows = list.map(e => {
     const pend = pendingOf(e.id).length;
     const steps = [['前撮り', e.maedori === 'yes' ? 'on' : e.maedori === 'no' ? 'off' : ''], ['7月LINE', e.lineJul ? 'on' : ''], ['8月LINE', e.lineAug ? 'on' : ''], ['打合せ', e.meetDate ? 'on' : '']];
@@ -459,7 +474,35 @@ function listView() {
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
   }).join('');
+  window.__skList = list;
+  if (S.view === 'table') return head + tableView(list);
   return head + `<div class="list">${rows || '<div class="empty">該当する予約はありません</div>'}</div>`;
+}
+
+/* ---- 一覧表 ---- */
+const TCOLS = FIELDS.filter(f => !['year'].includes(f[0]));
+function tableView(list) {
+  if (!list.length) return '<div class="list"><div class="empty">該当する予約はありません</div></div>';
+  const cell = (k, v) => { const t = fmtVal(k, v); return t === '—' ? '<span class="dim">—</span>' : esc(t); };
+  return `<div class="tbl-wrap"><table class="sk"><thead><tr><th>No.</th>${TCOLS.map(f => `<th>${f[1]}</th>`).join('')}</tr></thead><tbody>
+    ${list.map((e, i) => `<tr data-act="open" data-id="${e.id}" class="click"><td class="num">${i + 1}</td>${TCOLS.map(([k]) => `<td class="${k === 'name' ? 'nm' : k === 'memo' ? 'memo' : ''}">${cell(k, e[k])}${k === 'name' && pendingOf(e.id).length ? ' <span class="pill p-requested">申請中</span>' : ''}</td>`).join('')}</tr>`).join('')}
+  </tbody></table></div><div class="sub">横にスクロールできます。行を押すと詳細が開きます。</div>`;
+}
+/* ---- Excel ---- */
+let xlsxP = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return xlsxP ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/xlsx' + String.fromCharCode(64) + '0.18.5/dist/xlsx.full.min.js'; sc.onload = () => res(window.XLSX); sc.onerror = () => { xlsxP = null; rej(new Error('Excelの機能を読み込めませんでした')); }; document.head.appendChild(sc); });
+}
+async function exportXlsx() {
+  const X = await loadXlsx(), list = window.__skList || [], y = S.year || defaultYear();
+  const xv = (k, v) => { const t = (FIELDS.find(f => f[0] === k) || [])[2]; if (v == null || v === '') return ''; if (t === 'bool') return v ? '○' : ''; if (t === 'menus') return (v || []).join('・'); if (t === 'maedori') return v === 'yes' ? 'する' : v === 'no' ? 'しない' : ''; if (t === 'date') return ymd(v); return v; };
+  const aoa = [[`${y}年（${reiwa(y)}）成人式 予約一覧`], [`出力日 ${ymd(today())}　${list.length}名`], [], ['No.', ...TCOLS.map(f => f[1])], ...list.map((e, i) => [i + 1, ...TCOLS.map(([k]) => xv(k, e[k]))])];
+  const ws = X.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 4 }, ...TCOLS.map(([k]) => ({ wch: k === 'memo' ? 30 : k === 'name' || k === 'kana' ? 14 : 11 }))];
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, `${y}成人式`);
+  X.writeFile(wb, `成人式予約_${y}_${today().replace(/-/g, '')}.xlsx`);
+  toast('Excelを書き出しました');
 }
 
 /* ---- 詳細 ---- */
@@ -554,6 +597,8 @@ document.addEventListener('click', async ev => {
     switch (a) {
       case 'tab': S.tab = id; S.edit = null; S.open = null; render(); window.scrollTo(0, 0); break;
       case 'venue': S.venue = id; render(); break;
+      case 'view': S.view = id; try { localStorage.setItem('sk.view', id); } catch (x) {} render(); break;
+      case 'xlsx': if (isApprover()) await exportXlsx(); break;
       case 'filter': S.filter = id; render(); break;
       case 'open': S.open = id; S.confirm = ''; renderSheet(); break;
       case 'close': S.open = null; S.confirm = ''; renderSheet(); break;
