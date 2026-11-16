@@ -285,7 +285,7 @@ function leave(st, on) {
   let k = 0; while (addMonths(first, 12 * (k + 1)) <= on) k++;
   const from = addMonths(first, 12 * k), to = addMonths(first, 12 * (k + 1));
   const grant = st.grant ? Number(st.grant) : GRANT[Math.min(k, GRANT.length - 1)];
-  const used = S.recs.filter(r => r.staffId === st.id && r.date >= from && r.date < to && (r.type === 'paid' || r.type === 'half')).reduce((a, r) => a + (r.type === 'half' ? .5 : 1), 0);
+  const used = S.recs.filter(r => r.staffId === st.id && r.date >= (k === 0 ? st.start : from) && r.date < to && (r.type === 'paid' || r.type === 'half')).reduce((a, r) => a + (r.type === 'half' ? .5 : 1), 0);
   return { grant, from, to, used, left: grant - used, next: to };
 }
 const pendingReqs = () => S.reqs.filter(r => r.status === 'pending' && staffOf(r.staffId)).sort((a, b) => a.date < b.date ? -1 : 1);
