@@ -296,6 +296,8 @@ const shiftMonth = (m, n) => addMonths(m + '-01', n).slice(0, 7);
 
 /* ---- 表示 ---- */
 function render() {
+  const ae = document.activeElement;
+  if (S.editRec && ae && ae.closest && ae.closest('.er-form')) return;
   const m = $('main');
   $('who').hidden = !S.user || !WHO.me;
   if (S.user === undefined) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
@@ -376,7 +378,16 @@ function recList(list, withName, admin) {
   if (!list.length) return '<div class="empty" style="padding:14px">記録はありません</div>';
   return `<div class="list">${list.slice().sort((a, b) => a.date < b.date ? 1 : -1).map(r => `<div class="row"><div><div class="name">${md(r.date)} <span class="tp t-${r.type}">${TYPES[r.type]}</span>${withName ? ' ' + esc((staffOf(r.staffId) || {}).name || '') : ''}</div>
     ${r.note || r.time || r.min ? `<div class="sub">${r.time ? `<span>${r.time} ${r.type === 'late' ? '出勤' : '退勤'}</span>` : ''}${r.min ? `<span>${r.min}分</span>` : ''}${r.note ? `<span>${esc(r.note)}</span>` : ''}</div>` : ''}</div>
-    ${admin ? `<button type="button" class="btn small danger" data-act="delRec" data-id="${r.id}" aria-label="削除">削除</button>` : ''}</div>`).join('')}</div>`;
+    ${admin ? `<div class="row-act"><button type="button" class="btn small" data-act="editRec" data-id="${r.id}">修正</button><button type="button" class="btn small danger" data-act="delRec" data-id="${r.id}" aria-label="削除">削除</button></div>` : ''}</div>${admin && S.editRec === r.id ? recEditor(r) : ''}`).join('')}</div>`;
+}
+function recEditor(r) {
+  const tm = r.type === 'late' || r.type === 'early';
+  return `<div class="card er-form" style="margin:4px 0 10px;border:2px solid var(--accent)"><h3 style="margin:0 0 6px">${esc((staffOf(r.staffId) || {}).name || '')} の記録を修正</h3>
+    <div class="grid2"><label class="lbl">日付<input class="field" id="er-date" type="date" value="${r.date}"></label>
+    <label class="lbl">種類<select class="field" id="er-type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === r.type ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
+    <div class="grid2"><label class="lbl" id="er-time-w" style="visibility:${tm ? 'visible' : 'hidden'}"><span id="er-time-l">${r.type === 'early' ? '退勤した時刻' : '出勤した時刻'}</span><input class="field" id="er-time" type="time" step="300" value="${r.time || ''}"></label>
+    <label class="lbl">メモ<input class="field" id="er-note" value="${esc(r.note || '')}"></label></div>
+    <div class="row-act" style="margin-top:8px"><button type="button" class="btn primary" data-act="saveRec" data-id="${r.id}">保存</button><button type="button" class="btn" data-act="cancelRec">やめる</button></div></div>`;
 }
 function monthNav() {
   return `<div class="mnav"><button type="button" class="btn small" data-act="month" data-id="-1" aria-label="前の月">‹</button><b>${monthLabel(S.month)}</b><button type="button" class="btn small" data-act="month" data-id="1" aria-label="次の月">›</button></div>`;
@@ -427,7 +438,7 @@ function adminView() {
 function summaryCard() {
   return `<section class="card"><h3>月のまとめ</h3>${monthNav()}<div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th>${Object.values(TYPES).map(v => `<th>${v}</th>`).join('')}</tr></thead>
     <tbody>${byStore(workers()).map(([l, arr]) => grpRow(l, 6) + arr.map(s => { const c = counts(monthRecs(S.month, s.id)); return `<tr><td>${esc(s.name)}</td>${Object.keys(TYPES).map(k => `<td class="cell ${c[k] ? 'hot t-' + k : 'h0'}">${c[k] || '·'}</td>`).join('')}</tr>`; }).join('')).join('')}</tbody></table></div>
-    <details><summary class="sub" style="cursor:pointer">この月の記録を全部見る（${monthRecs(S.month).length}件）</summary><div style="margin-top:8px">${recList(monthRecs(S.month), true, true)}</div></details></section>`;
+    <details id="rec-all" ${S.recOpen || S.editRec ? 'open' : ''}><summary class="sub" style="cursor:pointer">この月の記録を全部見る（修正・削除はここ）（${monthRecs(S.month).length}件）</summary><div style="margin-top:8px">${recList(monthRecs(S.month), true, true)}</div></details></section>`;
 }
 function leaveTable() {
   if (!S.owner) return '';
@@ -506,6 +517,16 @@ document.addEventListener('click', async ev => {
         $('rc-time').value = ''; $('rc-note').value = '';
         toast(`${(staffOf(staffId) || {}).name} ${md(date)} ${TYPES[type]}を記録しました`); break;
       }
+      case 'editRec': S.editRec = id; S.recOpen = true; render(); break;
+      case 'cancelRec': S.editRec = null; render(); break;
+      case 'saveRec': {
+        const date = $('er-date').value, type = $('er-type').value, time = $('er-time').value;
+        if (!date) { toast('日付を選んでください'); break; }
+        if ((type === 'late' || type === 'early') && !time) { toast(type === 'late' ? '出勤した時刻を選んでください' : '退勤した時刻を選んでください'); break; }
+        el.disabled = true;
+        await db.doc('att_rec/' + id).update({ date, type, time: type === 'late' || type === 'early' ? time : null, note: $('er-note').value.trim(), editedAt: Date.now(), editedBy: S.me });
+        S.editRec = null; toast('修正しました'); render(); break;
+      }
       case 'delRec': {
         if (S.confirmDel !== id) { S.confirmDel = id; el.textContent = 'もう一度押すと削除'; break; }
         const r = S.recs.find(x => x.id === id);
@@ -539,6 +560,7 @@ document.addEventListener('click', async ev => {
   } catch (e) { toast('保存できませんでした：' + e.message); el.disabled = false; }
 });
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'er-type') { const t = ev.target.value; $('er-time-w').style.visibility = t === 'late' || t === 'early' ? 'visible' : 'hidden'; $('er-time-l').textContent = t === 'early' ? '退勤した時刻' : '出勤した時刻'; }
   if (ev.target.id === 'rp-kind') { const k = ev.target.value; $('rp-time-w').style.visibility = k === 'absent' ? 'hidden' : 'visible'; $('rp-time-l').textContent = k === 'early' ? '退勤した時刻（必須）' : '出勤した時刻（必須）'; }
   if (ev.target.name === 'rc-type') { const t = ev.target.value, w = $('rc-time-w'); if (!w) return; w.style.visibility = t === 'late' || t === 'early' ? 'visible' : 'hidden'; $('rc-time-l').textContent = t === 'early' ? '退勤した時刻（必須）' : '出勤した時刻（必須）'; }
 });
@@ -568,6 +590,8 @@ document.addEventListener('focusout', () => setTimeout(() => { const a = documen
   db = firebase.firestore();
   firebase.auth().onAuthStateChanged(u => { S.user = u || null; if (u && !started) { started = true; listen(); } render(); });
 })();
+
+document.addEventListener('toggle', ev => { if (ev.target.id === 'rec-all') S.recOpen = ev.target.open; }, true);
 </script>
 </body>
 </html>
