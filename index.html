@@ -159,6 +159,15 @@ label .field { font-size: 15px; color: var(--ink); }
 .levels { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
 .levels .lv-h { font-size: 12px; color: var(--muted); }
 .levels .lv-s { font-family: var(--font-num); font-size: 15px; }
+.bk-head, .bk-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px; gap: 8px; align-items: center; }
+.bk-head { font-size: 12px; color: var(--muted); padding: 0 2px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 2; padding-block: 6px; }
+.bk-row { padding: 6px 2px; border-bottom: 1px solid var(--line); }
+.bk-row .bk-n { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.bk-row input { text-align: center; padding-inline: 4px; font-family: var(--font-num); font-size: 16px; }
+.bk-row.changed .bk-n::after { content: ' ●'; color: var(--accent); font-size: 11px; }
+.bk-row.bad input { border-color: #d33; }
+.bk-bar { position: sticky; bottom: 0; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); display: flex; gap: 8px; align-items: center; z-index: 3; border-top: 1px solid var(--line); }
+.bk-stores { display: flex; gap: 6px; flex-wrap: wrap; }
 .err { color: var(--bad); font-size: 13px; }
 .dealer-row { display: flex; gap: 8px; align-items: center; padding: 8px 14px; }
 .dealer-row + .dealer-row { border-top: 1px solid var(--line); }
@@ -488,7 +497,7 @@ function scheduleRender() {
   if (S.holdUntil && Date.now() < S.holdUntil) { clearTimeout(S.holdT); S.holdT = setTimeout(scheduleRender, S.holdUntil - Date.now() + 50); return; }
   const a = document.activeElement;
   const typing = a && $('main').contains(a) && a.matches('input:not([readonly]),select,textarea:not([readonly])');
-  if (typing || S.editing || S.drag) { S.dirty = true; shell(); return; }
+  if (typing || S.editing || S.drag || (S.bulk && S.tab === 'items')) { S.dirty = true; shell(); return; }
   render();
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !S.editing) scheduleRender(); }, 0));
@@ -1047,7 +1056,24 @@ function itemList() {
   list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
   return Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div class="list">${arr.map(itemRow).join('')}</div></section>`).join('');
 }
+function bulkVal(store, it, k) { const v = S.bulkVals[store + '|' + it.id]; return v && k in v ? v[k] : (it[k === 'min' ? 'min' : 'par']?.[store] ?? ''); }
+function bulkView() {
+  const st = S.bulkStore, q = S.q.trim().toLowerCase();
+  const list = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+  const g = {}; list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
+  const n = Object.keys(S.bulkVals).length;
+  return `<section class="card"><div class="card-head"><h3>発注点・適正をまとめて編集</h3></div>
+    <div class="sub">数字を入れて「次へ」（Enter）で下の欄へ進みます。変えた行に ● が付きます。最後に「まとめて保存」。</div>
+    <div class="bk-stores" role="group" aria-label="店舗">${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>
+  </section>
+  <div class="tools"><input class="field" id="isearch" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">${catChips(false, true)}</div>
+  ${list.length ? `<div class="bk-head"><span>${esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
+  ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const a = bulkVal(st, it, 'min'), b = bulkVal(st, it, 'par'), ch = (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
+    return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}"><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}"></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
+  <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>まとめて保存${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
+}
 function viewItems() {
+  if (S.bulk && canEdit()) return bulkView();
   if (S.editing && canEdit()) return itemForm();
   const hasSample = S.items.some(i => i.sample) || S.dealers.some(d => d.sample);
   const dis = canEdit() ? '' : 'disabled';
@@ -1062,7 +1088,7 @@ function viewItems() {
     <button type="button" class="btn small danger" id="dd-${d.id}" data-act="delDealer" data-id="${d.id}" ${used || S.readOnly ? 'disabled' : ''} ${used ? 'title="使用中の商品があるため削除できません"' : ''}>削除</button></div>`;
   }).join('');
   return `${pinBar()}${sampleBar}
-  <div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button></div>
+  <div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button><button type="button" class="btn" data-act="bulkOpen" ${dis}>発注点・適正をまとめて編集</button></div>
   <div class="tools">
     <input class="field" id="isearch" type="search" placeholder="商品名で探す（全 ${S.items.length} 点）" aria-label="商品名で探す" value="${esc(S.q)}">
     ${catChips(false, true)}
@@ -1260,6 +1286,26 @@ document.addEventListener('click', async ev => {
     case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'bulkOpen': if (!canEdit()) break; armPin(); S.bulk = true; S.bulkStore = STORES.some(x => x.id === S.store) ? S.store : 'hair'; S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
+    case 'bulkStore': S.bulkStore = id; render(); break;
+    case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; el.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
+    case 'bulkSave': {
+      if (!canEdit()) break; armPin();
+      const ent = Object.entries(S.bulkVals), upd = {};
+      for (const [k, v] of ent) { const [st, iid] = k.split('|'); const it = S.items.find(x => x.id === iid); if (!it) continue;
+        const u = upd[iid] ||= { min: Object.assign({}, it.min || {}), par: Object.assign({}, it.par || {}), name: it.name };
+        const a = 'min' in v ? v.min : (it.min?.[st] ?? ''), b = 'par' in v ? v.par : (it.par?.[st] ?? '');
+        if (a === '' && b === '') { delete u.min[st]; delete u.par[st]; }
+        else { if (num(b) < num(a)) { toast(`${it.name}（${storeOf(st).short}）は適正を発注点以上にしてください`); S.bulkStore = st; render(); return; } u.min[st] = num(a); u.par[st] = num(b); } }
+      try {
+        el.disabled = true;
+        const ids = Object.keys(upd);
+        for (let i = 0; i < ids.length; i += 400) { const b = S.db.batch(); ids.slice(i, i + 400).forEach(iid => b.update(S.db.doc('items/' + iid), { min: upd[iid].min, par: upd[iid].par })); await b.commit(); }
+        logChange('item', '', '', null, null, { name: '発注点・適正をまとめて編集', text: ids.map(i => upd[i].name).join('、').slice(0, 400) });
+        S.bulk = false; S.bulkVals = {}; S.confirm = ''; toast(`${ids.length}商品を保存しました`); render();
+      } catch (e) { fail(e); el.disabled = false; }
+      break;
+    }
     case 'cancelEdit': S.editing = null; S.formErr = ''; S.confirm = ''; render(); break;
     case 'delItem': {
       const iid = S.editing.id;
@@ -1292,8 +1338,24 @@ document.addEventListener('change', ev => {
 document.addEventListener('input', ev => {
   if (ev.target.id === 'add-q') { S.addQ = ev.target.value; $('add-list').innerHTML = addPicker().match(/<div id="add-list">([\s\S]*)<\/div>\s*<\/section>$/)[1]; }
   if (ev.target.id === 'search') { S.q = ev.target.value; $('stock-list').innerHTML = stockList(); }
-  if (ev.target.id === 'isearch') { S.q = ev.target.value; $('item-list').innerHTML = itemList(); }
+  if (ev.target.id === 'isearch') { S.q = ev.target.value; if (S.bulk) { S.holdUntil = 0; const pos = ev.target.selectionStart; render(); const e2 = $('isearch'); if (e2) { e2.focus(); try { e2.setSelectionRange(pos, pos); } catch (x) {} } } else $('item-list').innerHTML = itemList(); }
+  if (ev.target.dataset && ev.target.dataset.bk) {
+    const el = ev.target, k = S.bulkStore + '|' + el.dataset.id, it = S.items.find(x => x.id === el.dataset.id); armPin();
+    const v = el.value === '' ? '' : Math.max(0, Math.round(Number(el.value)));
+    const o = (S.bulkVals[k] ||= {}); o[el.dataset.bk] = v;
+    const orig = f => it?.[f]?.[S.bulkStore] ?? '';
+    if (('min' in o ? o.min : orig('min')) === orig('min') && ('par' in o ? o.par : orig('par')) === orig('par')) delete S.bulkVals[k];
+    const row = el.closest('.bk-row'), a = row.querySelector('[data-bk=min]').value, b = row.querySelector('[data-bk=par]').value;
+    row.classList.toggle('changed', k in S.bulkVals); row.classList.toggle('bad', a !== '' && b !== '' && Number(b) < Number(a));
+    const n = Object.keys(S.bulkVals).length, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = 'まとめて保存' + (n ? `（${n}件）` : ''); }
+  }
 });
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter' || !ev.target.dataset || !ev.target.dataset.bk) return;
+  ev.preventDefault(); const all = [...document.querySelectorAll('[data-bk]')], i = all.indexOf(ev.target), nx = all[i + (ev.shiftKey ? -1 : 1)];
+  if (nx) { nx.focus(); nx.select(); nx.scrollIntoView({ block: 'center', behavior: 'smooth' }); } else ev.target.blur();
+});
+document.addEventListener('focusin', ev => { if (ev.target.dataset && ev.target.dataset.bk) { try { ev.target.select(); } catch (e) {} } });
 /* ---- 商品の並べ替え（つまみを押したままスライド） ---- */
 function clearDrop() { document.querySelectorAll('.drop-before,.drop-after').forEach(e => e.classList.remove('drop-before', 'drop-after')); }
 document.addEventListener('pointerdown', ev => {
