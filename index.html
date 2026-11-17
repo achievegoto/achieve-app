@@ -1057,19 +1057,21 @@ function itemList() {
   return Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div class="list">${arr.map(itemRow).join('')}</div></section>`).join('');
 }
 function bulkVal(store, it, k) { const v = S.bulkVals[store + '|' + it.id]; return v && k in v ? v[k] : (it[k === 'min' ? 'min' : 'par']?.[store] ?? ''); }
+const ALL3 = ['hair', 'liss', 'till'];
+function bulkValAll(it, k) { const vs = ALL3.map(st => bulkVal(st, it, k)); return vs.every(v => v === vs[0]) ? { v: vs[0], mixed: false } : { v: '', mixed: true }; }
 function bulkView() {
   const st = S.bulkStore, q = S.q.trim().toLowerCase();
   const list = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
   const g = {}; list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
-  const n = Object.keys(S.bulkVals).length;
+  const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size;
   return `<section class="card"><div class="card-head"><h3>発注点・適正をまとめて編集</h3></div>
     <div class="sub">数字を入れて「次へ」（Enter）で下の欄へ進みます。変えた行に ● が付きます。最後に「まとめて保存」。</div>
-    <div class="bk-stores" role="group" aria-label="店舗">${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>
+    <div class="bk-stores" role="group" aria-label="店舗"><button type="button" class="chip" data-act="bulkStore" data-id="all" aria-pressed="${st === 'all'}">全店共通（hair・Liss・till）</button>${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>
   </section>
   <div class="tools"><input class="field" id="isearch" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">${catChips(false, true)}</div>
-  ${list.length ? `<div class="bk-head"><span>${esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
-  ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const a = bulkVal(st, it, 'min'), b = bulkVal(st, it, 'par'), ch = (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
-    return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}"><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}"></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
+  ${list.length ? `${st === 'all' ? '<div class="sub">全店共通：hair design・Liss・till の3店に同じ数字を入れます（TONARI在庫は別）。「バラバラ」は店ごとに違う数字が入っている欄で、触らなければそのままです。</div>' : ''}<div class="bk-head"><span>${st === 'all' ? '全店共通' : esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
+  ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const A = st === 'all' ? bulkValAll(it, 'min') : { v: bulkVal(st, it, 'min') }, B = st === 'all' ? bulkValAll(it, 'par') : { v: bulkVal(st, it, 'par') }, a = A.v, b = B.v, ch = st === 'all' ? ALL3.some(x => (x + '|' + it.id) in S.bulkVals) : (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
+    return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}" ${A.mixed ? 'placeholder="バラバラ"' : ''}><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}" ${B.mixed ? 'placeholder="バラバラ"' : ''}></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
   <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>まとめて保存${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
 }
 function viewItems() {
@@ -1340,14 +1342,18 @@ document.addEventListener('input', ev => {
   if (ev.target.id === 'search') { S.q = ev.target.value; $('stock-list').innerHTML = stockList(); }
   if (ev.target.id === 'isearch') { S.q = ev.target.value; if (S.bulk) { S.holdUntil = 0; const pos = ev.target.selectionStart; render(); const e2 = $('isearch'); if (e2) { e2.focus(); try { e2.setSelectionRange(pos, pos); } catch (x) {} } } else $('item-list').innerHTML = itemList(); }
   if (ev.target.dataset && ev.target.dataset.bk) {
-    const el = ev.target, k = S.bulkStore + '|' + el.dataset.id, it = S.items.find(x => x.id === el.dataset.id); armPin();
+    const el = ev.target, it = S.items.find(x => x.id === el.dataset.id), f0 = el.dataset.bk; armPin();
     const v = el.value === '' ? '' : Math.max(0, Math.round(Number(el.value)));
-    const o = (S.bulkVals[k] ||= {}); o[el.dataset.bk] = v;
-    const orig = f => it?.[f]?.[S.bulkStore] ?? '';
-    if (('min' in o ? o.min : orig('min')) === orig('min') && ('par' in o ? o.par : orig('par')) === orig('par')) delete S.bulkVals[k];
+    const stores = S.bulkStore === 'all' ? ALL3 : [S.bulkStore];
+    stores.forEach(st => {
+      const k = st + '|' + el.dataset.id, o = (S.bulkVals[k] ||= {});
+      if (S.bulkStore === 'all' && v === '') delete o[f0]; else o[f0] = v;
+      const orig = f => it?.[f]?.[st] ?? '';
+      if (('min' in o ? o.min : orig('min')) === orig('min') && ('par' in o ? o.par : orig('par')) === orig('par')) delete S.bulkVals[k];
+    });
     const row = el.closest('.bk-row'), a = row.querySelector('[data-bk=min]').value, b = row.querySelector('[data-bk=par]').value;
-    row.classList.toggle('changed', k in S.bulkVals); row.classList.toggle('bad', a !== '' && b !== '' && Number(b) < Number(a));
-    const n = Object.keys(S.bulkVals).length, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = 'まとめて保存' + (n ? `（${n}件）` : ''); }
+    row.classList.toggle('changed', stores.some(st => (st + '|' + el.dataset.id) in S.bulkVals)); row.classList.toggle('bad', a !== '' && b !== '' && Number(b) < Number(a));
+    const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = 'まとめて保存' + (n ? `（${n}件）` : ''); }
   }
 });
 document.addEventListener('keydown', ev => {
