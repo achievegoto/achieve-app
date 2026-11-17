@@ -1566,6 +1566,7 @@ function makeApi(fs) {
   return {
     doc: p => fs.doc(p),
     collection: c => fs.collection(c),
+    batch: () => fs.batch(),
     async checkPin(v) {
       const s = await fs.doc('settings/app').get();
       const pin = s.exists ? String(s.data().pin || '') : '';
