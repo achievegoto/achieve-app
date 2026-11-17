@@ -240,8 +240,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 <main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
 <nav><div class="wrap tabs" id="tabs"></div></nav>
 <div id="toast" role="status" hidden></div>
-<button type="button" id="vbtn" aria-label="声で在庫を聞く" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></button>
-<div id="vpanel" hidden role="dialog" aria-label="声で在庫を聞く"><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名だけでOK（例：プレトワ 8-01）" aria-label="聞きたい商品"><button type="button" class="btn small" id="vclose">閉じる</button></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
+<button type="button" id="vbtn" aria-label="全店の在庫を探す" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
+<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名で全店の在庫を探す（例：プレトワ 8-01）" aria-label="探したい商品"><button type="button" class="btn small" id="vclose">閉じる</button></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -453,7 +453,7 @@ function confirmOther() {
 function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
-  { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing && (S.tab === 'stock' || S.tab === 'order')); }
+  { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing); }
   $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${s.id === S.store}">${esc(s.short)}</button>`).join('');
   const n = S.ready.size === 4 ? shortItems(S.store).length : 0;
   $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
@@ -1658,14 +1658,12 @@ function start() {
 }
 start();
 
-/* ---- 声で在庫を聞く ---- */
+/* ---- 全店の在庫を探す（右下の虫めがね） ---- */
 (function () {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, listening = false, userStop = false, typT = 0;
   const kata = t => t.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
   const FILL = /(在庫|ざいこ|何個|なんこ|何本|なんぼん|何箱|なんはこ|何袋|いくつ|幾つ|どれくらい|どのくらい|残り|のこり|教えて|おしえて|ありますか|あります|ある|ですか|です|って|は|が|を|も|？|\?|、|。)/g;
   const STOREW = [['liss', /リス|りす|liss/i], ['till', /ティル|てぃる|till/i], ['tonari', /トナリ|となり|tonari/i], ['hair', /ヘアデザイン|へあでざいん|hair|アチーブ|あちーぶ/i]];
-  const SYN = [[/シャンプー|しゃんぷー/g, ' SP '], [/トリートメント|とりーとめんと/g, ' TR '], [/サファイア|さふぁいあ/g, ' SA '], [/アメジスト|あめじすと/g, ' AM '], [/シルバー|しるばー/g, ' SI '], [/グレーパール|ぐれーぱーる/g, ' GP '], [/エメラルド|えめらるど/g, ' EM '], [/オーシャン|おーしゃん/g, ' OC '], [/ボルドー|ぼるどー/g, ' BOR ']];
+  const SYN = [[/リファ|りふぁ/g, ' ReFa '], [/ビューテック|びゅーてっく/g, ' BEAUTECH '], [/ドライヤー|どらいやー/g, ' DRYER '], [/アイロン|あいろん/g, ' IRON '], [/ストレート|すとれーと/g, ' STRAIGHT '], [/カール|かーる/g, ' CURL '], [/シャンプー|しゃんぷー/g, ' SP '], [/トリートメント|とりーとめんと/g, ' TR '], [/サファイア|さふぁいあ/g, ' SA '], [/アメジスト|あめじすと/g, ' AM '], [/シルバー|しるばー/g, ' SI '], [/グレーパール|ぐれーぱーる/g, ' GP '], [/エメラルド|えめらるど/g, ' EM '], [/オーシャン|おーしゃん/g, ' OC '], [/ボルドー|ぼるどー/g, ' BOR ']];
   const normName = t => kata(String(t || '').normalize('NFKC').toLowerCase()).replace(/[\s・\-‐－―ー\/／_.,()（）]/g, '').replace(/(\d)の(?=\d)/g, '$1');
   function parseQuery(raw) {
     let t = String(raw || '').normalize('NFKC');
@@ -1703,7 +1701,7 @@ start();
       .map(x => ({ it: x, s: score(nb, normName(x.name)) + (sr && x.name.normalize('NFKC').startsWith(sr) ? 1 : 0) })).sort((a, b) => b.s - a.s).slice(0, 6);
   }
   const spoken = n => String(n).replace(/(\d)-(\d)/g, '$1の$2').replace(/\//g, ' ');
-  function speak(text) { try { const ss = window.speechSynthesis; if (!ss) return; ss.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'ja-JP'; u.rate = 1.05; ss.speak(u); } catch (e) {} }
+  function speak() {}
   function card(it, store, top) {
     const stores = STORES.filter(x => x.id !== 'tonari' || (window.WHO && WHO.isOwner())), u = esc(uTxt(it.unit));
     const cells = stores.filter(sx => sx.id === store || carried(it, sx.id)).map(sx => `<span class="${sx.id === store ? 'cur' : ''}">${esc(sx.short)} <b>${qtyOf(sx.id, it.id)}</b>${u}</span>`).join('');
@@ -1711,7 +1709,7 @@ start();
   }
   function show(raw, talk) {
     const r = search(raw), res = $('vres'), st = $('vstat');
-    if (!r.q) { st.textContent = '商品名を言ってください（例：「プレトワ 8-01」）'; res.innerHTML = ''; return; }
+    if (!r.q) { st.textContent = '商品名を入れてください（例：プレトワ 8-01）'; res.innerHTML = ''; return; }
     if (!r.list.length) {
       if (!r.guess.length) { st.textContent = `「${raw}」に近い商品が見つかりませんでした。`; res.innerHTML = ''; if (talk) speak('見つかりませんでした'); return; }
       st.textContent = `「${raw}」ははっきり特定できませんでした。もしかしてこちら？`;
@@ -1730,32 +1728,14 @@ start();
     }
   }
   function openPanel() { $('vpanel').hidden = false; }
-  function closePanel() { stop(); $('vpanel').hidden = true; try { speechSynthesis.cancel(); } catch (e) {} }
-  function stop(byUser) { if (byUser) userStop = true; listening = false; $('vbtn').classList.remove('on'); try { rec && rec.abort(); } catch (e) {} }
-  function listen() {
-    openPanel();
-    if (!SR) { $('vstat').textContent = 'この端末は音声入力に対応していません。下の欄にキーボードのマイクで話すか、文字で入れてください。'; $('vq').focus(); return; }
-    if (listening) { stop(true); return; }
-    userStop = false;
-    try { speechSynthesis.cancel(); } catch (e) {}
-    rec = new SR(); rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = false;
-    listening = true; $('vbtn').classList.add('on'); $('vstat').textContent = '商品名をどうぞ…（例：「プレトワ 8-01」「リス インメトリィ SP 500」）'; $('vres').innerHTML = '';
-    let final = '';
-    rec.onresult = e => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; $('vq').value = t; if (e.results[e.results.length - 1].isFinal) final = t; };
-    rec.onerror = e => { const mine = userStop; stop(); if (mine && e.error === 'aborted') return;
-      const fb = '下の欄をタップして、キーボードのマイク（🎤）で商品名を話してください。話し終えると自動で調べます。';
-      $('vstat').textContent = e.error === 'not-allowed' ? 'マイクが許可されていません。設定でマイクを許可するか、' + fb
-        : e.error === 'no-speech' ? '声が聞き取れませんでした。もう一度マイクを押してください。'
-        : 'この画面ではマイクボタンの音声入力が使えないようです。' + fb; $('vq').value = ''; };
-    rec.onend = () => { const was = listening; stop(); const t = final || $('vq').value; if (was && t) show(t, true); else if (was && !t) $('vstat').textContent = '声が聞き取れませんでした。もう一度マイクを押してください。'; };
-    try { rec.start(); } catch (e) { stop(); $('vstat').textContent = '音声入力を開始できませんでした。'; }
-  }
+  function closePanel() { $('vpanel').hidden = true; }
+  function listen() { if (!$('vpanel').hidden) { closePanel(); return; } openPanel(); const q = $('vq'); q.focus(); if (q.value) show(q.value, false); }
   document.addEventListener('click', ev => {
     if (ev.target.closest('#vbtn')) { listen(); return; }
-    if (ev.target.closest('#vclose')) { userStop = true; closePanel(); return; }
+    if (ev.target.closest('#vclose')) { closePanel(); return; }
   });
-  document.addEventListener('keydown', ev => { if (ev.target.id === 'vq' && ev.key === 'Enter') { ev.preventDefault(); show(ev.target.value, true); } });
-  document.addEventListener('input', ev => { if (ev.target.id === 'vq' && !listening) { const v = ev.target.value; show(v, false); clearTimeout(typT); typT = setTimeout(() => { if ($('vq').value === v && v.trim()) show(v, true); }, 1300); } });
+  document.addEventListener('keydown', ev => { if (ev.target.id === 'vq' && ev.key === 'Enter') { ev.preventDefault(); show(ev.target.value, false); ev.target.blur(); } });
+  document.addEventListener('input', ev => { if (ev.target.id === 'vq') show(ev.target.value, false); });
   window.voiceSearch = search;
 })();
 </script>
