@@ -453,7 +453,7 @@ function confirmOther() {
 function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
-  { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !S.bulk && !S.editing && (S.tab === 'stock' || S.tab === 'order')); }
+  { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing && (S.tab === 'stock' || S.tab === 'order')); }
   $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${s.id === S.store}">${esc(s.short)}</button>`).join('');
   const n = S.ready.size === 4 ? shortItems(S.store).length : 0;
   $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
@@ -1698,7 +1698,7 @@ start();
     const r = search(raw), res = $('vres'), st = $('vstat');
     if (!r.q) { st.textContent = '商品名を言ってください（例：「プレトワ 8-01 何本ある？」）'; res.innerHTML = ''; return; }
     if (!r.list.length) { st.textContent = `「${raw}」に近い商品が見つかりませんでした。`; res.innerHTML = ''; if (talk) speak('見つかりませんでした'); return; }
-    const top = r.list[0], clear = r.list.length === 1 || top.s - r.list[1].s > .25 || top.s >= 2.5;
+    const top = r.list[0], clear = r.list.length === 1 || top.s - r.list[1].s > .25 || (top.s >= 3 && r.list[1].s < 3);
     st.textContent = clear ? `「${raw}」` : `「${raw}」に近い商品が${r.list.length}件あります`;
     const stores = STORES.filter(x => x.id !== 'tonari' || (window.WHO && WHO.isOwner()));
     res.innerHTML = r.list.map((x, i) => { const it = x.it, u = esc(uTxt(it.unit));
