@@ -249,7 +249,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 <main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
 <nav><div class="wrap tabs" id="tabs"></div></nav>
 <div id="toast" role="status" hidden></div>
-<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vtitle">全店の在庫を探す<span>hair design・Liss・till の在庫を一度に見られます</span></div><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名（例：プレトワ 8-01）" aria-label="探したい商品"></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
+<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vtitle">全店の在庫を探す<span>hair design・Liss・till・TONARI在庫 を一度に見られます</span></div><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名（例：プレトワ 8-01）" aria-label="探したい商品"></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -1711,7 +1711,7 @@ start();
   const spoken = n => String(n).replace(/(\d)-(\d)/g, '$1の$2').replace(/\//g, ' ');
   function speak() {}
   function card(it, store, top) {
-    const stores = STORES.filter(x => x.id !== 'tonari' || (window.WHO && WHO.isOwner())), u = esc(uTxt(it.unit));
+    const stores = STORES, u = esc(uTxt(it.unit));
     const cells = stores.filter(sx => sx.id === store || carried(it, sx.id)).map(sx => `<span class="${sx.id === store ? 'cur' : ''}">${esc(sx.short)} <b>${qtyOf(sx.id, it.id)}</b>${u}</span>`).join('');
     return `<div class="vitem${top ? ' top' : ''}"><div class="vname">${esc(it.name)}</div><div class="vqty">${cells}</div></div>`;
   }
