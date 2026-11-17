@@ -1665,12 +1665,13 @@ start();
   const kata = t => t.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
   const FILL = /(在庫|ざいこ|何個|なんこ|何本|なんぼん|何箱|なんはこ|何袋|いくつ|幾つ|どれくらい|どのくらい|残り|のこり|教えて|おしえて|ありますか|あります|ある|ですか|です|って|は|が|を|も|？|\?|、|。)/g;
   const STOREW = [['liss', /リス|りす|liss/i], ['till', /ティル|てぃる|till/i], ['tonari', /トナリ|となり|tonari/i], ['hair', /ヘアデザイン|へあでざいん|hair|アチーブ|あちーぶ/i]];
-  const KNUM = { 'いち': '1', 'に': '2', 'さん': '3', 'よん': '4', 'し': '4', 'ご': '5', 'ろく': '6', 'なな': '7', 'しち': '7', 'はち': '8', 'きゅう': '9', 'く': '9', 'じゅう': '10', 'ぜろ': '0', 'れい': '0' };
+  const SYN = [[/シャンプー|しゃんぷー/g, ' SP '], [/トリートメント|とりーとめんと/g, ' TR '], [/サファイア|さふぁいあ/g, ' SA '], [/アメジスト|あめじすと/g, ' AM '], [/シルバー|しるばー/g, ' SI '], [/グレーパール|ぐれーぱーる/g, ' GP '], [/エメラルド|えめらるど/g, ' EM '], [/オーシャン|おーしゃん/g, ' OC '], [/ボルドー|ぼるどー/g, ' BOR ']];
   const normName = t => kata(String(t || '').normalize('NFKC').toLowerCase()).replace(/[\s・\-‐－―ー\/／_.,()（）]/g, '').replace(/(\d)の(?=\d)/g, '$1');
   function parseQuery(raw) {
     let t = String(raw || '').normalize('NFKC');
     let store = '';
     for (const [id, re] of STOREW) if (re.test(t)) { store = id; t = t.replace(re, ' '); break; }
+    SYN.forEach(([re, v]) => { t = t.replace(re, v); });
     t = t.replace(/(\d)\s*の\s*(\d)/g, '$1$2').replace(FILL, ' ');
     return { store, q: normName(t) };
   }
