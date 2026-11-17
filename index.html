@@ -1687,23 +1687,43 @@ start();
     if (qd) d += qd === nd ? .4 : nd.includes(qd) ? .15 : -.3;
     return d;
   }
+  const uni = (q, n) => { const m = new Map(); for (const c of n) m.set(c, (m.get(c) || 0) + 1); let h = 0; for (const c of q) { const v = m.get(c) || 0; if (v) { h++; m.set(c, v - 1); } } return q.length ? h / q.length : 0; };
   function search(raw) {
     const { store, q } = parseQuery(raw);
-    const list = S.items.map(it => ({ it, s: score(q, normName(it.name)) })).filter(x => x.s >= .45).sort((a, b) => b.s - a.s).slice(0, 6);
-    return { store: store || S.store, list, q };
+    const all = S.items.map(it => { const n = normName(it.name); return { it, s: Math.max(score(q, n), .6 * uni(q, n) - .05) }; }).sort((a, b) => b.s - a.s);
+    const list = all.filter(x => x.s >= .45).slice(0, 6);
+    const guess = list.length ? [] : all.filter(x => x.s >= .2).slice(0, 6);
+    return { store: store || S.store, list, guess, q };
+  }
+  const head = n => (String(n).normalize('NFKC').split(/[\s　]+/)[0] || '');
+  const series = n => { const m = String(n).normalize('NFKC').match(/^(.*?\D)(\d+)[-‐ー]/); return m ? m[1].trim() + ' ' + m[2] + '-' : ''; };
+  function related(base, shown) {
+    const it = base.it, h = head(it.name), sr = series(it.name), nb = normName(it.name);
+    return S.items.filter(x => !shown.has(x.id) && (x.category || '') === (it.category || '') && (sr ? x.name.normalize('NFKC').startsWith(sr) || head(x.name) === h : head(x.name) === h))
+      .map(x => ({ it: x, s: score(nb, normName(x.name)) + (sr && x.name.normalize('NFKC').startsWith(sr) ? 1 : 0) })).sort((a, b) => b.s - a.s).slice(0, 6);
   }
   const spoken = n => String(n).replace(/(\d)-(\d)/g, '$1の$2').replace(/\//g, ' ');
   function speak(text) { try { const ss = window.speechSynthesis; if (!ss) return; ss.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'ja-JP'; u.rate = 1.05; ss.speak(u); } catch (e) {} }
+  function card(it, store, top) {
+    const stores = STORES.filter(x => x.id !== 'tonari' || (window.WHO && WHO.isOwner())), u = esc(uTxt(it.unit));
+    const cells = stores.filter(sx => sx.id === store || carried(it, sx.id)).map(sx => `<span class="${sx.id === store ? 'cur' : ''}">${esc(sx.short)} <b>${qtyOf(sx.id, it.id)}</b>${u}</span>`).join('');
+    return `<div class="vitem${top ? ' top' : ''}"><div class="vname">${esc(it.name)}</div><div class="vqty">${cells}</div></div>`;
+  }
   function show(raw, talk) {
     const r = search(raw), res = $('vres'), st = $('vstat');
     if (!r.q) { st.textContent = '商品名を言ってください（例：「プレトワ 8-01」）'; res.innerHTML = ''; return; }
-    if (!r.list.length) { st.textContent = `「${raw}」に近い商品が見つかりませんでした。`; res.innerHTML = ''; if (talk) speak('見つかりませんでした'); return; }
+    if (!r.list.length) {
+      if (!r.guess.length) { st.textContent = `「${raw}」に近い商品が見つかりませんでした。`; res.innerHTML = ''; if (talk) speak('見つかりませんでした'); return; }
+      st.textContent = `「${raw}」ははっきり特定できませんでした。もしかしてこちら？`;
+      const shown = new Set(r.guess.map(x => x.it.id)), rel = related(r.guess[0], shown);
+      res.innerHTML = r.guess.map(x => card(x.it, r.store, false)).join('') + (rel.length ? `<div class="vstat">関連商品</div>` + rel.map(x => card(x.it, r.store, false)).join('') : '');
+      if (talk) speak(`はっきり分かりませんでした。${spoken(r.guess[0].it.name)}などを画面に出しました`);
+      return;
+    }
     const top = r.list[0], clear = r.list.length === 1 || top.s - r.list[1].s > .25 || (top.s >= 3 && r.list[1].s < 3);
     st.textContent = clear ? `「${raw}」` : `「${raw}」に近い商品が${r.list.length}件あります`;
-    const stores = STORES.filter(x => x.id !== 'tonari' || (window.WHO && WHO.isOwner()));
-    res.innerHTML = r.list.map((x, i) => { const it = x.it, u = esc(uTxt(it.unit));
-      const cells = stores.filter(sx => sx.id === r.store || carried(it, sx.id)).map(sx => `<span class="${sx.id === r.store ? 'cur' : ''}">${esc(sx.short)} <b>${qtyOf(sx.id, it.id)}</b>${u}</span>`).join('');
-      return `<div class="vitem${i === 0 && clear ? ' top' : ''}"><div class="vname">${esc(it.name)}</div><div class="vqty">${cells}</div></div>`; }).join('');
+    const shown = new Set(r.list.map(x => x.it.id)), rel = related(top, shown);
+    res.innerHTML = r.list.map((x, i) => card(x.it, r.store, i === 0 && clear)).join('') + (rel.length ? `<div class="vstat">関連商品</div>` + rel.map(x => card(x.it, r.store, false)).join('') : '');
     if (talk) {
       if (clear) { const it = top.it; speak(`${spoken(it.name)}、${storeOf(r.store).short === 'hair design' ? 'ヘアデザイン' : storeOf(r.store).short}は${qtyOf(r.store, it.id)}${(it.unit || '').replace(/^[0-9０-９].*/, '')}です`); }
       else speak(`候補が${r.list.length}件あります。画面で選んでください`);
