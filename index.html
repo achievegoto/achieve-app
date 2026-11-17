@@ -168,8 +168,11 @@ label .field { font-size: 15px; color: var(--ink); }
 .bk-row.bad input { border-color: #d33; }
 .bk-bar { position: sticky; bottom: 0; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); display: flex; gap: 8px; align-items: center; z-index: 3; border-top: 1px solid var(--line); }
 .bk-stores { display: flex; gap: 6px; flex-wrap: wrap; }
-#vbtn { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(68px + env(safe-area-inset-bottom, 0px)); z-index: 15; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgba(0,0,0,.25); display: grid; place-items: center; }
-#vbtn svg { width: 26px; height: 26px; }
+#vbtn { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(68px + env(safe-area-inset-bottom, 0px)); z-index: 15; height: 48px; padding: 0 18px 0 14px; border-radius: 24px; border: 0; background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgba(0,0,0,.25); display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+#vbtn svg { width: 20px; height: 20px; flex: none; }
+#vbtn[aria-expanded="true"] { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+#vpanel .vtitle { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+#vpanel .vtitle span { font-weight: 400; font-size: 12px; color: var(--muted); }
 #vbtn.on { animation: vpulse 1.2s ease-in-out infinite; }
 @keyframes vpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(84,52,126,.5); } 50% { box-shadow: 0 0 0 14px rgba(84,52,126,0); } }
 #vpanel { position: fixed; left: 0; right: 0; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); z-index: 14; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0,0,0,.12); max-height: 62vh; overflow-y: auto; padding-block: 14px 84px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -240,8 +243,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 <main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
 <nav><div class="wrap tabs" id="tabs"></div></nav>
 <div id="toast" role="status" hidden></div>
-<button type="button" id="vbtn" aria-label="全店の在庫を探す" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
-<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名で全店の在庫を探す（例：プレトワ 8-01）" aria-label="探したい商品"><button type="button" class="btn small" id="vclose">閉じる</button></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
+<button type="button" id="vbtn" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span id="vbtn-l">全店の在庫</span></button>
+<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vtitle">全店の在庫を探す<span>hair design・Liss・till の在庫を一度に見られます</span></div><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名（例：プレトワ 8-01）" aria-label="探したい商品"></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -1727,8 +1730,8 @@ start();
       else speak(`候補が${r.list.length}件あります。画面で選んでください`);
     }
   }
-  function openPanel() { $('vpanel').hidden = false; }
-  function closePanel() { $('vpanel').hidden = true; }
+  function openPanel() { $('vpanel').hidden = false; $('vbtn').setAttribute('aria-expanded', 'true'); $('vbtn-l').textContent = '閉じる'; }
+  function closePanel() { $('vpanel').hidden = true; $('vbtn').setAttribute('aria-expanded', 'false'); $('vbtn-l').textContent = '全店の在庫'; }
   function listen() { if (!$('vpanel').hidden) { closePanel(); return; } openPanel(); const q = $('vq'); q.focus(); if (q.value) show(q.value, false); }
   document.addEventListener('click', ev => {
     if (ev.target.closest('#vbtn')) { listen(); return; }
