@@ -1288,7 +1288,7 @@ document.addEventListener('click', async ev => {
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'bulkOpen': if (!canEdit()) break; armPin(); S.bulk = true; S.bulkStore = STORES.some(x => x.id === S.store) ? S.store : 'hair'; S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
     case 'bulkStore': S.bulkStore = id; render(); break;
-    case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; el.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
+    case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; b.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
     case 'bulkSave': {
       if (!canEdit()) break; armPin();
       const ent = Object.entries(S.bulkVals), upd = {};
@@ -1298,12 +1298,12 @@ document.addEventListener('click', async ev => {
         if (a === '' && b === '') { delete u.min[st]; delete u.par[st]; }
         else { if (num(b) < num(a)) { toast(`${it.name}（${storeOf(st).short}）は適正を発注点以上にしてください`); S.bulkStore = st; render(); return; } u.min[st] = num(a); u.par[st] = num(b); } }
       try {
-        el.disabled = true;
+        b.disabled = true;
         const ids = Object.keys(upd);
         for (let i = 0; i < ids.length; i += 400) { const b = S.db.batch(); ids.slice(i, i + 400).forEach(iid => b.update(S.db.doc('items/' + iid), { min: upd[iid].min, par: upd[iid].par })); await b.commit(); }
         logChange('item', '', '', null, null, { name: '発注点・適正をまとめて編集', text: ids.map(i => upd[i].name).join('、').slice(0, 400) });
         S.bulk = false; S.bulkVals = {}; S.confirm = ''; toast(`${ids.length}商品を保存しました`); render();
-      } catch (e) { fail(e); el.disabled = false; }
+      } catch (e) { fail(e); b.disabled = false; }
       break;
     }
     case 'cancelEdit': S.editing = null; S.formErr = ''; S.confirm = ''; render(); break;
