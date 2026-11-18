@@ -49,6 +49,13 @@ main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16
 .summary { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--muted); }
 .summary b { font-family: var(--font-num); font-size: 22px; font-weight: 500; color: var(--ink); margin-left: 6px; font-variant-numeric: tabular-nums; }
 .summary b.alert { color: var(--bad); }
+.sum-btn { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
+.pend-line { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 8px; align-items: center; padding: 6px 0; }
+.pend-line + .pend-line { border-top: 1px dashed var(--line); }
+.pend-line .field { text-align: center; padding: 6px 4px; }
+.pend-line.done .name { color: var(--muted); }
+.late { color: var(--bad); font-weight: 700; }
+#toast button { margin-left: 10px; border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 6px; padding: 3px 10px; font: inherit; font-weight: 700; }
 .tools { display: flex; flex-direction: column; gap: 8px; }
 .field, select.field, textarea.field { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -302,14 +309,17 @@ const dateStr = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+function toastUndo(m, id) { const t = $('toast'); t.innerHTML = esc(m) + `<button type="button" data-act="undoRecv" data-id="${esc(id)}">取り消す</button>`; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 8000); }
 
 /* ---- 計算 ---- */
 const qtyOf = (store, id) => S.stock[store + '_' + id] ?? 0;
 const stockValue = store => S.items.reduce((a, it) => a + qtyOf(store, it.id) * num(it.price), 0);
+/* 一部入荷に対応：l.got = 入荷済みの数。残り = 発注数 − 入荷済み */
+const leftOf = l => Math.max(0, num(l.qty) - num(l.got));
 function onOrder(store, id) {
   let n = 0;
   for (const o of S.orders) if (o.store === store && o.status === 'ordered')
-    for (const l of o.lines || []) if (l.itemId === id) n += l.qty;
+    for (const l of o.lines || []) if (l.itemId === id) n += leftOf(l);
   return n;
 }
 const isUnset = (it, store) => it.min?.[store] === undefined && it.par?.[store] === undefined;
@@ -335,7 +345,7 @@ let resvCache = { orders: null, map: {} };
 function tonariReserved(id) {
   if (resvCache.orders !== S.orders) {
     const m = {};
-    for (const o of S.orders) if (o.dealerId === XFER && o.status === 'ordered') for (const l of o.lines || []) m[l.itemId] = (m[l.itemId] || 0) + num(l.qty);
+    for (const o of S.orders) if (o.dealerId === XFER && o.status === 'ordered') for (const l of o.lines || []) m[l.itemId] = (m[l.itemId] || 0) + leftOf(l);
     resvCache = { orders: S.orders, map: m };
   }
   return resvCache.map[id] || 0;
@@ -892,11 +902,12 @@ function allTable() {
 }
 function viewStock() {
   if (S.allView) return viewAll();
+  if (S.pend) return viewPending();
   const shorts = shortItems(S.store).length;
   const ordering = S.orders.filter(o => o.store === S.store && o.status === 'ordered').length;
   return `<div class="summary">
     <span>要発注<b class="${shorts ? 'alert' : ''}">${shorts}</b> 点</span>
-    <span>入荷待ち<b>${ordering}</b> 件</span>
+    <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b> 件 ›</button>
     <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
     <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
   </div>
@@ -1047,7 +1058,7 @@ function sumTable(rows, t) {
     + `<tr class="foot"><th>合計</th>${STORES.map(st => `<td>${yenS(colSum(st.id))}</td>`).join('')}<td class="tot">${yenS(total)}</td></tr>`;
   return [head, body, total];
 }
-const LOGK = { count: '数を変更', receive: '入荷', order: '発注', item: '商品を編集', itemNew: '商品を追加' };
+const LOGK = { count: '数を変更', receive: '入荷', unreceive: '入荷取消', order: '発注', item: '商品を編集', itemNew: '商品を追加' };
 function logCard() {
   if (!WHO.isAdmin()) return '';
   const all = (S.logs || []).filter(l => S.logAll || !l.store || l.store === S.store).slice(0, 150);
@@ -1119,18 +1130,46 @@ async function exportTana(scope) {
   X.writeFile(wb, `棚卸表_${scope === 'all' ? '全店舗' : stores[0].short}_${fs}.xlsx`);
   toast('棚卸表を書き出しました');
 }
-function orderRow(o) {
-  const open = o.status === 'ordered', cKey = 'cancel-' + o.id;
-  const summary = (o.lines || []).map(l => `${l.name} ×${l.qty}${uTxt(l.unit)}`).concat(o.extra ? [o.extra.replace(/・/g, '').replace(/\n/g, '、') + '（手打ち）'] : []).join('、');
-  const ctl = !open || S.readOnly ? '' : S.confirm === cKey
-    ? `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">取り消す</button><button type="button" class="btn small" id="cn-${o.id}" data-act="confirmNo">戻る</button>`
-    : `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">入荷済みにする</button><button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">取消</button>`;
+/* ---- 入荷待ち一覧（まとめて入荷・商品ごと入荷・取り消し） ---- */
+function viewPending() {
+  const all = !!S.pendAll;
+  const list = S.orders.filter(o => o.status === 'ordered' && (all || o.store === S.store)).sort((a, b) => num(a.orderedAt) - num(b.orderedAt));
+  const recent = S.orders.filter(o => o.status === 'received' && (o.receipts || []).length && (all || o.store === S.store)).sort((a, b) => lastRcpt(b).at - lastRcpt(a).at).slice(0, 5);
+  return `<section class="card"><div class="card-head"><h3>入荷待ち（${all ? '全店' : esc(storeOf(S.store).short)}）${list.length}件</h3><button type="button" class="btn small" id="pend-all" data-act="pendAll">${all ? 'この店舗だけ' : '全店舗'}</button></div>
+    <div class="sub">古い順。届いたら「まとめて入荷」か、商品ごとに数を入れて「入荷」。7日以上たっているものは赤字です。</div>
+    <div class="actions"><button type="button" class="btn small" id="pend-close" data-act="pendClose">‹ 在庫にもどる</button></div></section>
+    ${list.length ? `<div class="list">${list.map(pendCard).join('')}</div>` : '<div class="card"><div class="empty">入荷待ちの発注はありません</div></div>'}
+    ${recent.length ? `<div class="group"><h2>最近の入荷（取り消しできます）</h2><div class="list">${recent.map(pendCard).join('')}</div></div>` : ''}`;
+}
+const lastRcpt = o => { const r = o.receipts || []; return r[r.length - 1] || { at: num(o.receivedAt) }; };
+const canRecv = o => !S._ro && !(o.store === 'tonari' && !WHO.isOwner());
+function pendCard(o) {
+  const open = o.status === 'ordered', ro = !canRecv(o), days = Math.floor((Date.now() - num(o.orderedAt)) / 86400000);
+  const lines = o.lines || [], part = open && lines.some(l => num(l.got) > 0);
+  const rows = lines.map((l, i) => {
+    const left = open ? leftOf(l) : 0, k = o.id + ':' + i, v = S.pq && S.pq[k] !== undefined ? S.pq[k] : left;
+    const got = open ? num(l.got) : num(l.qty);
+    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div></div>
+      ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
+      <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : '✓'}</span>`}</div>`;
+  }).join('');
+  const uKey = 'undo-' + o.id, cKey = 'cancel-' + o.id, hasR = (o.receipts || []).length || !open;
+  let ctl = '';
+  if (!ro) {
+    if (S.confirm === uKey) ctl = `<span class="sub">直前の入荷を取り消して、在庫から引きますか？</span><button type="button" class="btn small danger" id="u2-${o.id}" data-act="undoRecv" data-id="${o.id}">入荷を取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button>`;
+    else if (S.confirm === cKey) ctl = `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">発注を取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button>`;
+    else ctl = (open ? `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">まとめて入荷</button>` : '')
+      + (hasR ? `<button type="button" class="btn small" id="u1-${o.id}" data-act="confirm" data-id="${uKey}">入荷を取り消す</button>` : '')
+      + (open && !hasR ? `<button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">発注取消</button>` : '');
+  }
   return `<div class="row" style="grid-template-columns:minmax(0,1fr)">
     <div class="card-head"><div class="name">${esc(o.dealerName)}</div><span class="amount">${yen(num(o.total))}</span></div>
-    <div class="sub"><span class="pill ${open ? 'ordering' : 'ok'}">${open ? '発注済み' : '入荷済み'}</span><span>${esc(storeOf(o.store).short)}</span><span>${dateStr(o.orderedAt)} 発注${o.receivedAt ? `・${dateStr(o.receivedAt)} 入荷` : ''}</span></div>
-    <div class="sub">${esc(summary)}</div>
+    <div class="sub"><span class="pill ${open ? 'ordering' : 'ok'}">${open ? (part ? '一部入荷' : '発注済み') : '入荷済み'}</span><span>${esc(storeOf(o.store).short)}</span><span>${dateStr(o.orderedAt)} 発注</span>${open ? `<span class="${days >= 7 ? 'late' : ''}">${days}日経過</span>` : `<span>${dateStr(lastRcpt(o).at)} 入荷</span>`}</div>
+    <div>${rows}</div>
+    ${o.extra ? `<div class="sub">手打ち：${esc(o.extra.replace(/\n/g, '、'))}（在庫には入りません）</div>` : ''}
     ${ctl ? `<div class="actions">${ctl}</div>` : ''}</div>`;
 }
+const orderRow = o => pendCard(o);
 
 const itemRow = it => `<div class="row${canEdit() ? ' has-grip' : ''}" data-row="${it.id}">${canEdit() ? `<button type="button" class="grip" data-grip="${it.id}" aria-label="${esc(it.name)}を並べ替え">⋮⋮</button>` : ''}<div><div class="name">${esc(it.name)}</div>
     <div class="sub">${it.ended ? '<span class="pill ended">取扱終了</span>' : ''}${it.sample ? '<span class="pill sample">サンプル</span>' : ''}<span>${esc(it.category || 'その他')}</span><span>${esc(dealerOf(it.dealerId)?.name || 'ディーラー未設定')}</span><span>${yen(num(it.price))}/${esc(it.unit)}</span></div></div>
@@ -1303,26 +1342,61 @@ async function markPlaced(did, quiet) {
   } catch (e) { fail(e); }
 }
 const receiving = new Set();
-async function receive(id) {
+/* 入荷：req = { 行番号: 数 }。null なら残りを全部入荷 */
+async function receive(id, req) {
   const o = S.orders.find(x => x.id === id);
   if (!o || o.status !== 'ordered' || receiving.has(id)) return;
   if (S._ro || (o.store === 'tonari' && !WHO.isOwner())) { toast('TONARI在庫はオーナーだけが変更できます'); return; }
+  const lines = (o.lines || []).map(l => ({ ...l })), rec = [];
+  lines.forEach((l, i) => { const left = leftOf(l), want = req ? Math.min(left, Math.round(num(req[i]))) : left; if (want > 0) { rec.push({ i, qty: want }); l.got = num(l.got) + want; } });
+  if (!rec.length && req) { toast('入荷する数を入れてください'); return; }
   receiving.add(id);
   try {
-    await S.db.doc('orders/' + id).update({ status: 'received', receivedAt: Date.now() });
-    for (const l of o.lines || []) {
-      const key = o.store + '_' + l.itemId, prev = S.stock[key] ?? 0, next = prev + l.qty;
+    const done = lines.every(l => leftOf(l) === 0), me = WHO.me || {}, at = Date.now();
+    for (const r of rec) {
+      const l = lines[r.i], key = o.store + '_' + l.itemId, prev = S.stock[key] ?? 0, next = prev + r.qty;
       S.stock[key] = next;
       logChange('receive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の発注を入荷' });
-      await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at: Date.now() });
+      await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at });
       if (o.dealerId === XFER) {
-        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, tn = Math.max(0, tp - l.qty);
-        S.stock[tk] = tn;
+        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, take = Math.min(tp, r.qty), tn = tp - take;
+        r.tonari = take; S.stock[tk] = tn;
         logChange('receive', 'tonari', l.itemId, tp, tn, { text: storeOf(o.store).short + 'へ移動' });
-        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at: Date.now() });
+        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at });
       }
     }
-    toast('入荷分を在庫に加えました'); render();
+    const receipts = (o.receipts || []).concat([{ at, by: me.id || '', byName: me.name || '', lines: rec }]);
+    await S.db.doc('orders/' + id).update({ lines, status: done ? 'received' : 'ordered', receivedAt: done ? at : null, receipts });
+    if (S.pq) rec.forEach(r => delete S.pq[id + ':' + r.i]);
+    toastUndo(done ? '入荷済みにしました' : '一部を入荷しました（残りは入荷待ち）', id); render();
+  } catch (e) { fail(e); } finally { receiving.delete(id); }
+}
+/* 直前の入荷を取り消す：在庫から引き、TONARIから移した分は戻し、発注を入荷待ちに戻す */
+async function undoReceive(id) {
+  const o = S.orders.find(x => x.id === id);
+  if (!o || receiving.has(id)) return;
+  if (!canRecv(o)) { toast('この発注は変更できません'); return; }
+  const lines = (o.lines || []).map(l => ({ ...l })), rs = (o.receipts || []).slice();
+  let last = rs.pop();
+  if (!last) { if (o.status !== 'received') return; last = { lines: lines.map((l, i) => ({ i, qty: num(l.qty), tonari: o.dealerId === XFER ? num(l.qty) : 0 })) }; lines.forEach(l => l.got = num(l.qty)); }
+  receiving.add(id);
+  try {
+    const at = Date.now();
+    for (const r of last.lines || []) {
+      const l = lines[r.i]; if (!l) continue;
+      const key = o.store + '_' + l.itemId, prev = S.stock[key] ?? 0, next = Math.max(0, prev - num(r.qty));
+      S.stock[key] = next; l.got = Math.max(0, num(l.got) - num(r.qty));
+      logChange('unreceive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の入荷を取り消し' });
+      await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at });
+      if (o.dealerId === XFER && num(r.tonari)) {
+        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, tn = tp + num(r.tonari);
+        S.stock[tk] = tn;
+        logChange('unreceive', 'tonari', l.itemId, tp, tn, { text: storeOf(o.store).short + 'への移動を取り消し' });
+        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at });
+      }
+    }
+    await S.db.doc('orders/' + id).update({ lines, status: 'ordered', receivedAt: null, receipts: rs });
+    S.confirm = ''; toast('入荷を取り消しました（入荷待ちに戻しました）'); render();
   } catch (e) { fail(e); } finally { receiving.delete(id); }
 }
 async function clearSamples() {
@@ -1346,7 +1420,7 @@ document.addEventListener('click', async ev => {
     case 'allView': S.allView = true; S.tab = 'stock'; S.cat = ''; S.big = ''; render(); window.scrollTo(0, 0); break;
     case 'store': S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
-    case 'tab': S.tab = id; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
+    case 'tab': S.tab = id; S.pend = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
@@ -1378,7 +1452,12 @@ document.addEventListener('click', async ev => {
     case 'scanAdd': S.scan.rows.push({ text: '', qty: 1, id: '' }); render(); break;
     case 'scanApply': applyScanNow(); break;
     case 'placedGoto': { const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
-    case 'receive': receive(id); break;
+    case 'receive': receive(id, null); break;
+    case 'recvLine': { const i = Number(b.dataset.i), el = $(`pq-${id}-${i}`), k = id + ':' + i; const v = S.pq && S.pq[k] !== undefined ? S.pq[k] : el ? num(el.value) : 0; receive(id, { [i]: v }); break; }
+    case 'undoRecv': $('toast').hidden = true; undoReceive(id); break;
+    case 'pendOpen': S.pend = true; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'pendClose': S.pend = false; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'pendAll': S.pendAll = !S.pendAll; render(); break;
     case 'confirm': if (S.editing) readForm(); S.confirm = id; render(); break;
     case 'month': S.monthOff = Math.min(0, (S.monthOff || 0) + Number(id)); render(); break;
     case 'confirmNo': S.confirm = ''; render(); break;
@@ -1433,6 +1512,7 @@ document.addEventListener('change', ev => {
   const el = ev.target, c = el.dataset.chg; if (!c) return;
   const { id, did } = el.dataset;
   if (c === 'qty') { setQty(S.store, id, num(el.value)); el.blur(); render(); }
+  if (c === 'pq') { (S.pq ||= {})[id] = Math.min(num(el.value), num(el.max, Infinity)); return; }
   if (c === 'oqty') { bumpDraft(did, id, num(el.value)); el.blur(); render(); }
   if (c === 'oextra') { S.holdUntil = Date.now() + 700; const k = draftKey(did); (S.draftExtra ||= {})[k] = el.value; const me = WHO.me || {}; draftDoc(did).set({ store: S.store, did, extra: el.value, at: Date.now(), by: me.id || '', byName: me.name || '' }, { merge: true }).catch(fail);
     /* ここで再描画するとコピーボタンの押下が消えるので、文章欄とボタンだけ更新 */
