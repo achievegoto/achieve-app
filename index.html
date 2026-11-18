@@ -262,6 +262,9 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.late-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.late-d { display: flex; flex-direction: column; gap: 2px; } .late-d b { font-size: 13px; } .late-d span { color: var(--muted); }
+.due-acts .btn { flex: 1 1 140px; }
 .due.in .due-btn { display: none; } .due-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 
@@ -1347,6 +1350,20 @@ function resetDraft(did, id) {
 function draftValue(did, id) {
   const r = linesFor(did).find(x => x.it.id === id); return r ? r.qty : 0;
 }
+/* 発注済みは日曜・月曜に押すルール。それ以外の曜日は、今の在庫で数が計算し直されているので確認を出す */
+const isLateDay = () => { const w = new Date().getDay(); return w !== 0 && w !== 1; };
+function lateAsk(dids) {
+  const old = $('late-pop'); if (old) old.remove();
+  const rows = dids.map(did => { const d = dealerOf(did), ls = linesFor(did).filter(r => r.qty > 0), xt = extraLines(did);
+    return `<div class="late-d"><b>${esc(d ? d.name : '')}</b>${ls.map(r => `<span>${esc(r.it.name)} ×${r.qty}</span>`).join('')}${xt.map(t => `<span>${esc(t)}</span>`).join('')}</div>`; }).join('');
+  const el = document.createElement('div'); el.id = 'late-pop'; el.className = 'due-pop';
+  el.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true" aria-labelledby="late-h">
+    <div class="due-h" id="late-h">⚠️ 今日は日曜・月曜ではありません</div>
+    <div class="due-b">「発注済み」は<b>日曜〜月曜に押すルール</b>です。今押すと、<b>今日の在庫で計算した数</b>で記録されるので、日曜に実際に発注した数とずれていることがあります。<br>下の数が<b>実際に発注した数と同じか</b>確認してください。違う場合は「戻って数を直す」で直してから押してください。</div>
+    <div class="late-list">${rows}</div>
+    <div class="due-acts"><button type="button" class="btn" data-act="lateNo">戻って数を直す</button><button type="button" class="btn primary" data-act="lateOk" data-dids="${dids.join(',')}">この内容で発注済みにする</button></div></div>`;
+  document.body.appendChild(el);
+}
 async function markPlaced(did, quiet) {
   if (S.readOnly) return;
   const active = linesFor(did).filter(r => r.qty > 0), xt = extraLines(did).join('\n'); if (!active.length && !xt) return;
@@ -1457,7 +1474,11 @@ document.addEventListener('click', async ev => {
       catch (e) { const t = $('msg-' + did); t.focus(); t.select(); toast('自動でコピーできません。選択された文章をコピーしてください'); }
       break;
     }
-    case 'placed': markPlaced(did); break;
+    case 'placed': if (isLateDay() && did !== XFER) { lateAsk([did]); break; } markPlaced(did); break;
+    case 'lateNo': { const p = $('late-pop'); if (p) p.remove(); break; }
+    case 'lateOk': { const p = $('late-pop'); if (p) p.remove(); const ids = (b.dataset.dids || '').split(',').filter(Boolean);
+      if (ids.length === 1) { markPlaced(ids[0]); break; }
+      for (const x of ids) await markPlaced(x, true); if (ids.length) { toast(`${ids.length}件を発注済みにしました`); render(); } break; }
     case 'scanStart': if (!confirmOther()) break; S.scanMode = id; $('scan-file').click(); break;
     case 'scanCancel': S.scan = null; render(); break;
     case 'tana': exportTana(id).catch(e => toast(e.message)); break;
@@ -1470,7 +1491,7 @@ document.addEventListener('click', async ev => {
     case 'janCam': $('jan-file').click(); break;
     case 'scanAdd': S.scan.rows.push({ text: '', qty: 1, id: '' }); render(); break;
     case 'scanApply': applyScanNow(); break;
-    case 'placedGoto': { const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
+    case 'placedGoto': { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
     case 'receive': receive(id, null); break;
     case 'recvLine': { const i = Number(b.dataset.i), el = $(`pq-${id}-${i}`), k = id + ':' + i; const v = S.pq && S.pq[k] !== undefined ? S.pq[k] : el ? num(el.value) : 0; receive(id, { [i]: v }); break; }
     case 'undoRecv': $('toast').hidden = true; undoReceive(id); break;
