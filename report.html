@@ -391,6 +391,7 @@ table.mx td .ok { color: var(--good); font-weight: 700; } table.mx td .ng { colo
 .ptop .psel { border-radius: 10px; }
 .dk-r { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
 .dk-r b { font-family: var(--font-num); font-size: 16px; color: var(--ink); font-weight: 500; margin-left: 4px; }
+.dk-tot span .dt { font-size: 12px; } .dk > b .dt { font-size: 11px; vertical-align: 2px; }
 </style>
 </head>
 <body>
@@ -525,6 +526,15 @@ function sumYear(pids, y) {
   yearYms(y).forEach(ym => { const m = sumMonth(pids, ym); if (!m) return; any = true; Object.keys(o).forEach(k => o[k] += m[k]); });
   return any ? o : null;
 }
+const ADDK = ['tech', 'free', 'retail', 'cust', 'custAll', 'newc', 'buyers'];
+const scaleObj = (o, r) => { if (!o) return null; const x = {}; ADDK.forEach(k => x[k] = (o[k] || 0) * r); return x; };
+/* 前年同期：今年なら1月〜今月（今月は同じ日数分に換算）、過去の年なら1年分 */
+function prevYTD(pids, yr) {
+  const now = nowYm(), isCur = String(yr) === now.slice(0, 4), cut = isCur ? Number(now.slice(5)) : 12, r = isCur ? pace(now).ratio : 1;
+  const o = {}; ADDK.forEach(k => o[k] = 0); let any = false;
+  for (let m = 1; m <= cut; m++) { const d = sumMonth(pids, `${yr - 1}-${pad(m)}`); if (!d) continue; any = true; const f = m === cut ? r : 1; ADDK.forEach(k => o[k] += (d[k] || 0) * f); }
+  return any ? o : null;
+}
 function periodTarget(pids, dates, k) { /* 月目標を営業日（水〜日）で割って期間分を合計 */
   let t = 0; dates.forEach(dt => { if (!isOpen(dt)) return; const ym = dt.slice(0, 7); const mt = pids.reduce((a, p) => a + (Number(T0(p, ym)[k]) || 0), 0); t += mt / openDays(ym); }); return t;
 }
@@ -537,14 +547,14 @@ function retailRows(pids, dates) {
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
 }
-function kpiCard(cur, pids, dates, scope, label) {
+function kpiCard(cur, pids, dates, scope, label, prev, prevLabel) {
   if (!cur) return `<section class="card"><div class="empty">${esc(label)}のデータはまだありません（毎日の自動取得の日から貯まります）</div></section>`;
   const tot = cur.tech + cur.free + cur.retail, today = ymdOf(new Date()), past = dates.filter(dt => dt <= today);
   const line = (k, l, unit) => { const tg = periodTarget(pids, dates, k), tgNow = past.length < dates.length ? periodTarget(pids, past, k) : tg, v = cur[k];
     const f = x => unit === 'yen' ? '¥' + fmt(x, 'yen') : fmt(x, 'n') + unit;
-    return `<div class="dk"><span class="dk-l">${l}</span><b>${f(v)}</b>${tg ? `<span class="dk-t">目標 ${f(tg)}・<b class="${v >= tgNow ? 'ok' : 'ng'}">${Math.round(v / tg * 100)}%</b></span>${progBar(v, tg, tgNow / tg)}` : ''}</div>`; };
+    return `<div class="dk"><span class="dk-l">${l}</span><b>${f(v)}${prev && prev[k] ? ' ' + diffTag(v, prev[k], k) : ''}</b>${tg ? `<span class="dk-t">目標 ${f(tg)}・<b class="${v >= tgNow ? 'ok' : 'ng'}">${Math.round(v / tg * 100)}%</b></span>${progBar(v, tg, tgNow / tg)}` : ''}</div>`; };
   const hasBuy = cur.buyers > 0 || dates[0] >= '2026-11-01';
-  return `<section class="card"><div class="card-head"><div><h3>${esc(scope)}</h3><div class="sub">${esc(label)}</div></div><div class="dk-tot"><span>総売上</span><b>¥${fmt(tot, 'yen')}</b></div></div>
+  return `<section class="card"><div class="card-head"><div><h3>${esc(scope)}</h3><div class="sub">${esc(label)}</div></div><div class="dk-tot"><span>総売上</span><b>¥${fmt(tot, 'yen')}</b>${prev ? (() => { const pt = prev.tech + prev.free + prev.retail; return pt ? `<span>${esc(prevLabel || '昨対')} ${diffTag(tot, pt, 'tot')}</span>` : ''; })() : ''}</div></div>
     <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${hasBuy ? line('buyers', '店販購入', '人') : ''}</div>
     <div class="dk-r">${hasBuy && (cur.custAll || cur.cust) ? `<span>店販購入率 <b>${(cur.buyers / (cur.custAll || cur.cust) * 100).toFixed(1)}%</b></span>` : ''}${cur.custAll ? `<span>総客数 <b>${fmt(cur.custAll, 'n')}人</b></span>` : ''}${tot ? `<span>店販売上比率 <b>${(cur.retail / tot * 100).toFixed(1)}%</b></span>` : ''}</div></section>`;
 }
@@ -567,6 +577,7 @@ function dailyView() {
   if (S.dp !== 'y') ensureDays([...new Set(dates.map(d => d.slice(0, 7)))]);
   const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : S.dp === 'y' ? `${yr}年の年間累計` : `${ymLabel(ym)}の月報`;
   const cur = S.dp === 'm' ? sumMonth(pids, ym) : S.dp === 'y' ? sumYear(pids, yr) : sumDays(pids, dates);
+  const prevC = S.dp === 'y' ? prevYTD(pids, Number(yr)) : S.dp === 'm' ? scaleObj(sumMonth(pids, shiftYm(ym, -12)), ym === nowYm() ? pace(ym).ratio : 1) : null;
   const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
   const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : S.dp === 'y' ? yr + '年' : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
   const pchips = `<div class="seg4">${[['d', '日報'], ['w', '週報'], ['m', '月'], ['y', '年間']].map(([id, l]) => `<button type="button" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
@@ -581,17 +592,19 @@ function dailyView() {
     const paceT = yms.reduce((a, m) => a + (m < now ? tg(m) : m === now ? tg(m) * pace(m).ratio : 0), 0);
     const yc = cur ? cur.tech : 0;
     const mrows = yms.map(m => ({ m, d: sumMonth(pids, m), t: tg(m) })).filter(x => x.d || x.t);
-    let cum = 0, cumT = 0;
-    monthLine = `<section class="card"><div class="card-head"><h3>指名技術の年間進捗</h3>${yr === now.slice(0, 4) ? `<span class="sub">今日時点の目標 ¥${fmt(paceT, 'yen')}</span>` : ''}</div><div class="dk"><b>¥${fmt(yc, 'yen')}</b>${yt ? `<span class="dk-t">年間目標 ¥${fmt(yt, 'yen')}・<b class="${yc >= (yr === now.slice(0, 4) ? paceT : yt) ? 'ok' : 'ng'}">${Math.round(yc / yt * 100)}%</b></span>${progBar(yc, yt, yr === now.slice(0, 4) && yt ? paceT / yt : 1)}` : ''}</div></section>
-    ${mrows.length ? `<section class="card"><h3>月別（累計）</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>月</th><th>指名技術</th><th>累計</th><th>累計目標</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${mrows.map(({ m, d, t }) => { const v = d ? d.tech : 0; cum += v; cumT += t; return `<tr><td>${Number(m.slice(5))}月</td><td class="cell">${d ? fmt(v, 'yen') : '-'}</td><td class="cell"><b>${fmt(cum, 'yen')}</b></td><td class="cell">${cumT ? fmt(cumT, 'yen') + `<br><span class="${cum >= cumT ? 'ok' : 'ng'}">${Math.round(cum / cumT * 100)}%</span>` : '-'}</td><td class="cell">${d ? fmt(d.free, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.retail, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.cust, 'n') : '-'}</td><td class="cell">${d ? fmt(d.newc, 'n') : '-'}</td></tr>`; }).join('')}</tbody></table></div></section>` : ''}`;
+    let cum = 0, cumT = 0, cumP = 0;
+    monthLine = `<section class="card"><div class="card-head"><h3>指名技術の年間進捗</h3>${yr === now.slice(0, 4) ? `<span class="sub">今日時点の目標 ¥${fmt(paceT, 'yen')}</span>` : ''}</div><div class="dk"><b>¥${fmt(yc, 'yen')}${prevC && prevC.tech ? ' ' + diffTag(yc, prevC.tech, 'tech') : ''}</b>${prevC && prevC.tech ? `<span class="dk-t">前年同期 ¥${fmt(prevC.tech, 'yen')}</span>` : ''}${yt ? `<span class="dk-t">年間目標 ¥${fmt(yt, 'yen')}・<b class="${yc >= (yr === now.slice(0, 4) ? paceT : yt) ? 'ok' : 'ng'}">${Math.round(yc / yt * 100)}%</b></span>${progBar(yc, yt, yr === now.slice(0, 4) && yt ? paceT / yt : 1)}` : ''}</div></section>
+    ${mrows.length ? `<section class="card"><h3>月別（累計）</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>月</th><th>指名技術</th><th>前年</th><th>昨対</th><th>累計</th><th>前年累計</th><th>累計目標</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${mrows.map(({ m, d, t }) => { const v = d ? d.tech : 0, pm = sumMonth(pids, shiftYm(m, -12)), pv = pm ? pm.tech : 0, pvS = m === nowYm() ? pv * pace(m).ratio : pv; cum += v; cumT += t; cumP += d ? pvS : 0; const y1 = d && pvS ? yoy(v, pvS) : null, y2 = cumP ? yoy(cum, cumP) : null;
+      return `<tr><td>${Number(m.slice(5))}月</td><td class="cell">${d ? fmt(v, 'yen') : '-'}</td><td class="cell">${pm ? fmt(pvS, 'yen') : '-'}</td><td class="cell">${y1 == null ? '-' : `<span class="${y1 >= 0 ? 'ok' : 'ng'}">${y1 >= 0 ? '+' : ''}${y1.toFixed(1)}%</span>`}</td><td class="cell"><b>${fmt(cum, 'yen')}</b></td><td class="cell">${cumP ? fmt(cumP, 'yen') + (y2 == null ? '' : `<br><span class="${y2 >= 0 ? 'ok' : 'ng'}">${y2 >= 0 ? '+' : ''}${y2.toFixed(1)}%</span>`) : '-'}</td><td class="cell">${cumT ? fmt(cumT, 'yen') + `<br><span class="${cum >= cumT ? 'ok' : 'ng'}">${Math.round(cum / cumT * 100)}%</span>` : '-'}</td><td class="cell">${d ? fmt(d.free, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.retail, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.cust, 'n') : '-'}</td><td class="cell">${d ? fmt(d.newc, 'n') : '-'}</td></tr>`; }).join('')}</tbody></table></div></section>` : ''}`;
   } else if (S.dp !== 'm') { const mc = sumMonth(pids, ym), mt = pids.reduce((a, p) => a + (Number(T0(p, ym).tech) || 0), 0), pc = pace(ym);
     if (mc) monthLine = `<section class="card"><div class="card-head"><h3>${Number(ym.slice(5))}月の指名技術</h3><span class="sub">${pc.label || ''}</span></div><div class="dk"><b>¥${fmt(mc.tech, 'yen')}</b>${mt ? `<span class="dk-t">月目標 ¥${fmt(mt, 'yen')}・<b class="${mc.tech >= mt * pc.ratio ? 'ok' : 'ng'}">${Math.round(mc.tech / mt * 100)}%</b>（ペース ${Math.round(pc.ratio * 100)}%）</span>${progBar(mc.tech, mt, pc.ratio)}` : ''}</div></section>`; }
   /* 人別の表（全員・店舗のとき） */
+  const prevOf = ids => S.dp === 'y' ? prevYTD(ids, Number(yr)) : S.dp === 'm' ? scaleObj(sumMonth(ids, shiftYm(ym, -12)), ym === nowYm() ? pace(ym).ratio : 1) : null;
   let table = '';
   if (pids.length > 1) {
     const rows = ppl.filter(p => pids.includes(p.id)).map(p => ({ p, d: S.dp === 'm' ? sumMonth([p.id], ym) : S.dp === 'y' ? sumYear([p.id], yr) : sumDays([p.id], dates) })).filter(x => x.d);
     if (own) rows.sort((a, b) => (b.d.tech || 0) - (a.d.tech || 0));
-    if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th><th>フリー</th><th>店販</th><th>店販比</th><th>客数</th><th>新規</th>${rows.some(r => r.d.buyers) ? '<th>購入率</th>' : ''}</tr></thead><tbody>${rows.map(({ p, d }) => { const r = val(d, 'retRate'), br = val(d, 'buyRate'); return `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td><td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${r == null ? '' : r.toFixed(1) + '%'}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td>${rows.some(x => x.d.buyers) ? `<td class="cell">${br == null ? '' : br.toFixed(1) + '%'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div></section>`;
+    if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th>${S.dp === 'y' || S.dp === 'm' ? '<th>総売上 昨対</th>' : ''}<th>フリー</th><th>店販</th><th>店販比</th><th>客数</th><th>新規</th>${rows.some(r => r.d.buyers) ? '<th>購入率</th>' : ''}</tr></thead><tbody>${rows.map(({ p, d }) => { const r = val(d, 'retRate'), br = val(d, 'buyRate'); return `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td>${S.dp === 'y' || S.dp === 'm' ? (() => { const q = prevOf([p.id]), a = d.tech + d.free + d.retail, b = q ? q.tech + q.free + q.retail : 0, yv = b ? yoy(a, b) : null; return `<td class="cell">${yv == null ? '-' : `<span class="${yv >= 0 ? 'ok' : 'ng'}">${yv >= 0 ? '+' : ''}${yv.toFixed(1)}%</span>`}</td>`; })() : ''}<td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${r == null ? '' : r.toFixed(1) + '%'}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td>${rows.some(x => x.d.buyers) ? `<td class="cell">${br == null ? '' : br.toFixed(1) + '%'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div></section>`;
   }
   /* 店販 商品別 */
   let rt = retailRows(pids, dates); let rtNote = '';
@@ -605,7 +618,7 @@ function dailyView() {
       <input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す"></section>
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
   } else rhtml = `<section class="card"><div class="empty" style="padding:10px">${S.dp === 'd' && dates[0] < '2026-11-01' ? 'この日の店販（商品別）はありません。週報・月で見られます' : 'この期間の店販（商品別）はまだありません'}</div></section>`;
-  return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, scopeName.replace(' 全体', ''), label)}${monthLine}${table}${rhtml}
+  return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, scopeName.replace(' 全体', ''), label, prevC, S.dp === 'y' ? '前年同期比' : '昨対')}${monthLine}${table}${rhtml}
     <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
