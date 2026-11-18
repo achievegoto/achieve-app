@@ -168,6 +168,8 @@ label .field { font-size: 15px; color: var(--ink); }
 .bk-row.bad input { border-color: #d33; }
 .bk-bar { position: sticky; bottom: 0; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); display: flex; gap: 8px; align-items: center; z-index: 3; border-top: 1px solid var(--line); }
 .bk-stores { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill.ended { background: var(--bg); color: var(--muted); border: 1px solid var(--line); text-decoration: none; }
+.row.is-ended .name { color: var(--muted); text-decoration: line-through; }
 .lvreq .lvr { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
 .lvreq ul { margin: 6px 0; padding-left: 18px; font-size: 13px; }
 .lvreq li { margin: 2px 0; }
@@ -310,6 +312,7 @@ function statusOf(it, store) {
   return 'ok';
 }
 function needOf(it, store) {
+  if (it.ended) return 0;
   if (!carried(it, store) || statusOf(it, store) !== 'short') return 0;
   return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - onOrder(store, it.id), 1);
 }
@@ -895,13 +898,14 @@ function stockList() {
   return Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
 }
 function pillOf(it) {
+  if (it.ended) return '<span class="pill ended">取扱終了（発注しない）</span>';
   const s = statusOf(it, S.store);
   if (s === 'unset') return '<span class="pill sample">発注点未設定</span>';
   return s === 'short' ? '<span class="pill short">要発注</span>' : s === 'ordering' ? `<span class="pill ordering">入荷待ち ${onOrder(S.store, it.id)}</span>` : '<span class="pill ok">適正</span>';
 }
 function stockRow(it) {
   const q = qtyOf(S.store, it.id), dis = S.readOnly || !S.unlocked ? 'disabled' : '';
-  return `<div class="row"><div><div class="name">${esc(it.name)}</div>
+  return `<div class="row${it.ended ? ' is-ended' : ''}"><div><div class="name">${esc(it.name)}</div>
     <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(uTxt(it.unit))}</span>`}</div></div>
     <div class="stepper${S.unlocked ? '' : ' locked'}">
       <button type="button" id="m-${it.id}" data-act="dec" data-id="${it.id}" aria-label="${esc(it.name)}を1減らす" ${dis}>−</button>
@@ -978,7 +982,7 @@ function addPicker() {
   const active = q || S.cat || S.big;
   let list = '';
   if (active) {
-    const hits = S.items.filter(it => carried(it, S.store) && (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+    const hits = S.items.filter(it => !it.ended && carried(it, S.store) && (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
     const shown = hits.slice(0, 60);
     list = hits.length ? `<div class="list">${shown.map(it => {
       const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
@@ -1101,7 +1105,7 @@ function orderRow(o) {
 }
 
 const itemRow = it => `<div class="row${canEdit() ? ' has-grip' : ''}" data-row="${it.id}">${canEdit() ? `<button type="button" class="grip" data-grip="${it.id}" aria-label="${esc(it.name)}を並べ替え">⋮⋮</button>` : ''}<div><div class="name">${esc(it.name)}</div>
-    <div class="sub">${it.sample ? '<span class="pill sample">サンプル</span>' : ''}<span>${esc(it.category || 'その他')}</span><span>${esc(dealerOf(it.dealerId)?.name || 'ディーラー未設定')}</span><span>${yen(num(it.price))}/${esc(it.unit)}</span></div></div>
+    <div class="sub">${it.ended ? '<span class="pill ended">取扱終了</span>' : ''}${it.sample ? '<span class="pill sample">サンプル</span>' : ''}<span>${esc(it.category || 'その他')}</span><span>${esc(dealerOf(it.dealerId)?.name || 'ディーラー未設定')}</span><span>${yen(num(it.price))}/${esc(it.unit)}</span></div></div>
     <button type="button" class="btn small" id="ed-${it.id}" data-act="edit" data-id="${it.id}" ${canEdit() ? '' : 'disabled'}>編集</button></div>`;
 function itemList() {
   const q = S.q.trim().toLowerCase();
@@ -1185,6 +1189,7 @@ function itemForm() {
     <input type="file" id="jan-file" accept="image/&#42;" capture="environment" hidden>
     <label id="f-newc-w" ${it.category === '__new' ? '' : 'hidden'}>新しいカテゴリ名<input class="field" id="f-newc" autocomplete="off"></label>
     <label id="f-newd-w" ${it.dealerId === '__new' ? '' : 'hidden'}>新しいディーラー名<input class="field" id="f-newd" autocomplete="off"></label>
+    <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="f-ended" ${it.ended ? 'checked' : ''} style="width:20px;height:20px">取扱終了（発注しない・在庫は残せる）</label>
     <div class="levels">
       <span class="lv-h">店舗</span><span class="lv-h">発注点</span><span class="lv-h">適正在庫</span>
       ${STORES.map(s => `<span class="lv-s">${esc(s.short)}</span><input class="field" id="f-min-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の発注点" value="${it.min?.[s.id] ?? ''}" ${it.id && !lvStores().includes(s.id) ? 'disabled' : ''}><input class="field" id="f-par-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の適正在庫" value="${it.par?.[s.id] ?? ''}" ${it.id && !lvStores().includes(s.id) ? 'disabled' : ''}>`).join('')}
@@ -1204,7 +1209,7 @@ function readForm() {
   const it = S.editing;
   it.name = $('f-name').value; it.category = $('f-cat').value === '__new' ? $('f-newc').value.trim() || '__new' : $('f-cat').value; it.unit = $('f-unit').value;
   it.dealerId = $('f-dealer').value; it.price = num($('f-price').value);
-  it.newDealer = $('f-newd').value; it.jan = $('f-jan').value.replace(/[^0-9,]/g, '');
+  it.newDealer = $('f-newd').value; it.ended = !!($('f-ended') && $('f-ended').checked); it.jan = $('f-jan').value.replace(/[^0-9,]/g, '');
   it.min = {}; it.par = {};
   STORES.forEach(s => { const a = $(`f-min-${s.id}`).value, b = $(`f-par-${s.id}`).value; if (a !== '' || b !== '') { it.min[s.id] = num(a); it.par[s.id] = num(b); } });
 }
@@ -1225,6 +1230,7 @@ async function saveItem() {
     const ref = it.id ? S.db.doc('items/' + it.id) : S.db.collection('items').doc();
     const data = { name, category: it.category.trim(), unit: it.unit.trim(), dealerId: did, price: it.price, min: it.min, par: it.par, jan: it.jan || '', createdAt: it.createdAt || Date.now() };
     if (it.sample) data.sample = true;
+    if (it.ended) data.ended = true;
     let reqRows = [];
     if (it.id && !isBoss()) {
       const orig = S.items.find(x => x.id === it.id) || {};
@@ -1762,7 +1768,7 @@ start();
   function card(it, store, top) {
     const stores = STORES, u = esc(uTxt(it.unit));
     const cells = stores.filter(sx => sx.id === store || carried(it, sx.id)).map(sx => `<span class="${sx.id === store ? 'cur' : ''}">${esc(sx.short)} <b>${qtyOf(sx.id, it.id)}</b>${u}</span>`).join('');
-    return `<div class="vitem${top ? ' top' : ''}"><div class="vname">${esc(it.name)}</div><div class="vqty">${cells}</div></div>`;
+    return `<div class="vitem${top ? ' top' : ''}"><div class="vname">${esc(it.name)}${it.ended ? ' <span class="pill ended">取扱終了</span>' : ''}</div><div class="vqty">${cells}</div></div>`;
   }
   function show(raw, talk) {
     const r = search(raw), res = $('vres'), st = $('vstat');
