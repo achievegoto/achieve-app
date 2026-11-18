@@ -441,7 +441,7 @@ function periodTarget(pids, dates, k) { /* 月目標を営業日（水〜日）�
 }
 function retailRows(pids, dates) {
   const set = new Set(pids), acc = {}; let src = 0;
-  const add = (r, p) => { if (!set.has(p) || r.m === 'EC連携') return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
+  const add = (r, p) => { if (!set.has(p)) return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
   if (S.dp === 'm') { const ym = dates[0].slice(0, 7), mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
@@ -478,7 +478,6 @@ function dailyView() {
   }
   /* 店販 商品別 */
   let rt = retailRows(pids, dates); let rtNote = '';
-  if (!rt && S.dp === 'm' && S.dsc === 'ALL' && S.retail['m_' + ym]) { rt = (S.retail['m_' + ym].items || []).map(a => ({ mid: a.m, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 })).filter(x => x.mid !== 'EC連携'); rtNote = '（全店合計のみ）'; }
   let rhtml = '';
   if (rt) {
     const q = S.rq.trim().toLowerCase(); const items = rt.filter(x => x.qty && (!q || (x.name + ' ' + x.mid).toLowerCase().includes(q)));
@@ -490,7 +489,7 @@ function dailyView() {
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
   } else rhtml = `<section class="card"><div class="empty" style="padding:10px">この期間の店販（商品別）はまだありません</div></section>`;
   return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, `${scopeName}｜${label}`)}${monthLine}${table}${rhtml}
-    <div class="sub">サロンアンサー（明細担当・税抜・EC除く）から毎日自動で取り込み。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
+    <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
 async function importRetail() {
