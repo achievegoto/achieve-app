@@ -67,6 +67,7 @@ button.row:hover { background: var(--bg); }
 .name { font-weight: 500; overflow-wrap: anywhere; }
 .sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.pill.p-main { background: var(--accent); color: var(--accent-ink); font-size: 12px; padding: 2px 10px; }
 .p-none { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 .p-lectured, .p-redo { background: var(--info-soft); color: var(--info); }
 .p-requested { background: var(--warn-soft); color: var(--warn); }
@@ -524,9 +525,9 @@ function listView() {
     const pend = pendingOf(e.id).length;
     const steps = [['前撮り', e.maedori === 'yes' ? 'on' : e.maedori === 'no' ? 'off' : ''], ['7月LINE', e.lineJul ? 'on' : ''], ['8月LINE', e.lineAug ? 'on' : ''], ['打合せ', e.meetDate ? 'on' : '']];
     return `<button type="button" class="row ent" data-act="open" data-id="${e.id}">
-      <div style="min-width:0"><div class="name">${esc(e.name)} ${prioTag(e)}${e.notes > 0 ? ` <span class="pill p-std">📝${e.notes}</span>` : ''}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
+      <div style="min-width:0"><div class="name">${esc(e.name)} ${e.mainStaff ? `<span class="pill p-main">担当 ${esc(e.mainStaff)}</span> ` : ''}${prioTag(e)}${e.notes > 0 ? ` <span class="pill p-std">📝${e.notes}</span>` : ''}${e.photos > 0 ? ` <span class="pill p-std">📷${e.photos}</span>` : ''}${pend ? ' <span class="pill p-requested">申請中</span>' : ''}</div>
         <div class="sub"><span>${esc((e.menus || []).join('・') || 'メニュー未定')}</span><span>${esc(e.venue || '会場未定')}</span>${e.school ? `<span>${esc(e.school)}</span>` : ''}${e.route === 'gofuku' ? `<span>紹介：${esc(e.gofuku || '呉服屋さん')}</span>` : e.route === 'parent' ? '<span>親の紹介</span>' : ''}${e.booker ? `<span>受付 ${esc(e.booker)}</span>` : ''}</div>
-        ${e.mainStaff || e.stHair || e.stMake || e.stKitsuke ? `<div class="sub">${[['普段', e.mainStaff], ['ヘア', e.stHair], ['メイク', e.stMake], ['着付', e.stKitsuke]].filter(x => x[1]).map(([l, n]) => `<span>${l}：${esc(n)}</span>`).join('')}</div>` : ''}
+        ${e.stHair || e.stMake || e.stKitsuke ? `<div class="sub">${[['ヘア', e.stHair], ['メイク', e.stMake], ['着付', e.stKitsuke]].filter(x => x[1]).map(([l, n]) => `<span>${l}：${esc(n)}</span>`).join('')}</div>` : ''}
         <div class="steps">${steps.map(([l, c]) => `<span class="st ${c}">${l}</span>`).join('')}</div></div>
       <span class="sub">${e.meetDate ? '打合せ ' + md(e.meetDate) : ''}</span></button>`;
   }).join('');
