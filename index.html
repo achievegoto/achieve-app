@@ -1061,7 +1061,7 @@ function logCard() {
 function viewHistory() {
   const n = new Date(), base = new Date(n.getFullYear(), n.getMonth() + (S.monthOff || 0), 1);
   const y = base.getFullYear(), m = base.getMonth();
-  const rows = ['カラー', 'パーマ全般', 'Aujua店販', 'Aujua業務', 'インプレア', 'スタイリング剤', '美容器具', 'その他業務', 'その他消耗品'], t = {};
+  const rows = GROUPS.map(g => g[0]), t = {};
   rows.forEach(r => { t[r] = {}; STORES.forEach(st => t[r][st.id] = 0); });
   for (const o of S.orders) {
     const d = new Date(o.orderedAt); if (d.getFullYear() !== y || d.getMonth() !== m) continue;
