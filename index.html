@@ -168,6 +168,9 @@ label .field { font-size: 15px; color: var(--ink); }
 .bk-row.bad input { border-color: #d33; }
 .bk-bar { position: sticky; bottom: 0; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); display: flex; gap: 8px; align-items: center; z-index: 3; border-top: 1px solid var(--line); }
 .bk-stores { display: flex; gap: 6px; flex-wrap: wrap; }
+.lvreq .lvr { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.lvreq ul { margin: 6px 0; padding-left: 18px; font-size: 13px; }
+.lvreq li { margin: 2px 0; }
 .head-r { display: flex; align-items: center; gap: 8px; flex: none; }
 .brand-row .brand { min-width: 0; }
 @media (max-width: 460px) { .brand small { display: none; } .brand-row .brand { font-size: 17px; letter-spacing: .03em; } #vbtn { padding: 0 10px 0 8px; } .head-r { gap: 6px; } }
@@ -431,6 +434,28 @@ let lockT;
 let pinT = 0;
 function armPin() { clearTimeout(pinT); if (S.pin) pinT = setTimeout(() => { S.pin = ''; S.editing = null; if (S.tab === 'items') scheduleRender(); }, 600000); }
 const canEdit = () => !S._ro && WHO.isAdmin();
+const isBoss = () => !!(window.WHO && WHO.isOwner && WHO.isOwner());
+const canReq = () => !S._ro && !!(window.WHO && WHO.me);
+const pendingLv = () => (S.lvReqs || []).filter(r => r.status === 'pending');
+/* 発注点・適正の変更行 → 申請 or 即反映 */
+function lvRowsText(rows) { const f = v => v === '' || v == null ? '－' : v; return rows.map(r => `${r.name}（${storeOf(r.store).short}）発注点 ${f(r.oldMin)}→${f(r.min)}／適正 ${f(r.oldPar)}→${f(r.par)}`); }
+async function applyLv(rows) {
+  const FV = firebase.firestore.FieldValue, by = {};
+  rows.forEach(r => { const u = by[r.id] ||= {}; if (r.min === '' && r.par === '') { u['min.' + r.store] = FV.delete(); u['par.' + r.store] = FV.delete(); } else { u['min.' + r.store] = num(r.min); u['par.' + r.store] = num(r.par); } });
+  const ids = Object.keys(by);
+  for (let i = 0; i < ids.length; i += 400) { const b = S.db.batch(); ids.slice(i, i + 400).forEach(id => b.update(S.db.doc('items/' + id), by[id])); await b.commit(); }
+  return ids.length;
+}
+async function requestLv(rows) {
+  const me = WHO.me || {};
+  await S.db.collection('item_req').add({ rows, status: 'pending', at: Date.now(), by: me.id || '', byName: me.name || '' });
+}
+function lvReqCard() {
+  const P = pendingLv(); if (!P.length) return '';
+  if (isBoss()) return `<section class="card lvreq"><div class="card-head"><h3>発注点・適正の変更申請</h3><span class="sub">${P.length}件</span></div>${P.map(r => `<div class="lvr"><div class="sub"><b>${esc(r.byName || '')}</b>　${dateStr(r.at)}</div><ul>${lvRowsText(r.rows || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul><div class="actions"><button type="button" class="btn small primary" data-act="lvOk" data-id="${r.id}">承認して反映</button><button type="button" class="btn small" data-act="lvNg" data-id="${r.id}">却下</button></div></div>`).join('')}</section>`;
+  const mine = P.filter(r => r.by === (WHO.me || {}).id);
+  return mine.length ? `<div class="note">発注点・適正の変更を${mine.length}件申請中です（後藤さんの承認で反映されます）。</div>` : '';
+}
 const pinBar = () => S.readOnly ? '' : WHO.isAdmin() ? '<div class="pinbar open"><span style="flex:1;min-width:0"><b>管理者として商品を編集できます</b></span></div>' : '<div class="pinbar"><span style="flex:1;min-width:0"><b>商品の編集は管理者だけです</b></span></div>';
 const pinBarOld = () => S.readOnly ? '' : S.pin
   ? `<div class="pinbar open"><span style="flex:1;min-width:0"><b>商品を編集できます</b><br>10分操作がないと自動でロックします</span><button type="button" class="btn small" id="pin-lock" data-act="pinLock">ロックする</button></div>`
@@ -464,7 +489,7 @@ function shell() {
   { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing); }
   $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${s.id === S.store}">${esc(s.short)}</button>`).join('');
   const n = S.ready.size === 4 ? shortItems(S.store).length : 0;
-  $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
+  $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}${id === 'items' && isBoss() && pendingLv().length ? `<span class="badge">${pendingLv().length}</span>` : ''}</button>`).join('');
 }
 function notes() {
   let h = '';
@@ -1092,18 +1117,18 @@ function bulkView() {
   const list = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
   const g = {}; list.forEach(it => (g[it.category || 'その他'] ||= []).push(it));
   const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size;
-  return `<section class="card"><div class="card-head"><h3>発注点・適正をまとめて編集</h3></div>
-    <div class="sub">数字を入れて「次へ」（Enter）で下の欄へ進みます。変えた行に ● が付きます。最後に「まとめて保存」。</div>
+  return `<section class="card"><div class="card-head"><h3>${isBoss() ? '発注点・適正をまとめて編集' : '発注点・適正の変更を申請'}</h3></div>
+    <div class="sub">数字を入れて「次へ」（Enter）で下の欄へ進みます。変えた行に ● が付きます。最後に「${isBoss() ? 'まとめて保存' : 'まとめて申請'}」${isBoss() ? '' : '（後藤さんの承認で反映されます）'}。</div>
     <div class="bk-stores" role="group" aria-label="店舗"><button type="button" class="chip" data-act="bulkStore" data-id="all" aria-pressed="${st === 'all'}">全店共通（hair・Liss・till）</button>${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>
   </section>
   <div class="tools"><input class="field" id="isearch" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">${catChips(false, true)}</div>
   ${list.length ? `${st === 'all' ? '<div class="sub">全店共通：hair design・Liss・till の3店に同じ数字を入れます（TONARI在庫は別）。「バラバラ」は店ごとに違う数字が入っている欄で、触らなければそのままです。</div>' : ''}<div class="bk-head"><span>${st === 'all' ? '全店共通' : esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
   ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const A = st === 'all' ? bulkValAll(it, 'min') : { v: bulkVal(st, it, 'min') }, B = st === 'all' ? bulkValAll(it, 'par') : { v: bulkVal(st, it, 'par') }, a = A.v, b = B.v, ch = st === 'all' ? ALL3.some(x => (x + '|' + it.id) in S.bulkVals) : (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
     return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}" ${A.mixed ? 'placeholder="バラバラ"' : ''}><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}" ${B.mixed ? 'placeholder="バラバラ"' : ''}></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
-  <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>まとめて保存${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
+  <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>${isBoss() ? 'まとめて保存' : 'まとめて申請'}${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
 }
 function viewItems() {
-  if (S.bulk && canEdit()) return bulkView();
+  if (S.bulk && canReq()) return bulkView();
   if (S.editing && canEdit()) return itemForm();
   const hasSample = S.items.some(i => i.sample) || S.dealers.some(d => d.sample);
   const dis = canEdit() ? '' : 'disabled';
@@ -1118,7 +1143,7 @@ function viewItems() {
     <button type="button" class="btn small danger" id="dd-${d.id}" data-act="delDealer" data-id="${d.id}" ${used || S.readOnly ? 'disabled' : ''} ${used ? 'title="使用中の商品があるため削除できません"' : ''}>削除</button></div>`;
   }).join('');
   return `${pinBar()}${sampleBar}
-  <div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button><button type="button" class="btn" data-act="bulkOpen" ${dis}>発注点・適正をまとめて編集</button></div>
+  ${lvReqCard()}<div class="actions"><button type="button" class="btn primary" id="new-item" data-act="newItem" ${dis}>商品を追加</button><button type="button" class="btn" data-act="bulkOpen" ${canReq() ? '' : 'disabled'}>${isBoss() ? '発注点・適正をまとめて編集' : '発注点・適正の変更を申請'}</button></div>
   <div class="tools">
     <input class="field" id="isearch" type="search" placeholder="商品名で探す（全 ${S.items.length} 点）" aria-label="商品名で探す" value="${esc(S.q)}">
     ${catChips(false, true)}
@@ -1198,10 +1223,18 @@ async function saveItem() {
     const ref = it.id ? S.db.doc('items/' + it.id) : S.db.collection('items').doc();
     const data = { name, category: it.category.trim(), unit: it.unit.trim(), dealerId: did, price: it.price, min: it.min, par: it.par, jan: it.jan || '', createdAt: it.createdAt || Date.now() };
     if (it.sample) data.sample = true;
+    let reqRows = [];
+    if (it.id && !isBoss()) {
+      const orig = S.items.find(x => x.id === it.id) || {};
+      STORES.forEach(st => { const oMin = orig.min?.[st.id] ?? '', oPar = orig.par?.[st.id] ?? '', nMin = it.min[st.id] ?? '', nPar = it.par[st.id] ?? '';
+        if (String(oMin) !== String(nMin) || String(oPar) !== String(nPar)) reqRows.push({ id: it.id, name, store: st.id, oldMin: oMin, oldPar: oPar, min: nMin, par: nPar }); });
+      data.min = orig.min || {}; data.par = orig.par || {};
+    }
     await ref.set(data);
+    if (reqRows.length) { await requestLv(reqRows); toast('保存しました。発注点・適正は申請しました（後藤さんの承認で反映）'); }
     logChange(it.id ? 'item' : 'itemNew', '', ref.id, null, null, { name, text: it.id ? '商品を編集' : '商品を追加' });
     S.editing = null; S.formErr = ''; S.confirm = '';
-    toast('保存しました'); render();
+    if (!reqRows.length) toast('保存しました'); render();
   } catch (e) { fail(e); }
 }
 
@@ -1316,23 +1349,35 @@ document.addEventListener('click', async ev => {
     case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
-    case 'bulkOpen': if (!canEdit()) break; armPin(); S.bulk = true; S.bulkStore = STORES.some(x => x.id === S.store) ? S.store : 'hair'; S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
+    case 'bulkOpen': if (!canReq()) break; armPin(); S.bulk = true; S.bulkStore = STORES.some(x => x.id === S.store) ? S.store : 'hair'; S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
     case 'bulkStore': S.bulkStore = id; render(); break;
     case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; b.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
     case 'bulkSave': {
-      if (!canEdit()) break; armPin();
-      const ent = Object.entries(S.bulkVals), upd = {};
-      for (const [k, v] of ent) { const [st, iid] = k.split('|'); const it = S.items.find(x => x.id === iid); if (!it) continue;
-        const u = upd[iid] ||= { min: Object.assign({}, it.min || {}), par: Object.assign({}, it.par || {}), name: it.name };
-        const a = 'min' in v ? v.min : (it.min?.[st] ?? ''), b = 'par' in v ? v.par : (it.par?.[st] ?? '');
-        if (a === '' && b === '') { delete u.min[st]; delete u.par[st]; }
-        else { if (num(b) < num(a)) { toast(`${it.name}（${storeOf(st).short}）は適正を発注点以上にしてください`); S.bulkStore = st; render(); return; } u.min[st] = num(a); u.par[st] = num(b); } }
+      if (!canReq()) break; armPin();
+      const rows = [];
+      for (const [k, v] of Object.entries(S.bulkVals)) { const [st, iid] = k.split('|'); const it = S.items.find(x => x.id === iid); if (!it) continue;
+        const oMin = it.min?.[st] ?? '', oPar = it.par?.[st] ?? '';
+        const a = 'min' in v ? v.min : oMin, c = 'par' in v ? v.par : oPar;
+        if (a !== '' && c !== '' && num(c) < num(a)) { toast(`${it.name}（${storeOf(st).short}）は適正を発注点以上にしてください`); S.bulkStore = st; render(); return; }
+        if (a !== '' && c === '' || a === '' && c !== '') { toast(`${it.name}（${storeOf(st).short}）は発注点と適正を両方入れてください`); S.bulkStore = st; render(); return; }
+        rows.push({ id: iid, name: it.name, store: st, oldMin: oMin, oldPar: oPar, min: a, par: c }); }
+      if (!rows.length) break;
       try {
         b.disabled = true;
-        const ids = Object.keys(upd);
-        for (let i = 0; i < ids.length; i += 400) { const b = S.db.batch(); ids.slice(i, i + 400).forEach(iid => b.update(S.db.doc('items/' + iid), { min: upd[iid].min, par: upd[iid].par })); await b.commit(); }
-        logChange('item', '', '', null, null, { name: '発注点・適正をまとめて編集', text: ids.map(i => upd[i].name).join('、').slice(0, 400) });
-        S.bulk = false; S.bulkVals = {}; S.confirm = ''; toast(`${ids.length}商品を保存しました`); render();
+        const nItems = new Set(rows.map(r => r.id)).size;
+        if (isBoss()) { await applyLv(rows); logChange('item', '', '', null, null, { name: '発注点・適正をまとめて編集', text: [...new Set(rows.map(r => r.name))].join('、').slice(0, 400) }); toast(`${nItems}商品を保存しました`); }
+        else { await requestLv(rows); toast(`${nItems}商品の変更を申請しました（後藤さんの承認で反映）`); }
+        S.bulk = false; S.bulkVals = {}; S.confirm = ''; render();
+      } catch (e) { fail(e); b.disabled = false; }
+      break;
+    }
+    case 'lvOk': case 'lvNg': {
+      if (!isBoss()) break; const r = pendingLv().find(x => x.id === id); if (!r) break;
+      try {
+        b.disabled = true;
+        if (act === 'lvOk') { await applyLv(r.rows || []); logChange('item', '', '', null, null, { name: '発注点・適正の申請を承認', text: (r.byName || '') + '：' + [...new Set((r.rows || []).map(x => x.name))].join('、').slice(0, 380) }); }
+        await S.db.doc('item_req/' + id).update({ status: act === 'lvOk' ? 'approved' : 'rejected', decidedAt: Date.now(), decidedBy: (WHO.me || {}).name || '' });
+        toast(act === 'lvOk' ? '承認して反映しました' : '却下しました');
       } catch (e) { fail(e); b.disabled = false; }
       break;
     }
@@ -1381,7 +1426,7 @@ document.addEventListener('input', ev => {
     });
     const row = el.closest('.bk-row'), a = row.querySelector('[data-bk=min]').value, b = row.querySelector('[data-bk=par]').value;
     row.classList.toggle('changed', stores.some(st => (st + '|' + el.dataset.id) in S.bulkVals)); row.classList.toggle('bad', a !== '' && b !== '' && Number(b) < Number(a));
-    const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = 'まとめて保存' + (n ? `（${n}件）` : ''); }
+    const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = (isBoss() ? 'まとめて保存' : 'まとめて申請') + (n ? `（${n}件）` : ''); }
   }
 });
 document.addEventListener('keydown', ev => {
@@ -1643,6 +1688,7 @@ function listen(fs) {
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
   fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; } }); S.draft = d; S.draftExtra = ex; scheduleRender(); }, () => {});
+  fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
   fs.collection('stock').onSnapshot(s => {
