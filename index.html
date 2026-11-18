@@ -492,7 +492,7 @@ function render() {
 }
 /* ---- 日曜19時の発注締め：発注済みになっていない発注があれば警告 ---- */
 const DUE_STORES = ['hair', 'liss', 'till'];
-function dueWindow() { const d = new Date(), w = d.getDay(), m = d.getHours() * 60 + d.getMinutes(); return (w === 0 && m >= 18 * 60 + 30) || w === 1 || w === 2 || (w === 3 && m < 10 * 60); } /* 日曜18:30〜水曜10:00 */
+function dueWindow() { const d = new Date(), w = d.getDay(), m = d.getHours() * 60 + d.getMinutes(); return (w === 0 && m >= 18 * 60 + 30) || w === 1 || w === 2 || (w === 3 && m < 11 * 60); } /* 日曜18:30〜水曜11:00 */
 function pendingOf(store) {
   const prev = S.store; S.store = store;
   try { return [XFER].concat(S.dealers.map(d => d.id)).filter(did => dealerOf(did) && (linesFor(did).some(r => r.qty > 0) || extraLines(did).length)).map(did => dealerOf(did).name); }
