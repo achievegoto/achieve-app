@@ -422,6 +422,7 @@ function dRange() {
   const d = S.dd || ymdOf(new Date());
   if (S.dp === 'd') return [d];
   if (S.dp === 'w') { const w = wkStart(d); return [0, 1, 2, 3, 4].map(i => addD(w, i)); }
+  if (S.dp === 'y') { const y = Number(d.slice(0, 4)), out = []; for (let m = 1; m <= 12; m++) for (let i = 1; i <= new Date(y, m, 0).getDate(); i++) out.push(`${y}-${pad(m)}-${pad(i)}`); return out; }
   const ym = d.slice(0, 7), [y, m] = ym.split('-').map(Number); const out = []; for (let i = 1; i <= new Date(y, m, 0).getDate(); i++) out.push(`${ym}-${pad(i)}`); return out;
 }
 function scopePids() { const g = GROUP(S.dsc); return g ? g.map(p => p.id) : [S.dsc]; }
@@ -435,6 +436,12 @@ function sumMonth(pids, ym) {
   pids.forEach(p => { const x = D0(p, ym); if (!x) return; any = true; Object.keys(o).forEach(k => o[k] += Number(x[k]) || 0); });
   return any ? o : null;
 }
+const yearYms = y => Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}`);
+function sumYear(pids, y) {
+  const o = { tech: 0, free: 0, retail: 0, cust: 0, newc: 0, buyers: 0 }; let any = false;
+  yearYms(y).forEach(ym => { const m = sumMonth(pids, ym); if (!m) return; any = true; Object.keys(o).forEach(k => o[k] += m[k]); });
+  return any ? o : null;
+}
 function periodTarget(pids, dates, k) { /* 月目標を営業日（水〜日）で割って期間分を合計 */
   let t = 0; dates.forEach(dt => { if (!isOpen(dt)) return; const ym = dt.slice(0, 7); const mt = pids.reduce((a, p) => a + (Number(T0(p, ym)[k]) || 0), 0); t += mt / openDays(ym); }); return t;
 }
@@ -442,6 +449,7 @@ function retailRows(pids, dates) {
   const set = new Set(pids), acc = {}; let src = 0;
   const add = (r, p) => { if (!set.has(p)) return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
   if (S.dp === 'm') { const ym = dates[0].slice(0, 7), mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }
+  else if (S.dp === 'y') { yearYms(dates[0].slice(0, 4)).forEach(ym => { const mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }); }
   else if (S.dp === 'w' && S.rwks[dates[0]] && dates.some(dt => !S.rdays[dt])) { src = 1; (S.rwks[dates[0]].rows || []).forEach(r => add(r, r.p)); }
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
@@ -470,22 +478,33 @@ function ensureDays(yms) {
 function dailyView() {
   if (!S.dd) { const ds = Object.values(S.day).map(x => x.date).filter(Boolean).sort(); S.dd = ds.length ? ds[ds.length - 1] : ymdOf(new Date()); }
   const own = WHO.isOwner(), dates = dRange(), pids = scopePids(), ym = S.dd.slice(0, 7);
-  ensureDays([...new Set(dates.map(d => d.slice(0, 7)))]);
-  const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : `${ymLabel(ym)}の月報`;
-  const cur = S.dp === 'm' ? sumMonth(pids, ym) : sumDays(pids, dates);
+  const yr = S.dd.slice(0, 4);
+  if (S.dp !== 'y') ensureDays([...new Set(dates.map(d => d.slice(0, 7)))]);
+  const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : S.dp === 'y' ? `${yr}年の年間累計` : `${ymLabel(ym)}の月報`;
+  const cur = S.dp === 'm' ? sumMonth(pids, ym) : S.dp === 'y' ? sumYear(pids, yr) : sumDays(pids, dates);
   const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
-  const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
-  const pchips = `<div class="chips">${[['d', '日報'], ['w', '週報（水〜日）'], ['m', '月']].map(([id, l]) => `<button type="button" class="chip" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
+  const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : S.dp === 'y' ? yr + '年' : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
+  const pchips = `<div class="chips">${[['d', '日報'], ['w', '週報（水〜日）'], ['m', '月'], ['y', '年間累計']].map(([id, l]) => `<button type="button" class="chip" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
   const ppl = active().filter(p => !p.ownerOnly || own);
   const schips = `<div class="chips">${AGG.map(([id, l]) => `<button type="button" class="chip" data-act="dsc" data-id="${id}" aria-pressed="${S.dsc === id}">${esc(l)}</button>`).join('')}<select class="field" data-chg="dscSel" style="width:auto;flex:1 1 9em" aria-label="個人"><option value="">個人を選ぶ</option>${ppl.map(p => `<option value="${p.id}" ${S.dsc === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
   /* 月の累計（週報・日報のときの進捗） */
   let monthLine = '';
-  if (S.dp !== 'm') { const mc = sumMonth(pids, ym), mt = pids.reduce((a, p) => a + (Number(T0(p, ym).tech) || 0), 0), pc = pace(ym);
+  if (S.dp === 'y') {
+    const now = nowYm(), yms = yearYms(yr);
+    const tg = ym2 => pids.reduce((a, p) => a + (Number(T0(p, ym2).tech) || 0), 0);
+    const yt = yms.reduce((a, m) => a + tg(m), 0);
+    const paceT = yms.reduce((a, m) => a + (m < now ? tg(m) : m === now ? tg(m) * pace(m).ratio : 0), 0);
+    const yc = cur ? cur.tech : 0;
+    const mrows = yms.map(m => ({ m, d: sumMonth(pids, m), t: tg(m) })).filter(x => x.d || x.t);
+    let cum = 0, cumT = 0;
+    monthLine = `<section class="card"><div class="card-head"><h3>${yr}年の進捗（指名技術）</h3>${yr === now.slice(0, 4) ? `<span class="sub">今日時点の目標 ¥${fmt(paceT, 'yen')}</span>` : ''}</div><div class="dk"><b>¥${fmt(yc, 'yen')}</b>${yt ? `<span class="dk-t">年間目標 ¥${fmt(yt, 'yen')}・<b class="${yc >= (yr === now.slice(0, 4) ? paceT : yt) ? 'ok' : 'ng'}">${Math.round(yc / yt * 100)}%</b></span>${progBar(yc, yt, yr === now.slice(0, 4) && yt ? paceT / yt : 1)}` : ''}</div></section>
+    ${mrows.length ? `<section class="card"><h3>月別（累計）</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>月</th><th>指名技術</th><th>累計</th><th>累計目標</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${mrows.map(({ m, d, t }) => { const v = d ? d.tech : 0; cum += v; cumT += t; return `<tr><td>${Number(m.slice(5))}月</td><td class="cell">${d ? fmt(v, 'yen') : '-'}</td><td class="cell"><b>${fmt(cum, 'yen')}</b></td><td class="cell">${cumT ? fmt(cumT, 'yen') + `<br><span class="${cum >= cumT ? 'ok' : 'ng'}">${Math.round(cum / cumT * 100)}%</span>` : '-'}</td><td class="cell">${d ? fmt(d.free, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.retail, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.cust, 'n') : '-'}</td><td class="cell">${d ? fmt(d.newc, 'n') : '-'}</td></tr>`; }).join('')}</tbody></table></div></section>` : ''}`;
+  } else if (S.dp !== 'm') { const mc = sumMonth(pids, ym), mt = pids.reduce((a, p) => a + (Number(T0(p, ym).tech) || 0), 0), pc = pace(ym);
     if (mc) monthLine = `<section class="card"><div class="card-head"><h3>${ymLabel(ym)}の進捗（指名技術）</h3><span class="sub">${pc.label || ''}</span></div><div class="dk"><b>¥${fmt(mc.tech, 'yen')}</b>${mt ? `<span class="dk-t">月目標 ¥${fmt(mt, 'yen')}・<b class="${mc.tech >= mt * pc.ratio ? 'ok' : 'ng'}">${Math.round(mc.tech / mt * 100)}%</b>（ペース ${Math.round(pc.ratio * 100)}%）</span>${progBar(mc.tech, mt, pc.ratio)}` : ''}</div></section>`; }
   /* 人別の表（全員・店舗のとき） */
   let table = '';
   if (pids.length > 1) {
-    const rows = ppl.filter(p => pids.includes(p.id)).map(p => ({ p, d: S.dp === 'm' ? sumMonth([p.id], ym) : sumDays([p.id], dates) })).filter(x => x.d);
+    const rows = ppl.filter(p => pids.includes(p.id)).map(p => ({ p, d: S.dp === 'm' ? sumMonth([p.id], ym) : S.dp === 'y' ? sumYear([p.id], yr) : sumDays([p.id], dates) })).filter(x => x.d);
     if (own) rows.sort((a, b) => (b.d.tech || 0) - (a.d.tech || 0));
     if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${rows.map(({ p, d }) => `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td><td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td></tr>`).join('')}</tbody></table></div></section>`;
   }
@@ -711,7 +730,7 @@ document.addEventListener('click', async ev => {
       case 'pick': S.pid = id; render(); break;
       case 'dp': S.dp = id; render(); break;
       case 'dsc': S.dsc = id; render(); window.scrollTo(0, 0); break;
-      case 'dnav': { const n = Number(id), d = S.dd || ymdOf(new Date()); S.dd = S.dp === 'd' ? addD(d, n) : S.dp === 'w' ? addD(wkStart(d), 7 * n) : shiftYm(d.slice(0, 7), n) + '-01'; render(); break; }
+      case 'dnav': { const n = Number(id), d = S.dd || ymdOf(new Date()); S.dd = S.dp === 'd' ? addD(d, n) : S.dp === 'w' ? addD(wkStart(d), 7 * n) : S.dp === 'y' ? (Number(d.slice(0, 4)) + n) + d.slice(4, 7) + '-01' : shiftYm(d.slice(0, 7), n) + '-01'; render(); break; }
       case 'metric': S.metric = id; render(); break;
       case 'openP': S.pid = id; S.tab = 'person'; render(); window.scrollTo(0, 0); break;
       case 'saveTg': {
