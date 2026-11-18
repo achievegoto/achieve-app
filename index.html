@@ -436,6 +436,8 @@ function armPin() { clearTimeout(pinT); if (S.pin) pinT = setTimeout(() => { S.p
 const canEdit = () => !S._ro && WHO.isAdmin();
 const isBoss = () => !!(window.WHO && WHO.isOwner && WHO.isOwner());
 const canReq = () => !S._ro && !!(window.WHO && WHO.me);
+const myStore = () => { const st = (WHO.me || {}).store; return STORES.some(x => x.id === st) ? st : ''; };
+const lvStores = () => isBoss() ? STORES.map(x => x.id) : (myStore() ? [myStore()] : []);
 const pendingLv = () => (S.lvReqs || []).filter(r => r.status === 'pending');
 /* 発注点・適正の変更行 → 申請 or 即反映 */
 function lvRowsText(rows) { const f = v => v === '' || v == null ? '－' : v; return rows.map(r => `${r.name}（${storeOf(r.store).short}）発注点 ${f(r.oldMin)}→${f(r.min)}／適正 ${f(r.oldPar)}→${f(r.par)}`); }
@@ -1119,7 +1121,7 @@ function bulkView() {
   const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size;
   return `<section class="card"><div class="card-head"><h3>${isBoss() ? '発注点・適正をまとめて編集' : '発注点・適正の変更を申請'}</h3></div>
     <div class="sub">数字を入れて「次へ」（Enter）で下の欄へ進みます。変えた行に ● が付きます。最後に「${isBoss() ? 'まとめて保存' : 'まとめて申請'}」${isBoss() ? '' : '（後藤さんの承認で反映されます）'}。</div>
-    <div class="bk-stores" role="group" aria-label="店舗"><button type="button" class="chip" data-act="bulkStore" data-id="all" aria-pressed="${st === 'all'}">全店共通（hair・Liss・till）</button>${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>
+    ${isBoss() ? `<div class="bk-stores" role="group" aria-label="店舗"><button type="button" class="chip" data-act="bulkStore" data-id="all" aria-pressed="${st === 'all'}">全店共通（hair・Liss・till）</button>${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>` : `<div class="sub">申請できるのは自分の店舗（<b>${esc(storeOf(st).short)}</b>）の発注点・適正だけです。</div>`}
   </section>
   <div class="tools"><input class="field" id="isearch" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">${catChips(false, true)}</div>
   ${list.length ? `${st === 'all' ? '<div class="sub">全店共通：hair design・Liss・till の3店に同じ数字を入れます（TONARI在庫は別）。「バラバラ」は店ごとに違う数字が入っている欄で、触らなければそのままです。</div>' : ''}<div class="bk-head"><span>${st === 'all' ? '全店共通' : esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
@@ -1185,7 +1187,7 @@ function itemForm() {
     <label id="f-newd-w" ${it.dealerId === '__new' ? '' : 'hidden'}>新しいディーラー名<input class="field" id="f-newd" autocomplete="off"></label>
     <div class="levels">
       <span class="lv-h">店舗</span><span class="lv-h">発注点</span><span class="lv-h">適正在庫</span>
-      ${STORES.map(s => `<span class="lv-s">${esc(s.short)}</span><input class="field" id="f-min-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の発注点" value="${it.min?.[s.id] ?? ''}"><input class="field" id="f-par-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の適正在庫" value="${it.par?.[s.id] ?? ''}">`).join('')}
+      ${STORES.map(s => `<span class="lv-s">${esc(s.short)}</span><input class="field" id="f-min-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の発注点" value="${it.min?.[s.id] ?? ''}" ${it.id && !lvStores().includes(s.id) ? 'disabled' : ''}><input class="field" id="f-par-${s.id}" type="number" min="0" inputmode="numeric" aria-label="${esc(s.short)}の適正在庫" value="${it.par?.[s.id] ?? ''}" ${it.id && !lvStores().includes(s.id) ? 'disabled' : ''}>`).join('')}
     </div>
     <div class="sub">在庫が発注点以下になると、適正在庫までの不足分を発注文に入れます。空欄の店舗は在庫数だけ管理します。その店で扱わない商品は両方 0 にしてください。</div>
     ${S.formErr ? `<div class="err">${esc(S.formErr)}</div>` : ''}
@@ -1226,7 +1228,7 @@ async function saveItem() {
     let reqRows = [];
     if (it.id && !isBoss()) {
       const orig = S.items.find(x => x.id === it.id) || {};
-      STORES.forEach(st => { const oMin = orig.min?.[st.id] ?? '', oPar = orig.par?.[st.id] ?? '', nMin = it.min[st.id] ?? '', nPar = it.par[st.id] ?? '';
+      STORES.filter(st => lvStores().includes(st.id)).forEach(st => { const oMin = orig.min?.[st.id] ?? '', oPar = orig.par?.[st.id] ?? '', nMin = it.min[st.id] ?? '', nPar = it.par[st.id] ?? '';
         if (String(oMin) !== String(nMin) || String(oPar) !== String(nPar)) reqRows.push({ id: it.id, name, store: st.id, oldMin: oMin, oldPar: oPar, min: nMin, par: nPar }); });
       data.min = orig.min || {}; data.par = orig.par || {};
     }
@@ -1349,8 +1351,8 @@ document.addEventListener('click', async ev => {
     case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
-    case 'bulkOpen': if (!canReq()) break; armPin(); S.bulk = true; S.bulkStore = STORES.some(x => x.id === S.store) ? S.store : 'hair'; S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
-    case 'bulkStore': S.bulkStore = id; render(); break;
+    case 'bulkOpen': if (!canReq()) break; if (!isBoss() && !myStore()) { toast('所属店舗が未設定のため申請できません（後藤さんに設定を頼んでください）'); break; } armPin(); S.bulk = true; S.bulkStore = isBoss() ? (STORES.some(x => x.id === S.store) ? S.store : 'hair') : myStore(); S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
+    case 'bulkStore': if (!isBoss()) break; S.bulkStore = id; render(); break;
     case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; b.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
     case 'bulkSave': {
       if (!canReq()) break; armPin();
@@ -1360,6 +1362,7 @@ document.addEventListener('click', async ev => {
         const a = 'min' in v ? v.min : oMin, c = 'par' in v ? v.par : oPar;
         if (a !== '' && c !== '' && num(c) < num(a)) { toast(`${it.name}（${storeOf(st).short}）は適正を発注点以上にしてください`); S.bulkStore = st; render(); return; }
         if (a !== '' && c === '' || a === '' && c !== '') { toast(`${it.name}（${storeOf(st).short}）は発注点と適正を両方入れてください`); S.bulkStore = st; render(); return; }
+        if (!lvStores().includes(st)) continue;
         rows.push({ id: iid, name: it.name, store: st, oldMin: oMin, oldPar: oPar, min: a, par: c }); }
       if (!rows.length) break;
       try {
