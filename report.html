@@ -417,7 +417,7 @@ function retailView() {
   if (!r) body = S.rmode === 'm' ? '<div class="empty">この月の店販データはまだありません</div>' : '';
   else {
     const q = S.rq.trim().toLowerCase();
-    const items = (r.items || []).map(a => ({ mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 })).filter(x => !q || (x.name + ' ' + x.mid).toLowerCase().includes(q));
+    const items = (r.items || []).map(a => Array.isArray(a) ? { mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 } : { mid: a.m, code: a.c, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 }).filter(x => !q || (x.name + ' ' + x.mid).toLowerCase().includes(q));
     const tq = items.reduce((a, x) => a + x.qty, 0), ts = items.reduce((a, x) => a + x.sales, 0);
     const g = {}; items.forEach(x => (g[x.mid || 'その他'] ||= []).push(x));
     const groups = Object.entries(g).map(([m, arr]) => [m, arr.sort((a, b) => b.qty - a.qty || b.sales - a.sales)]).sort((a, b) => b[1].reduce((s, x) => s + x.qty, 0) - a[1].reduce((s, x) => s + x.qty, 0));
@@ -436,7 +436,7 @@ async function importRetail() {
     const o = JSON.parse(decodeURIComponent(h.slice(8)));
     if (!o || !o.key || !Array.isArray(o.items)) throw new Error('形式が違います');
     const kind = o.k === 'd' ? 'day' : 'month';
-    const doc = { kind, items: o.items, asOf: Date.now(), src: 'サロンアンサー 店販売上集計（商品ごと・全店・税抜）', n: o.items.length };
+    const doc = { kind, items: o.items.map(a => Array.isArray(a) ? { m: a[0] || '', c: String(a[1] || ''), n: a[2] || '', q: Number(a[3]) || 0, s: Number(a[4]) || 0 } : a), asOf: Date.now(), src: 'サロンアンサー 店販売上集計（商品ごと・全店・税抜）', n: o.items.length };
     if (kind === 'day') { doc.date = o.key; doc.ym = o.key.slice(0, 7); } else { doc.ym = o.key; doc.from = o.from || ''; doc.to = o.to || ''; }
     await db.doc('mr_retail/' + (kind === 'day' ? 'd_' : 'm_') + o.key).set(doc);
     window.__retailSaved = (kind === 'day' ? 'd_' : 'm_') + o.key + ':' + o.items.length;
