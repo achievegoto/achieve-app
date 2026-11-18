@@ -311,6 +311,84 @@ table.rep td.pos { color: var(--good); } table.rep td.neg { color: var(--bad); }
 table.mlist td.tot { font-weight: 600; }
 .crate { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: 2px 0 10px; font-size: 12px; text-align: left; } .crate b { font-family: var(--font-num); font-size: 17px; font-weight: 500; margin-left: 4px; } .crate small { color: var(--muted); font-size: 11px; margin-left: 4px; } .crate b small { margin-left: 1px; } .crate .cnote { color: var(--muted); font-size: 11px; }
 .ctot { display: flex; gap: 8px; align-items: baseline; margin: 2px 0 10px; font-size: 12px; text-align: left; } .ctot small { color: var(--muted); font-size: 11px; } .ctot b { font-family: var(--font-num); font-size: 22px; font-weight: 500; }
+
+/* ==== 見やすさ改善（2026-11） ==== */
+main { gap: 12px; }
+.card { padding: 14px 14px; gap: 10px; border-radius: 14px; }
+.card h3 { font-size: 15px; }
+.group { gap: 8px; }
+.group h2 { font-size: 13px; color: var(--ink); font-weight: 700; letter-spacing: .04em; align-items: baseline; }
+.group h2 span { font-size: 11px; color: var(--muted); font-weight: 500; }
+/* ヒーロー */
+.hero { padding: 16px; gap: 10px; border-radius: 16px; }
+.hero .sub { color: rgba(255,255,255,.78); font-size: 12px; }
+.hz-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.hero .lv-big { font-size: clamp(30px, 9vw, 40px); }
+.hz-yoy { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; opacity: .9; }
+.hz-yoy b { font-family: var(--font-num); font-size: 20px; font-weight: 500; }
+.hz-split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.hz-c { background: rgba(255,255,255,.12); border-radius: 10px; padding: 8px 9px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hz-c span { font-size: 10.5px; opacity: .85; white-space: nowrap; }
+.hz-c b { font-family: var(--font-num); font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hz-c i { display: block; height: 14px; }
+.hz-goal { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; opacity: .92; }
+.hz-goal b { font-family: var(--font-num); font-size: 18px; font-weight: 500; }
+.hero .hbar { position: relative; overflow: visible; }
+.hero .hbar i { border-radius: 99px; }
+.hero .hbar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; opacity: .9; }
+.hz-note { font-size: 11px; opacity: .72; line-height: 1.5; }
+.hero .dt { font-size: 11px; } .hero .dt.up { color: #a6efc9; } .hero .dt.dn { color: #ffc0b5; }
+.hero .crate { margin: 0; color: rgba(255,255,255,.85); }
+/* KPI（値と比較を同じ行に） */
+.kpis { gap: 10px 14px; }
+.kpi { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 6px; row-gap: 1px; }
+.kpi .kl { grid-column: 1 / -1; }
+.kpi b { font-size: 16px; white-space: nowrap; }
+.kpi .ks { font-size: 10.5px; display: flex; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.kpi .pbar { grid-column: 1 / -1; }
+.scard .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px) { .scard .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ctot { margin: 0; } .crate { margin: 0; }
+/* スタッフ一覧（今月の進捗） */
+.plist { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.prow { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; border: 0; background: transparent; padding: 11px 14px; font: inherit; color: var(--ink); }
+.prow + .prow { border-top: 1px solid var(--line); }
+.prow:hover { background: var(--bg); }
+.prow-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.prow-n { font-weight: 700; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.prow-t { font-family: var(--font-num); font-size: 17px; white-space: nowrap; display: flex; gap: 6px; align-items: baseline; }
+.prow-t .dt { font-size: 11px; }
+.prow-g { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.prow-g b { font-family: var(--font-num); color: var(--ink); font-size: 14px; font-weight: 500; }
+.prow-a.ok { color: var(--good); font-weight: 700; } .prow-a.ng { color: var(--warn); font-weight: 700; }
+.prow-s { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11px; color: var(--muted); }
+.prow-s b { font-family: var(--font-num); color: var(--ink); font-weight: 500; font-size: 12px; }
+/* 切り替え */
+.seg4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; background: var(--surface); border: 1px solid var(--line); padding: 3px; border-radius: 10px; }
+.seg4 button { border: 0; background: transparent; padding: 8px 2px; border-radius: 7px; font-size: 14px; color: var(--muted); }
+.seg4 button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.chips.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; }
+.chips.scroll::-webkit-scrollbar { display: none; }
+.chip { padding: 6px 13px; }
+.chip-sel { width: auto; flex: none; padding: 5px 28px 5px 12px; border-radius: 99px; font-size: 13px; }
+.mnav { gap: 12px; } .mnav b { font-size: 16px; }
+.mnav .btn.small { width: 40px; height: 36px; padding: 0; font-size: 18px; border-radius: 10px; }
+/* 日報 KPI */
+.dk-tot { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; color: var(--muted); }
+.dk-tot b { font-family: var(--font-num); font-size: 22px; color: var(--ink); font-weight: 500; }
+.dkg { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+@media (min-width: 560px) { .dkg { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.dk > b { font-size: 18px; font-weight: 500; }
+.dk-t { font-size: 10.5px; }
+.dk-t b.ng { color: var(--warn); }
+/* 表 */
+table.mx { font-size: 12.5px; }
+table.mx th, table.mx td { padding: 8px 7px; }
+table.mx td.cell { text-align: right; font-variant-numeric: tabular-nums; }
+table.mx td .ok { color: var(--good); font-weight: 700; } table.mx td .ng { color: var(--warn); font-weight: 700; }
+/* 個人の月報 */
+.tiles .tile b { font-size: 18px; }
+.ptop .psel { border-radius: 10px; }
 </style>
 </head>
 <body>
@@ -454,14 +532,15 @@ function retailRows(pids, dates) {
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
 }
-function kpiCard(cur, pids, dates, label) {
-  const own = WHO.isOwner();
+function kpiCard(cur, pids, dates, scope, label) {
   if (!cur) return `<section class="card"><div class="empty">${esc(label)}のデータはまだありません（毎日の自動取得の日から貯まります）</div></section>`;
-  const tot = cur.tech + cur.free + cur.retail;
-  const line = (k, l, unit) => { const tg = periodTarget(pids, dates, k), v = cur[k];
-    return `<div class="dk"><span class="dk-l">${l}</span><b>${unit === 'yen' ? '¥' + fmt(v, 'yen') : fmt(v, 'n') + unit}</b>${tg ? `<span class="dk-t">目標 ${unit === 'yen' ? '¥' + fmt(tg, 'yen') : fmt(tg, 'n') + unit}・<b class="${v >= tg ? 'ok' : 'ng'}">${Math.round(v / tg * 100)}%</b></span>${progBar(v, tg, 1)}` : ''}</div>`; };
-  return `<section class="card"><div class="card-head"><h3>${esc(label)}</h3><span class="sub">総売上 <b style="font-size:18px;color:var(--ink)">¥${fmt(tot, 'yen')}</b></span></div>
-    <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${line('buyers', '店販購入', '人')}</div></section>`;
+  const tot = cur.tech + cur.free + cur.retail, today = ymdOf(new Date()), past = dates.filter(dt => dt <= today);
+  const line = (k, l, unit) => { const tg = periodTarget(pids, dates, k), tgNow = past.length < dates.length ? periodTarget(pids, past, k) : tg, v = cur[k];
+    const f = x => unit === 'yen' ? '¥' + fmt(x, 'yen') : fmt(x, 'n') + unit;
+    return `<div class="dk"><span class="dk-l">${l}</span><b>${f(v)}</b>${tg ? `<span class="dk-t">目標 ${f(tg)}・<b class="${v >= tgNow ? 'ok' : 'ng'}">${Math.round(v / tg * 100)}%</b></span>${progBar(v, tg, tgNow / tg)}` : ''}</div>`; };
+  const hasBuy = cur.buyers > 0 || dates[0] >= '2026-11-01';
+  return `<section class="card"><div class="card-head"><div><h3>${esc(scope)}</h3><div class="sub">${esc(label)}</div></div><div class="dk-tot"><span>総売上</span><b>¥${fmt(tot, 'yen')}</b></div></div>
+    <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${hasBuy ? line('buyers', '店販購入', '人') : ''}</div></section>`;
 }
 /* 古い月の日報データは見るときだけ読み込む */
 const DAYS = { since: '9999-99', oldD: {}, oldR: {}, liveD: {}, liveR: {}, done: new Set(), wk: new Set() };
@@ -484,9 +563,9 @@ function dailyView() {
   const cur = S.dp === 'm' ? sumMonth(pids, ym) : S.dp === 'y' ? sumYear(pids, yr) : sumDays(pids, dates);
   const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
   const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : S.dp === 'y' ? yr + '年' : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
-  const pchips = `<div class="chips">${[['d', '日報'], ['w', '週報（水〜日）'], ['m', '月'], ['y', '年間累計']].map(([id, l]) => `<button type="button" class="chip" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
+  const pchips = `<div class="seg4">${[['d', '日報'], ['w', '週報'], ['m', '月'], ['y', '年間']].map(([id, l]) => `<button type="button" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
   const ppl = active().filter(p => !p.ownerOnly || own);
-  const schips = `<div class="chips">${AGG.map(([id, l]) => `<button type="button" class="chip" data-act="dsc" data-id="${id}" aria-pressed="${S.dsc === id}">${esc(l)}</button>`).join('')}<select class="field" data-chg="dscSel" style="width:auto;flex:1 1 9em" aria-label="個人"><option value="">個人を選ぶ</option>${ppl.map(p => `<option value="${p.id}" ${S.dsc === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
+  const schips = `<div class="chips scroll">${AGG.map(([id, l]) => `<button type="button" class="chip" data-act="dsc" data-id="${id}" aria-pressed="${S.dsc === id}">${esc(l.replace(' 全体', ''))}</button>`).join('')}<select class="field chip-sel" data-chg="dscSel" aria-label="個人"><option value="">個人を選ぶ</option>${ppl.map(p => `<option value="${p.id}" ${S.dsc === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
   /* 月の累計（週報・日報のときの進捗） */
   let monthLine = '';
   if (S.dp === 'y') {
@@ -497,10 +576,10 @@ function dailyView() {
     const yc = cur ? cur.tech : 0;
     const mrows = yms.map(m => ({ m, d: sumMonth(pids, m), t: tg(m) })).filter(x => x.d || x.t);
     let cum = 0, cumT = 0;
-    monthLine = `<section class="card"><div class="card-head"><h3>${yr}年の進捗（指名技術）</h3>${yr === now.slice(0, 4) ? `<span class="sub">今日時点の目標 ¥${fmt(paceT, 'yen')}</span>` : ''}</div><div class="dk"><b>¥${fmt(yc, 'yen')}</b>${yt ? `<span class="dk-t">年間目標 ¥${fmt(yt, 'yen')}・<b class="${yc >= (yr === now.slice(0, 4) ? paceT : yt) ? 'ok' : 'ng'}">${Math.round(yc / yt * 100)}%</b></span>${progBar(yc, yt, yr === now.slice(0, 4) && yt ? paceT / yt : 1)}` : ''}</div></section>
+    monthLine = `<section class="card"><div class="card-head"><h3>指名技術の年間進捗</h3>${yr === now.slice(0, 4) ? `<span class="sub">今日時点の目標 ¥${fmt(paceT, 'yen')}</span>` : ''}</div><div class="dk"><b>¥${fmt(yc, 'yen')}</b>${yt ? `<span class="dk-t">年間目標 ¥${fmt(yt, 'yen')}・<b class="${yc >= (yr === now.slice(0, 4) ? paceT : yt) ? 'ok' : 'ng'}">${Math.round(yc / yt * 100)}%</b></span>${progBar(yc, yt, yr === now.slice(0, 4) && yt ? paceT / yt : 1)}` : ''}</div></section>
     ${mrows.length ? `<section class="card"><h3>月別（累計）</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>月</th><th>指名技術</th><th>累計</th><th>累計目標</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${mrows.map(({ m, d, t }) => { const v = d ? d.tech : 0; cum += v; cumT += t; return `<tr><td>${Number(m.slice(5))}月</td><td class="cell">${d ? fmt(v, 'yen') : '-'}</td><td class="cell"><b>${fmt(cum, 'yen')}</b></td><td class="cell">${cumT ? fmt(cumT, 'yen') + `<br><span class="${cum >= cumT ? 'ok' : 'ng'}">${Math.round(cum / cumT * 100)}%</span>` : '-'}</td><td class="cell">${d ? fmt(d.free, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.retail, 'yen') : '-'}</td><td class="cell">${d ? fmt(d.cust, 'n') : '-'}</td><td class="cell">${d ? fmt(d.newc, 'n') : '-'}</td></tr>`; }).join('')}</tbody></table></div></section>` : ''}`;
   } else if (S.dp !== 'm') { const mc = sumMonth(pids, ym), mt = pids.reduce((a, p) => a + (Number(T0(p, ym).tech) || 0), 0), pc = pace(ym);
-    if (mc) monthLine = `<section class="card"><div class="card-head"><h3>${ymLabel(ym)}の進捗（指名技術）</h3><span class="sub">${pc.label || ''}</span></div><div class="dk"><b>¥${fmt(mc.tech, 'yen')}</b>${mt ? `<span class="dk-t">月目標 ¥${fmt(mt, 'yen')}・<b class="${mc.tech >= mt * pc.ratio ? 'ok' : 'ng'}">${Math.round(mc.tech / mt * 100)}%</b>（ペース ${Math.round(pc.ratio * 100)}%）</span>${progBar(mc.tech, mt, pc.ratio)}` : ''}</div></section>`; }
+    if (mc) monthLine = `<section class="card"><div class="card-head"><h3>${Number(ym.slice(5))}月の指名技術</h3><span class="sub">${pc.label || ''}</span></div><div class="dk"><b>¥${fmt(mc.tech, 'yen')}</b>${mt ? `<span class="dk-t">月目標 ¥${fmt(mt, 'yen')}・<b class="${mc.tech >= mt * pc.ratio ? 'ok' : 'ng'}">${Math.round(mc.tech / mt * 100)}%</b>（ペース ${Math.round(pc.ratio * 100)}%）</span>${progBar(mc.tech, mt, pc.ratio)}` : ''}</div></section>`; }
   /* 人別の表（全員・店舗のとき） */
   let table = '';
   if (pids.length > 1) {
@@ -520,7 +599,7 @@ function dailyView() {
       <input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す"></section>
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
   } else rhtml = `<section class="card"><div class="empty" style="padding:10px">${S.dp === 'd' && dates[0] < '2026-11-01' ? 'この日の店販（商品別）はありません。週報・月で見られます' : 'この期間の店販（商品別）はまだありません'}</div></section>`;
-  return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, `${scopeName}｜${label}`)}${monthLine}${table}${rhtml}
+  return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, scopeName.replace(' 全体', ''), label)}${monthLine}${table}${rhtml}
     <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
@@ -597,20 +676,23 @@ function monthView() {
   const tot = k => staffP.reduce((a, p) => a + (val(D(p.id, ym), k) || 0), 0), totP = k => staffP.reduce((a, p) => a + (val(D(p.id, py), k) || 0), 0) * pc.ratio;
   const tTot = staffP.reduce((a, p) => a + (Number(T(p.id, ym).tech) || 0), 0);
   const all = tot('tech') + tot('free') + tot('retail'), allP = totP('tech') + totP('free') + totP('retail');
-  const line = (k, l) => `<div class="lv-free"><span>${l}</span><b>¥${fmt(tot(k), 'yen')}</b>${totP(k) ? diffTag(tot(k), totP(k), k) : ''}</div>`;
-  const head = `<section class="hero"><div class="hero-top"><div><div class="sub">${ymLabel(ym)}の総売上（全員）</div><div class="lv-big">¥${fmt(all, 'yen')}</div>${line('tech', '指名技術')}${line('free', 'フリー技術')}${line('retail', '店販')}${costTag('ALL', D('ALL', ym), ym)}</div>
-      <div class="lv-side"><span>前年同月${pc.ratio < 1 ? '（同じ日数分）' : ''} ¥${fmt(allP, 'yen')}</span><span>昨対 <b>${yoy(all, allP) == null ? '—' : yoy(all, allP).toFixed(1) + '%'}</b></span>${tTot ? `<span>指名技術の目標達成 <b>${(tot('tech') / tTot * 100).toFixed(0)}%</b></span>` : ''}</div></div>
-      ${tTot ? `<div class="hbar"><i style="width:${Math.min(100, tot('tech') / tTot * 100)}%"></i></div>` : ''}
-      <div class="sub">${pc.label ? pc.label + 'のデータです。売上・客数の昨対は、前年同月を同じ日数分に換算して比べています。' : (S.meta[ym] && S.meta[ym].asOf ? '月末までのデータです。' : '')}${S.meta[ym] && S.meta[ym].src ? ' 取り込み元：' + esc(S.meta[ym].src) : ''}</div></section>`;
+  const cell = (k, l) => `<div class="hz-c"><span>${l}</span><b>¥${fmt(tot(k), 'yen')}</b>${totP(k) ? diffTag(tot(k), totP(k), k) : '<i></i>'}</div>`;
+  const yv = yoy(all, allP), ach = tTot ? tot('tech') / tTot * 100 : 0;
+  const head = `<section class="hero"><div class="sub">${ymLabel(ym)}の総売上（全員）</div>
+      <div class="hz-main"><div class="lv-big">¥${fmt(all, 'yen')}</div>${yv == null ? '' : `<div class="hz-yoy"><span>昨対${pc.ratio < 1 ? '（同日数）' : ''}</span><b>${yv >= 0 ? '+' : ''}${yv.toFixed(1)}%</b></div>`}</div>
+      <div class="hz-split">${cell('tech', '指名技術')}${cell('free', 'フリー技術')}${cell('retail', '店販')}</div>
+      ${tTot ? `<div class="hz-goal"><span>指名技術の目標 ¥${fmt(tTot, 'yen')}</span><b>${ach.toFixed(0)}%</b></div><div class="hbar"><i style="width:${Math.min(100, ach)}%"></i>${pc.ratio < 1 ? `<b style="left:${pc.ratio * 100}%"></b>` : ''}</div>` : ''}
+      ${costTag('ALL', D('ALL', ym), ym)}
+      <div class="hz-note">${pc.label ? pc.label + 'のデータ。昨対は前年同月を同じ日数分に換算しています。' : (S.meta[ym] && S.meta[ym].asOf ? '月末までのデータです。' : '')}${allP ? ` 前年同月 ¥${fmt(allP, 'yen')}` : ''}</div></section>`;
   if (!people.length) return mnav('ym') + head + '<div class="empty">この月のデータはまだありません。</div>';
-  const cards = byStore(people).map(([l, arr]) => `<div class="group"><h2>${esc(l)}</h2>${arr.map(p => {
-    const d = D(p.id, ym) || {}, q = D(p.id, py) || {}, t = T(p.id, ym);
-    const k = (key, label, type) => { const c = val(d, key), pv0 = val(q, key), pv = pv0 != null && ['tech', 'free', 'retail', 'cust', 'newc', 'buyers'].includes(key) ? pv0 * pc.ratio : pv0, y = yoy(c, pv), tg = Number(t[key]) || 0;
-      return `<div class="kpi"><span class="kl">${label}</span><b>${fmt(c, type) || '—'}${type === 'pct' && c != null ? '<small>%</small>' : ''}</b>
-        <span class="ks">${y == null ? '' : `<span class="${y < 0 ? 'neg' : 'pos'}">昨対 ${y.toFixed(0)}%</span>`}${tg ? ` 目標 ${fmt(tg, type)}${type === 'pct' ? '%' : ''}` : ''}</span>${key !== 'next' && tg ? progBar(c || 0, tg, pc.ratio) : ''}</div>`; };
-    return `<button type="button" class="card pcard" data-act="openP" data-id="${p.id}"><div class="card-head"><h3>${esc(p.name)}</h3><span class="sub">${t.tech ? `達成 ${((val(d, 'tech') || 0) / t.tech * 100).toFixed(0)}%` : ''}</span></div>${totTag(d, q, pc.ratio)}
-      <div class="kpis">${k('tech', '指名技術', 'yen')}${k('free', 'フリー技術', 'yen')}${k('retail', '店販売上', 'yen')}${k('cust', '客数', 'n')}${k('unit', '客単価', 'yen')}${k('next', '次予率', 'pct')}${k('newc', '新規', 'n')}</div></button>`;
-  }).join('')}</div>`).join('');
+  const cards = byStore(people).map(([l, arr]) => `<div class="group"><h2>${esc(l)}<span>${arr.length}名</span></h2><div class="plist">${arr.map(p => {
+    const d = D(p.id, ym) || {}, q = D(p.id, py) || {}, t = T(p.id, ym), tc = val(d, 'tech') || 0, tg = Number(t.tech) || 0;
+    const tt = totalOf(d), tq = totalOf(q);
+    const mini = (k, l, ty) => { const v = val(d, k); return v == null ? '' : `<span>${l} <b>${ty === 'yen' ? '¥' : ''}${fmt(v, ty)}${ty === 'pct' ? '%' : ''}</b></span>`; };
+    return `<button type="button" class="prow" data-act="openP" data-id="${p.id}"><div class="prow-top"><span class="prow-n">${esc(p.name)}</span><span class="prow-t">${tt == null ? '—' : '¥' + fmt(tt, 'yen')}${tq ? diffTag(tt, tq * pc.ratio, 'tot') : ''}</span></div>
+      <div class="prow-g"><span>指名技術 <b>¥${fmt(tc, 'yen')}</b></span>${tg ? `<span class="prow-a ${tc >= tg * pc.ratio ? 'ok' : 'ng'}">目標 ¥${fmt(tg, 'yen')}・${Math.round(tc / tg * 100)}%</span>` : ''}</div>${tg ? progBar(tc, tg, pc.ratio) : ''}
+      <div class="prow-s">${mini('free', 'フリー', 'yen')}${mini('retail', '店販', 'yen')}${mini('cust', '客数', 'n')}${mini('unit', '客単価', 'yen')}${mini('next', '次予', 'pct')}${mini('newc', '新規', 'n')}</div></button>`;
+  }).join('')}</div></div>`).join('');
   const storeCards = `<div class="group"><h2>店舗別</h2><div class="stores">${AGG.slice(1).filter(a => GROUP(a[0]).length).map(([gid, l]) => {
     const d = D(gid, ym) || {}, q = D(gid, py) || {}, t = T(gid, ym);
     const one = (k, label, ty) => { const c = val(d, k), pv0 = val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' ? pv0 * pc.ratio : pv0;
@@ -671,14 +753,14 @@ function personView() {
   const csum = yr => { const a = ['tech', 'free', 'retail'].map(k => cum(yr, k)); return a.every(v => v == null) ? null : a.reduce((x, v) => x + (v || 0), 0); }, ct = csum(y), pt = csum(y - 1);
   const tech = val(d, 'tech'), techP = q && q.tech != null ? q.tech * pc.ratio : null;
   const tt = x => x ? (x.tech || 0) + (x.free || 0) + (x.retail || 0) : null, all = tt(d), allP = q ? tt(q) * pc.ratio : null;
-  const line = (k, l) => `<div class="lv-free"><span>${l}</span><b>${val(d, k) == null ? '—' : '¥' + fmt(val(d, k), 'yen')}</b>${q && q[k] != null && val(d, k) != null ? diffTag(val(d, k), q[k] * pc.ratio, k) : ''}</div>`;
-  const hero = `<section class="hero"><div class="hero-top"><div style="min-width:0"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の総売上</div>
-      <div class="lv-big">${all == null ? '—' : '¥' + fmt(all, 'yen')}</div>
-      ${line('tech', '指名技術')}${line('free', 'フリー技術')}${line('retail', '店販')}${costTag(p.id, d, ym)}</div>
-      <div class="lv-side">${allP ? `<span>前年同月 ¥${fmt(allP, 'yen')}</span><span>昨対 <b>${all == null ? '—' : (yoy(all, allP) >= 0 ? '+' : '') + yoy(all, allP).toFixed(1) + '%'}</b></span>` : '<span>前年同月のデータなし</span>'}${t.tech ? `<span>指名技術 目標 ¥${fmt(t.tech, 'yen')}・達成 <b>${((tech || 0) / t.tech * 100).toFixed(0)}%</b></span>` : ''}</div></div>
-      ${t.tech ? `<div class="hbar"><i style="width:${Math.min(100, (tech || 0) / t.tech * 100)}%"></i></div>` : ''}
-      ${ct != null ? `<div class="sub">${y}年1〜${mo}月の総売上累計 ¥${fmt(ct, 'yen')}${pt ? `（前年同期 ¥${fmt(pt, 'yen')}・${(yoy(ct, pt) >= 0 ? '+' : '') + yoy(ct, pt).toFixed(1)}%）` : ''}</div>` : ''}
-      ${pc.label ? `<div class="sub">${pc.label}のデータ。前年は同じ日数分に換算しています。</div>` : ''}</section>`;
+  const cell = (k, l) => `<div class="hz-c"><span>${l}</span><b>${val(d, k) == null ? '—' : '¥' + fmt(val(d, k), 'yen')}</b>${q && q[k] != null && val(d, k) != null ? diffTag(val(d, k), q[k] * pc.ratio, k) : '<i></i>'}</div>`;
+  const yv = all != null && allP ? yoy(all, allP) : null, ach = t.tech ? (tech || 0) / t.tech * 100 : 0;
+  const hero = `<section class="hero"><div class="sub">${esc(storeL)} ・ ${ymLabel(ym)}の総売上</div>
+      <div class="hz-main"><div class="lv-big">${all == null ? '—' : '¥' + fmt(all, 'yen')}</div>${yv == null ? '' : `<div class="hz-yoy"><span>昨対</span><b>${yv >= 0 ? '+' : ''}${yv.toFixed(1)}%</b></div>`}</div>
+      <div class="hz-split">${cell('tech', '指名技術')}${cell('free', 'フリー技術')}${cell('retail', '店販')}</div>
+      ${t.tech ? `<div class="hz-goal"><span>指名技術の目標 ¥${fmt(t.tech, 'yen')}</span><b>${ach.toFixed(0)}%</b></div><div class="hbar"><i style="width:${Math.min(100, ach)}%"></i>${pc.ratio < 1 ? `<b style="left:${pc.ratio * 100}%"></b>` : ''}</div>` : ''}
+      ${costTag(p.id, d, ym)}
+      <div class="hz-note">${ct != null ? `${y}年1〜${mo}月の累計 ¥${fmt(ct, 'yen')}${pt ? `（前年同期比 ${(yoy(ct, pt) >= 0 ? '+' : '') + yoy(ct, pt).toFixed(1)}%）` : ''}` : ''}${allP ? ` ・ 前年同月 ¥${fmt(allP, 'yen')}` : ''}${pc.label ? `<br>${pc.label}のデータ（前年は同じ日数分に換算）` : ''}</div></section>`;
   const tiles = M.filter(([k]) => k !== 'tech' && k !== 'free' && k !== 'over').map(([k, label, type, , noyoy]) => {
     const c = val(d, k), pv0 = noyoy ? val(D(p.id, shiftYm(ym, -1)), k) : val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' && !noyoy ? pv0 * pc.ratio : pv0, tg = Number(t[k]) || 0;
     return `<button type="button" class="tile${S.metric === k ? ' on' : ''}" data-act="metric" data-id="${k}"><span class="kl">${label}</span>
@@ -686,7 +768,7 @@ function personView() {
       <span class="ks">${diffTag(c, pv, k)}<span>${pv0 == null ? '' : noyoy ? '前月比' : '昨対'}</span>${tg ? `<span>目標 ${fmt(tg, type)}${type === 'pct' ? '%' : ''}</span>` : ''}</span>${spark(p.id, ym, k)}</button>`;
   }).join('');
   const mk = M.find(x => x[0] === S.metric) || M[0];
-  const metricChips = `<div class="chips">${M.map(([k, l]) => `<button type="button" class="chip" data-act="metric" data-id="${k}" aria-pressed="${k === mk[0]}">${l}</button>`).join('')}</div>`;
+  const metricChips = `<div class="chips scroll">${M.map(([k, l]) => `<button type="button" class="chip" data-act="metric" data-id="${k}" aria-pressed="${k === mk[0]}">${l}</button>`).join('')}</div>`;
   const list = last12(ym).reverse().map(m => { const a = D(p.id, m), b = D(p.id, shiftYm(m, -12)); if (!a) return '';
     const c = (k, type) => `<td class="c">${val(a, k) == null ? '' : fmt(val(a, k), type)}</td>`;
     const yv = yoy(val(a, 'tech'), val(b, 'tech'));
