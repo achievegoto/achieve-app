@@ -42,7 +42,7 @@ header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; backg
 .head { display: flex; flex-direction: column; gap: 10px; padding-block: 12px; }
 .brand { font-family: var(--font-num); font-size: 20px; letter-spacing: .08em; display: flex; align-items: baseline; gap: 10px; }
 .brand small { font-family: var(--font-body); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
-.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; background: var(--bg); padding: 3px; border-radius: 10px; }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, .8fr); gap: 4px; background: var(--bg); padding: 3px; border-radius: 10px; }
 .seg button { border: 0; background: transparent; padding: 8px 2px; border-radius: 8px; font-family: var(--font-num); font-size: 13px; line-height: 1.25; color: var(--muted); min-width: 0; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
@@ -168,6 +168,17 @@ label .field { font-size: 15px; color: var(--ink); }
 .bk-row.bad input { border-color: #d33; }
 .bk-bar { position: sticky; bottom: 0; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); display: flex; gap: 8px; align-items: center; z-index: 3; border-top: 1px solid var(--line); }
 .bk-stores { display: flex; gap: 6px; flex-wrap: wrap; }
+.alltbl-w { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.alltbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.alltbl th { position: sticky; top: 0; background: var(--surface); font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+.alltbl th:first-child { text-align: left; padding-left: 12px; }
+.alltbl td { padding: 9px 4px; border-bottom: 1px solid var(--line); }
+.alltbl tr:last-child td { border-bottom: 0; }
+.alltbl .an { padding-left: 12px; min-width: 8em; line-height: 1.35; }
+.alltbl .aq { width: 3.2em; text-align: center; font-family: var(--font-num); font-size: 16px; font-weight: 600; }
+.alltbl .aq.low { color: var(--bad); background: var(--bad-soft); }
+.alltbl .aq.na { color: var(--line); font-weight: 400; }
+.alltbl tr.is-ended .an { color: var(--muted); text-decoration: line-through; }
 .pill.ended { background: var(--bg); color: var(--muted); border: 1px solid var(--line); text-decoration: none; }
 .row.is-ended .name { color: var(--muted); text-decoration: line-through; }
 .lvreq .lvr { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
@@ -248,13 +259,12 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 </style>
 
 <header><div class="wrap head">
-  <div class="brand-row"><div class="brand">achieve Group <small>在庫・発注</small></div><div class="head-r"><button type="button" id="vbtn" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><svg class="vx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span id="vbtn-l">全店在庫</span></button><button type="button" class="who" id="who" data-act="whoSwitch" hidden></button></div></div>
+  <div class="brand-row"><div class="brand">achieve Group <small>在庫・発注</small></div><div class="head-r"><button type="button" class="who" id="who" data-act="whoSwitch" hidden></button></div></div>
   <div class="seg" id="stores" role="group" aria-label="店舗"></div>
 </div></header>
 <main class="wrap" id="main"><div class="empty">在庫データを読み込んでいます</div></main>
 <nav><div class="wrap tabs" id="tabs"></div></nav>
 <div id="toast" role="status" hidden></div>
-<div id="vpanel" hidden role="dialog" aria-label="全店の在庫を探す"><div class="vtitle">全店の在庫を探す<span>hair design・Liss・till・TONARI在庫 を一度に見られます</span></div><div class="vq"><input class="field" id="vq" type="search" enterkeyhint="search" placeholder="商品名（例：プレトワ 8-01）" aria-label="探したい商品"></div><div class="vstat" id="vstat"></div><div class="vres" id="vres"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -492,7 +502,7 @@ function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() 
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
   { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing); }
-  $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${s.id === S.store}">${esc(s.short)}</button>`).join('');
+  $('stores').innerHTML = STORES.map(s => `<button type="button" id="store-${s.id}" data-act="store" data-id="${s.id}" aria-pressed="${!S.allView && s.id === S.store}">${esc(s.short)}</button>`).join('') + `<button type="button" id="store-all" data-act="allView" aria-pressed="${!!S.allView}">全店</button>`;
   const n = S.ready.size === 4 ? shortItems(S.store).length : 0;
   $('tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${id === S.tab ? 'aria-current="page"' : ''}>${label}${id === 'order' && n ? `<span class="badge">${n}</span>` : ''}${id === 'items' && isBoss() && pendingLv().length ? `<span class="badge">${pendingLv().length}</span>` : ''}</button>`).join('');
 }
@@ -864,7 +874,24 @@ async function janFromPhoto(file) {
   } catch (e) { toast((e && e.message) || '読み取れませんでした'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '📷 撮って入れる'; } }
 }
+function viewAll() {
+  return `<div class="note" style="background:var(--accent-soft);color:var(--ink)">全店の在庫を一覧で見ています。<b style="color:var(--bad)">赤</b>は発注点以下の店舗です。数を変えるときは各店舗に切り替えてください。</div>
+  <div class="tools">
+    <input class="field" id="search" type="search" placeholder="商品名で探す（全店）" aria-label="商品名で探す" value="${esc(S.q)}">
+    ${catChips(false, true)}
+  </div>
+  <div id="stock-list" style="display:flex;flex-direction:column;gap:16px"></div>`;
+}
+function allTable() {
+  const q = S.q.trim().toLowerCase();
+  const list = S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it));
+  if (!list.length) return '<div class="empty">条件に合う商品はありません。</div>';
+  const groups = {}; list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
+  const head = `<tr><th>商品</th>${STORES.map(x => `<th>${esc(x.id === 'tonari' ? 'TONARI' : x.short === 'hair design' ? 'hair' : x.short)}</th>`).join('')}</tr>`;
+  return Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div class="alltbl-w"><table class="alltbl"><thead>${head}</thead><tbody>${arr.map(it => `<tr class="${it.ended ? 'is-ended' : ''}"><td class="an">${esc(it.name)}${it.ended ? ' <span class="pill ended">取扱終了</span>' : ''}</td>${STORES.map(x => { const v = qtyOf(x.id, it.id), car = x.id === 'tonari' || carried(it, x.id), low = !it.ended && x.id !== 'tonari' && statusOf(it, x.id) === 'short'; return `<td class="aq${low ? ' low' : ''}${!car && !v ? ' na' : ''}">${!car && !v ? '·' : v}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div></section>`).join('');
+}
 function viewStock() {
+  if (S.allView) return viewAll();
   const shorts = shortItems(S.store).length;
   const ordering = S.orders.filter(o => o.store === S.store && o.status === 'ordered').length;
   return `<div class="summary">
@@ -885,6 +912,7 @@ function viewStock() {
   <div id="stock-list" style="display:flex;flex-direction:column;gap:16px"></div>`;
 }
 function stockList() {
+  if (S.allView) return allTable();
   if (!S.items.length) return '<div class="empty">商品がまだありません。「商品」タブから追加してください。</div>';
   if (!S.items.some(it => carried(it, S.store))) return '<div class="empty">この店舗で扱う商品が未設定です。「商品」タブで商品を開き、この店舗の発注点と適正在庫を入れてください。</div>';
   const q = S.q.trim().toLowerCase();
@@ -1315,9 +1343,10 @@ document.addEventListener('click', async ev => {
   if (act === 'whoSwitch') { WHO.handle('whoOut', b); window.scrollTo(0, 0); return; }
   if (await WHO.handle(act, b)) return;
   switch (act) {
-    case 'store': S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
+    case 'allView': S.allView = true; S.tab = 'stock'; S.cat = ''; S.big = ''; render(); window.scrollTo(0, 0); break;
+    case 'store': S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
-    case 'tab': S.tab = id; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
+    case 'tab': S.tab = id; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
