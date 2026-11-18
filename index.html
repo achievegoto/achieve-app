@@ -421,6 +421,23 @@ function lineText(did) {
   return `${d ? d.name : ''} ご担当者様\nいつもお世話になっております。\n${st.full}です。\n下記の発注をお願いいたします。\n\n${body}\n\n納品先：${st.full}\n納期が分かりましたらご連絡ください。\nよろしくお願いいたします。`;
 }
 
+/* オンライン発注サイト（ミルボン等）：AI（ブラウザ操作）にカート入れを頼む指示文。注文確定はさせない */
+function aiText(did) {
+  const d = dealerOf(did), st = storeOf(S.store);
+  const items = linesFor(did).filter(r => r.qty > 0).map(r => `・${r.it.name}${r.it.category && !r.it.name.includes(r.it.category.split(' ')[0]) ? `（${r.it.category}）` : ''} × ${r.qty}${uTxt(r.it.unit)}`).concat(extraLines(did));
+  return `${d ? d.name.replace(/[（(]オンライン発注[）)]/g, '').trim() : ''}の発注サイト${d && d.url ? `（${d.url}）` : ''}で、下の商品をカートに入れてください。
+
+・最初に、ログイン中の店舗が「${st.full}」になっているか確認してください。違う店舗なら作業を止めて教えてください。
+・商品名で検索し、名前・容量・色番号まで一致するものを選んで、指定の数量でカートに入れてください。
+・見つからない、在庫切れ、候補が複数あって決められない商品はカートに入れず、最後にまとめて教えてください。
+・すでにカートに入っている商品があれば、消さずに教えてください。
+・注文の確定（購入・注文ボタン）は押さないでください。最後にカートの中身（商品名・数量・金額）を一覧で見せて終わってください。
+
+【${st.full}　カートに入れる商品】
+${items.join('\n')}`;
+}
+const msgText = did => (dealerOf(did) || {}).url ? aiText(did) : lineText(did);
+
 /* ---- 保存 ---- */
 function fail(e) {
   if (e && e.code === 'invalid_argument') { S.readOnly = true; render(); toast('この画面では変更を保存できません'); return; }
@@ -998,9 +1015,11 @@ function orderCard(did, force) {
       </div></div>`).join('')}</div>
     ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${catGroups(others, i => `<option value="${i.id}">${esc(i.name)}</option>`)}</select>` : ''}
     ${xbox}
-    ${d.url ? `<div class="sub">${esc(storeOf(S.store).full)}の発注です。サイトのログイン店舗を確認して、上の数量を注文してください。</div>
+    ${d.url ? `<div class="sub">${esc(storeOf(S.store).full)}の発注です。サイトのログイン店舗を確認して、上の数量を注文してください。AI（Claudeなど）にカートへ入れてもらうときは、下の指示文をコピーして貼り付けてください。注文の確定は自分で押します。</div>
+    <textarea class="field msg" id="msg-${did}" readonly aria-label="AIに貼るカート入れの指示文">${esc(any ? aiText(did) : '')}</textarea>
     <div class="actions">
-      <a class="btn primary" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
+      <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>AI用の指示文をコピー</button>
+      <a class="btn" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
     </div>` : isGotoDid(did) ? `<div class="sub gonote">後藤さんへのLINEは、一番上の「後藤さん宛て（まとめて）」に1つの文章でまとまっています。そこでコピー・発注済みにしてください。</div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
     <div class="actions">
@@ -1433,8 +1452,8 @@ document.addEventListener('click', async ev => {
     case 'oinc': armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
     case 'odec': armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
     case 'copy': {
-      const text = did === '__goto' ? gotoText() : lineText(did);
-      try { await navigator.clipboard.writeText(text); toast('コピーしました。LINEに貼り付けてください'); }
+      const text = did === '__goto' ? gotoText() : msgText(did), ai = did !== '__goto' && !!(dealerOf(did) || {}).url;
+      try { await navigator.clipboard.writeText(text); toast(ai ? 'コピーしました。AIに貼り付けてください' : 'コピーしました。LINEに貼り付けてください'); }
       catch (e) { const t = $('msg-' + did); t.focus(); t.select(); toast('自動でコピーできません。選択された文章をコピーしてください'); }
       break;
     }
@@ -1517,7 +1536,7 @@ document.addEventListener('change', ev => {
   if (c === 'oextra') { S.holdUntil = Date.now() + 700; const k = draftKey(did); (S.draftExtra ||= {})[k] = el.value; const me = WHO.me || {}; draftDoc(did).set({ store: S.store, did, extra: el.value, at: Date.now(), by: me.id || '', byName: me.name || '' }, { merge: true }).catch(fail);
     /* ここで再描画するとコピーボタンの押下が消えるので、文章欄とボタンだけ更新 */
     const any = linesFor(did).some(r => r.qty > 0) || extraLines(did).length, m = $('msg-' + did), cp = $('copy-' + did), dn = $('done-' + did), gm = $('msg-__goto');
-    if (m) m.value = any ? lineText(did) : ''; if (cp) cp.disabled = !any; if (dn) dn.disabled = S.readOnly || !any; if (gm) gm.value = gotoText(); return; }
+    if (m) m.value = any ? msgText(did) : ''; if (cp) cp.disabled = !any; if (dn) dn.disabled = S.readOnly || !any; if (gm) gm.value = gotoText(); return; }
   if (c === 'xShow' && el.value) { (S.xShow ||= new Set()).add(S.store + ':' + el.value); (S.oOpen ||= new Set()).add(el.value); S.oPick = el.value; render(); window.scrollTo(0, 0); return; }
   if (c === 'oPick') { S.oPick = el.value; el.blur(); render(); window.scrollTo(0, 0); return; }
   if (c === 'addLine' && el.value) { bumpDraft(did, el.value, 1); el.value = ''; el.blur(); render(); }
