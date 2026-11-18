@@ -327,7 +327,6 @@ table.mlist td.tot { font-weight: 600; }
 <script src="config.js"></script>
 <script src="who.js?v=3"></script>
 <script>
-
 const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
 const M = [
   ['tech', '指名技術売上', 'yen', 'sum'], ['free', 'フリー技術売上', 'yen', 'sum'], ['retail', '店販売上', 'yen', 'sum'], ['cust', '客数', 'n', 'sum'], ['unit', '客単価', 'yen', 'calc'],
@@ -347,7 +346,7 @@ const yoyCell = v => v == null ? '<td class="c h0">—</td>' : `<td class="c ${v
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
-const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', retail: {}, rq: '', day: {}, rdays: {}, rmons: {}, dp: 'w', dd: '', dsc: 'ALL', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
+const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', retail: {}, rq: '', day: {}, rdays: {}, rwks: {}, rmons: {}, dp: 'w', dd: '', dsc: 'ALL', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
 
 /* ---- 計算 ---- */
 const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
@@ -443,6 +442,7 @@ function retailRows(pids, dates) {
   const set = new Set(pids), acc = {}; let src = 0;
   const add = (r, p) => { if (!set.has(p)) return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
   if (S.dp === 'm') { const ym = dates[0].slice(0, 7), mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }
+  else if (S.dp === 'w' && S.rwks[dates[0]] && dates.some(dt => !S.rdays[dt])) { src = 1; (S.rwks[dates[0]].rows || []).forEach(r => add(r, r.p)); }
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
 }
@@ -455,9 +455,22 @@ function kpiCard(cur, pids, dates, label) {
   return `<section class="card"><div class="card-head"><h3>${esc(label)}</h3><span class="sub">総売上 <b style="font-size:18px;color:var(--ink)">¥${fmt(tot, 'yen')}</b></span></div>
     <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${line('buyers', '店販購入', '人')}</div></section>`;
 }
+/* 古い月の日報データは見るときだけ読み込む */
+const DAYS = { since: '9999-99', oldD: {}, oldR: {}, liveD: {}, liveR: {}, done: new Set(), wk: new Set() };
+function ensureDays(yms) {
+  yms.forEach(ym => {
+    if (!DAYS.wk.has(ym)) { DAYS.wk.add(ym); db.collection('mr_rwk').where('ym', '==', ym).get().then(c => { c.docs.forEach(d => S.rwks[d.id] = d.data()); if (S.tab === 'daily') soft(); }).catch(() => DAYS.wk.delete(ym)); }
+    if (ym >= DAYS.since || DAYS.done.has(ym)) return; DAYS.done.add(ym);
+    Promise.all([db.collection('mr_day').where('ym', '==', ym).get(), db.collection('mr_rday').where('ym', '==', ym).get()]).then(([a, b]) => {
+      a.docs.forEach(d => DAYS.oldD[d.id] = d.data()); b.docs.forEach(d => DAYS.oldR[d.id] = d.data());
+      S.day = { ...DAYS.oldD, ...DAYS.liveD }; S.rdays = { ...DAYS.oldR, ...DAYS.liveR }; if (S.tab === 'daily') soft();
+    }).catch(() => DAYS.done.delete(ym));
+  });
+}
 function dailyView() {
   if (!S.dd) { const ds = Object.values(S.day).map(x => x.date).filter(Boolean).sort(); S.dd = ds.length ? ds[ds.length - 1] : ymdOf(new Date()); }
   const own = WHO.isOwner(), dates = dRange(), pids = scopePids(), ym = S.dd.slice(0, 7);
+  ensureDays([...new Set(dates.map(d => d.slice(0, 7)))]);
   const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : `${ymLabel(ym)}の月報`;
   const cur = S.dp === 'm' ? sumMonth(pids, ym) : sumDays(pids, dates);
   const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
@@ -487,7 +500,7 @@ function dailyView() {
     rhtml = `<section class="card"><div class="card-head"><h3>店販 商品別${rtNote}</h3><span class="sub">合計 <b style="font-size:18px;color:var(--ink)">${fmt(tq, 'n')}</b>個・${items.length}商品${own ? `・¥${fmt(ts, 'yen')}` : ''}</span></div>
       <input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す"></section>
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
-  } else rhtml = `<section class="card"><div class="empty" style="padding:10px">この期間の店販（商品別）はまだありません</div></section>`;
+  } else rhtml = `<section class="card"><div class="empty" style="padding:10px">${S.dp === 'd' && dates[0] < '2026-11-01' ? 'この日の店販（商品別）はありません。週報・月で見られます' : 'この期間の店販（商品別）はまだありません'}</div></section>`;
   return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, `${scopeName}｜${label}`)}${monthLine}${table}${rhtml}
     <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
@@ -740,8 +753,9 @@ function listen() {
   db.collection('orders').orderBy('orderedAt', 'desc').limit(2000).onSnapshot(s => { S.orders = s.docs.map(d => d.data()); S.costReady = true; soft(); }, e => console.warn(e));
   db.collection('items').onSnapshot(s => { const o = {}; s.docs.forEach(d => { const x = d.data(); o[d.id] = { category: x.category || '', name: x.name || '' }; }); S.itemCat = o; soft(); }, e => console.warn(e));
   const sinceYm = shiftYm(nowYm(), -3);
-  db.collection('mr_day').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.day = o; if (S.tab === 'daily') soft(); }, () => {});
-  db.collection('mr_rday').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.rdays = o; if (S.tab === 'daily') soft(); }, () => {});
+  DAYS.since = sinceYm;
+  db.collection('mr_day').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); DAYS.liveD = o; S.day = { ...DAYS.oldD, ...o }; if (S.tab === 'daily') soft(); }, () => {});
+  db.collection('mr_rday').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); DAYS.liveR = o; S.rdays = { ...DAYS.oldR, ...o }; if (S.tab === 'daily') soft(); }, () => {});
   db.collection('mr_rmon').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.rmons = o; if (S.tab === 'daily') soft(); }, () => {});
   db.collection('mr_retail').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.retail = o; if (S.tab === 'daily') soft(); }, () => {});
   db.collection('mr_meta').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.meta = o; S.ready.add('m'); soft(); }, fail);
