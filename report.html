@@ -417,7 +417,7 @@ function retailView() {
   if (!r) body = S.rmode === 'm' ? '<div class="empty">この月の店販データはまだありません</div>' : '';
   else {
     const q = S.rq.trim().toLowerCase();
-    const items = (r.items || []).map(a => Array.isArray(a) ? { mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 } : { mid: a.m, code: a.c, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 }).filter(x => !q || (x.name + ' ' + x.mid).toLowerCase().includes(q));
+    const items = (r.items || []).map(a => Array.isArray(a) ? { mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 } : { mid: a.m, code: a.c, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 }).filter(x => x.mid !== 'EC連携' && (!q || (x.name + ' ' + x.mid).toLowerCase().includes(q)));
     const tq = items.reduce((a, x) => a + x.qty, 0), ts = items.reduce((a, x) => a + x.sales, 0);
     const g = {}; items.forEach(x => (g[x.mid || 'その他'] ||= []).push(x));
     const groups = Object.entries(g).map(([m, arr]) => [m, arr.sort((a, b) => b.qty - a.qty || b.sales - a.sales)]).sort((a, b) => b[1].reduce((s, x) => s + x.qty, 0) - a[1].reduce((s, x) => s + x.qty, 0));
@@ -427,7 +427,7 @@ function retailView() {
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
   }
   return `${mnav('ym')}${mode}${dayChips}<input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す">${body}
-    <div class="sub">サロンアンサーの店販売上集計（商品ごと・全店合計・税抜）から自動で取り込んでいます。</div>`;
+    <div class="sub">サロンアンサーの店販売上集計（商品ごと・全店合計・税抜）から自動で取り込んでいます。EC連携（ミルボンiD）分は除いています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
 async function importRetail() {
