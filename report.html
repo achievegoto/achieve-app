@@ -58,6 +58,16 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .chip { flex: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 99px; font-size: 13px; color: var(--muted); }
 .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .group { display: flex; flex-direction: column; gap: 6px; }
+.rt-tot { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.rt-tot b { font-size: 20px; color: var(--ink); font-family: var(--font-num, inherit); }
+.rt-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.rt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rt-row:last-child { border-bottom: 0; }
+.rt-n { min-width: 0; overflow-wrap: anywhere; }
+.rt-q { white-space: nowrap; color: var(--muted); font-size: 12px; } .rt-q b { font-size: 17px; color: var(--ink); margin-right: 2px; }
+.rt-s { white-space: nowrap; color: var(--muted); font-size: 12px; min-width: 5.5em; text-align: right; }
+.group h2 span { margin-left: auto; }
+
 .group h2 { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 0; display: flex; justify-content: space-between; }
 .list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 11px 14px; width: 100%; text-align: left; border: 0; background: transparent; }
@@ -312,6 +322,7 @@ table.mlist td.tot { font-weight: 600; }
 <script src="config.js"></script>
 <script src="who.js?v=3"></script>
 <script>
+
 const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
 const M = [
   ['tech', '指名技術売上', 'yen', 'sum'], ['free', 'フリー技術売上', 'yen', 'sum'], ['retail', '店販売上', 'yen', 'sum'], ['cust', '客数', 'n', 'sum'], ['unit', '客単価', 'yen', 'calc'],
@@ -331,7 +342,7 @@ const yoyCell = v => v == null ? '<td class="c h0">—</td>' : `<td class="c ${v
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
-const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
+const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', retail: {}, rmode: 'm', rday: '', rq: '', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
 
 /* ---- 計算 ---- */
 const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
@@ -383,13 +394,55 @@ function render() {
   if (S.ready.size < 4) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
   const g = WHO.gate(); if (g) { $('nav').hidden = true; m.innerHTML = g; return; }
   $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
-  const tabs = [['month', '今月の進捗'], ['person', '個人の月報']].concat(WHO.isAdmin() ? [['target', '目標']] : []);
+  const tabs = [['month', '今月の進捗'], ['person', '個人の月報'], ['retail', '店販']].concat(WHO.isAdmin() ? [['target', '目標']] : []);
   if (!tabs.some(t => t[0] === S.tab)) S.tab = 'month';
   $('nav').hidden = false;
   $('tabs').style.gridTemplateColumns = `repeat(${tabs.length}, 1fr)`;
   $('tabs').innerHTML = tabs.map(([id, l]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}</button>`).join('');
   if (!S.pid) { const mine = active().find(p => WHO.me && p.personId === WHO.me.id); S.pid = (mine || active()[0] || {}).id || ''; }
-  m.innerHTML = S.tab === 'month' ? monthView() : S.tab === 'person' ? personView() : targetView();
+  m.innerHTML = S.tab === 'month' ? monthView() : S.tab === 'person' ? personView() : S.tab === 'retail' ? retailView() : targetView();
+}
+/* ---- 店販 販売実績（サロンアンサー 店販売上集計・商品ごと・全店合計・税抜） ---- */
+function retailDays(ym) { return Object.values(S.retail).filter(r => r.kind === 'day' && r.ym === ym).map(r => r.date).sort().reverse(); }
+function retailList() {
+  const ym = S.ym;
+  if (S.rmode === 'd') { const days = retailDays(ym); if (!days.includes(S.rday)) S.rday = days[0] || ''; return S.rday ? S.retail['d_' + S.rday] : null; }
+  return S.retail['m_' + ym] || null;
+}
+function retailView() {
+  const own = WHO.isOwner(), r = retailList(), days = retailDays(S.ym);
+  const mode = `<div class="chips" role="group" aria-label="表示"><button type="button" class="chip" data-act="rmode" data-id="m" aria-pressed="${S.rmode === 'm'}">月の累計</button><button type="button" class="chip" data-act="rmode" data-id="d" aria-pressed="${S.rmode === 'd'}">日別</button></div>`;
+  const dayChips = S.rmode === 'd' ? (days.length ? `<div class="chips">${days.map(d => `<button type="button" class="chip" data-act="rday" data-id="${d}" aria-pressed="${d === S.rday}">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</button>`).join('')}</div>` : '<div class="empty" style="padding:12px">この月の日別データはまだありません（自動取得の日から貯まります）</div>') : '';
+  let body = '';
+  if (!r) body = S.rmode === 'm' ? '<div class="empty">この月の店販データはまだありません</div>' : '';
+  else {
+    const q = S.rq.trim().toLowerCase();
+    const items = (r.items || []).map(a => ({ mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 })).filter(x => !q || (x.name + ' ' + x.mid).toLowerCase().includes(q));
+    const tq = items.reduce((a, x) => a + x.qty, 0), ts = items.reduce((a, x) => a + x.sales, 0);
+    const g = {}; items.forEach(x => (g[x.mid || 'その他'] ||= []).push(x));
+    const groups = Object.entries(g).map(([m, arr]) => [m, arr.sort((a, b) => b.qty - a.qty || b.sales - a.sales)]).sort((a, b) => b[1].reduce((s, x) => s + x.qty, 0) - a[1].reduce((s, x) => s + x.qty, 0));
+    const range = r.kind === 'day' ? `${Number(r.date.slice(5, 7))}月${Number(r.date.slice(8))}日` : `${r.from ? Number(r.from.slice(8)) : 1}日〜${r.to ? Number(r.to.slice(8)) : ''}日`;
+    body = `<section class="card"><div class="card-head"><h3>${range}の店販</h3><span class="sub">${r.asOf ? new Date(r.asOf).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' 取得' : ''}</span></div>
+      <div class="rt-tot"><span>合計 <b>${fmt(tq, 'n')}</b> 個</span><span>${items.length} 商品</span>${own ? `<span>売上 <b>¥${fmt(ts, 'yen')}</b>（税抜）</span>` : ''}</div></section>
+      ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
+  }
+  return `${mnav('ym')}${mode}${dayChips}<input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す">${body}
+    <div class="sub">サロンアンサーの店販売上集計（商品ごと・全店合計・税抜）から自動で取り込んでいます。</div>`;
+}
+/* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
+async function importRetail() {
+  const h = location.hash; if (!h.startsWith('#retail=')) return;
+  try {
+    const o = JSON.parse(decodeURIComponent(h.slice(8)));
+    if (!o || !o.key || !Array.isArray(o.items)) throw new Error('形式が違います');
+    const kind = o.k === 'd' ? 'day' : 'month';
+    const doc = { kind, items: o.items, asOf: Date.now(), src: 'サロンアンサー 店販売上集計（商品ごと・全店・税抜）', n: o.items.length };
+    if (kind === 'day') { doc.date = o.key; doc.ym = o.key.slice(0, 7); } else { doc.ym = o.key; doc.from = o.from || ''; doc.to = o.to || ''; }
+    await db.doc('mr_retail/' + (kind === 'day' ? 'd_' : 'm_') + o.key).set(doc);
+    window.__retailSaved = (kind === 'day' ? 'd_' : 'm_') + o.key + ':' + o.items.length;
+    toast('店販データを保存しました（' + o.items.length + '商品）');
+  } catch (e) { window.__retailSaved = 'ERR ' + e.message; toast('店販データを保存できませんでした：' + e.message); }
+  history.replaceState(null, '', location.pathname + location.search);
 }
 function loginView() {
   return `<form class="card login" id="login-form"><h3>ログイン</h3><div class="sub">在庫アプリと同じスタッフ用アカウントでログインします。</div>
@@ -574,6 +627,8 @@ document.addEventListener('click', async ev => {
       case 'ym': S.ym = shiftYm(S.ym, Number(id)); render(); break;
       case 'year': S.year += Number(id); render(); break;
       case 'pick': S.pid = id; render(); break;
+      case 'rmode': S.rmode = id; render(); break;
+      case 'rday': S.rday = id; render(); break;
       case 'metric': S.metric = id; render(); break;
       case 'openP': S.pid = id; S.tab = 'person'; render(); window.scrollTo(0, 0); break;
       case 'saveTg': {
@@ -613,14 +668,17 @@ function listen() {
   db.collection('mr_target').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.targets = o; S.ready.add('t'); soft(); }, fail);
   db.collection('orders').orderBy('orderedAt', 'desc').limit(2000).onSnapshot(s => { S.orders = s.docs.map(d => d.data()); S.costReady = true; soft(); }, e => console.warn(e));
   db.collection('items').onSnapshot(s => { const o = {}; s.docs.forEach(d => { const x = d.data(); o[d.id] = { category: x.category || '', name: x.name || '' }; }); S.itemCat = o; soft(); }, e => console.warn(e));
+  db.collection('mr_retail').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.retail = o; if (S.tab === 'retail') soft(); }, () => {});
   db.collection('mr_meta').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.meta = o; S.ready.add('m'); soft(); }, fail);
 }
 (function init() {
   if (typeof firebaseConfig === 'undefined' || !window.firebase) { $('main').innerHTML = '<div class="empty">設定ファイル（config.js）が読み込めません。</div>'; return; }
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-  firebase.auth().onAuthStateChanged(u => { S.user = u || null; if (u && !started) { started = true; listen(); } render(); });
+  firebase.auth().onAuthStateChanged(u => { S.user = u || null; if (u && !started) { started = true; listen(); importRetail(); } render(); });
 })();
+
+document.addEventListener('input', ev => { if (ev.target.id === 'rt-q') { S.rq = ev.target.value; const pos = ev.target.selectionStart; render(); const e = $('rt-q'); if (e) { e.focus(); try { e.setSelectionRange(pos, pos); } catch (x) {} } } });
 </script>
 </body>
 </html>
