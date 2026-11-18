@@ -58,6 +58,11 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .chip { flex: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 99px; font-size: 13px; color: var(--muted); }
 .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .group { display: flex; flex-direction: column; gap: 6px; }
+.dkg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; }
+.dk { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dk-l { font-size: 12px; color: var(--muted); }
+.dk > b { font-family: var(--font-num, inherit); font-size: 20px; }
+.dk-t { font-size: 11px; color: var(--muted); } .dk-t b.ok { color: var(--good); } .dk-t b.ng { color: var(--bad); }
 .rt-tot { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
 .rt-tot b { font-size: 20px; color: var(--ink); font-family: var(--font-num, inherit); }
 .rt-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
@@ -342,7 +347,7 @@ const yoyCell = v => v == null ? '<td class="c h0">—</td>' : `<td class="c ${v
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
-const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', retail: {}, rmode: 'm', rday: '', rq: '', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
+const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}, meta: {}, orders: [], itemCat: {}, costReady: false, tab: 'month', retail: {}, rq: '', day: {}, rdays: {}, rmons: {}, dp: 'w', dd: '', dsc: 'ALL', ym: nowYm(), pid: '', year: new Date().getFullYear(), err: '', editTg: false, metric: 'tech' };
 
 /* ---- 計算 ---- */
 const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
@@ -394,40 +399,98 @@ function render() {
   if (S.ready.size < 4) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
   const g = WHO.gate(); if (g) { $('nav').hidden = true; m.innerHTML = g; return; }
   $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
-  const tabs = [['month', '今月の進捗'], ['person', '個人の月報'], ['retail', '店販']].concat(WHO.isAdmin() ? [['target', '目標']] : []);
+  const tabs = [['month', '今月の進捗'], ['person', '個人の月報'], ['daily', '日報・週報']].concat(WHO.isAdmin() ? [['target', '目標']] : []);
   if (!tabs.some(t => t[0] === S.tab)) S.tab = 'month';
   $('nav').hidden = false;
   $('tabs').style.gridTemplateColumns = `repeat(${tabs.length}, 1fr)`;
   $('tabs').innerHTML = tabs.map(([id, l]) => `<button type="button" id="tab-${id}" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}</button>`).join('');
   if (!S.pid) { const mine = active().find(p => WHO.me && p.personId === WHO.me.id); S.pid = (mine || active()[0] || {}).id || ''; }
-  m.innerHTML = S.tab === 'month' ? monthView() : S.tab === 'person' ? personView() : S.tab === 'retail' ? retailView() : targetView();
+  m.innerHTML = S.tab === 'month' ? monthView() : S.tab === 'person' ? personView() : S.tab === 'daily' ? dailyView() : targetView();
 }
 /* ---- 店販 販売実績（サロンアンサー 店販売上集計・商品ごと・全店合計・税抜） ---- */
-function retailDays(ym) { return Object.values(S.retail).filter(r => r.kind === 'day' && r.ym === ym).map(r => r.date).sort().reverse(); }
-function retailList() {
-  const ym = S.ym;
-  if (S.rmode === 'd') { const days = retailDays(ym); if (!days.includes(S.rday)) S.rday = days[0] || ''; return S.rday ? S.retail['d_' + S.rday] : null; }
-  return S.retail['m_' + ym] || null;
+/* ---- 日報・週報（日 / 週=水〜日 / 月）。各店・個人。店販は商品別個数 ---- */
+const CODE2PID = { 1: 's01', 3: 'm01', 8: 'm02', 2: 'm03', 7: 'm04', 5: 'm05', 6: 'm06', 17: 'm07', 19: 'm08', 18: 'm09', 21: 'm10', 9: 'm11', 22: 's22', 25: 's25', 26: 's26', 27: 's27', 28: 's28', 29: 's29', 50: 's50' };
+const c2p = c => CODE2PID[c] || ('s' + c);
+const ymdOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const pdate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addD = (s, n) => { const d = pdate(s); d.setDate(d.getDate() + n); return ymdOf(d); };
+const isOpen = s => { const w = pdate(s).getDay(); return w !== 1 && w !== 2; }; /* 月火は定休 */
+const wkStart = s => addD(s, -((pdate(s).getDay() + 4) % 7)); /* 水曜はじまり */
+const openDays = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) if (isOpen(`${ym}-${pad(d)}`)) n++; return n || 1; };
+const md2 = s => `${Number(s.slice(5, 7))}/${Number(s.slice(8))}`;
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+function dRange() {
+  const d = S.dd || ymdOf(new Date());
+  if (S.dp === 'd') return [d];
+  if (S.dp === 'w') { const w = wkStart(d); return [0, 1, 2, 3, 4].map(i => addD(w, i)); }
+  const ym = d.slice(0, 7), [y, m] = ym.split('-').map(Number); const out = []; for (let i = 1; i <= new Date(y, m, 0).getDate(); i++) out.push(`${ym}-${pad(i)}`); return out;
 }
-function retailView() {
-  const own = WHO.isOwner(), r = retailList(), days = retailDays(S.ym);
-  const mode = `<div class="chips" role="group" aria-label="表示"><button type="button" class="chip" data-act="rmode" data-id="m" aria-pressed="${S.rmode === 'm'}">月の累計</button><button type="button" class="chip" data-act="rmode" data-id="d" aria-pressed="${S.rmode === 'd'}">日別</button></div>`;
-  const dayChips = S.rmode === 'd' ? (days.length ? `<div class="chips">${days.map(d => `<button type="button" class="chip" data-act="rday" data-id="${d}" aria-pressed="${d === S.rday}">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</button>`).join('')}</div>` : '<div class="empty" style="padding:12px">この月の日別データはまだありません（自動取得の日から貯まります）</div>') : '';
-  let body = '';
-  if (!r) body = S.rmode === 'm' ? '<div class="empty">この月の店販データはまだありません</div>' : '';
-  else {
-    const q = S.rq.trim().toLowerCase();
-    const items = (r.items || []).map(a => Array.isArray(a) ? { mid: a[0], code: a[1], name: a[2], qty: Number(a[3]) || 0, sales: Number(a[4]) || 0 } : { mid: a.m, code: a.c, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 }).filter(x => x.mid !== 'EC連携' && (!q || (x.name + ' ' + x.mid).toLowerCase().includes(q)));
+function scopePids() { const g = GROUP(S.dsc); return g ? g.map(p => p.id) : [S.dsc]; }
+function sumDays(pids, dates) {
+  const o = { tech: 0, free: 0, retail: 0, cust: 0, newc: 0, buyers: 0 }; let any = false;
+  pids.forEach(p => dates.forEach(dt => { const x = S.day[p + '_' + dt]; if (!x) return; any = true; Object.keys(o).forEach(k => o[k] += Number(x[k]) || 0); }));
+  return any ? o : null;
+}
+function sumMonth(pids, ym) {
+  const o = { tech: 0, free: 0, retail: 0, cust: 0, newc: 0, buyers: 0 }; let any = false;
+  pids.forEach(p => { const x = D0(p, ym); if (!x) return; any = true; Object.keys(o).forEach(k => o[k] += Number(x[k]) || 0); });
+  return any ? o : null;
+}
+function periodTarget(pids, dates, k) { /* 月目標を営業日（水〜日）で割って期間分を合計 */
+  let t = 0; dates.forEach(dt => { if (!isOpen(dt)) return; const ym = dt.slice(0, 7); const mt = pids.reduce((a, p) => a + (Number(T0(p, ym)[k]) || 0), 0); t += mt / openDays(ym); }); return t;
+}
+function retailRows(pids, dates) {
+  const set = new Set(pids), acc = {}; let src = 0;
+  const add = (r, p) => { if (!set.has(p) || r.m === 'EC連携') return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
+  if (S.dp === 'm') { const ym = dates[0].slice(0, 7), mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }
+  else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
+  return src ? Object.values(acc) : null;
+}
+function kpiCard(cur, pids, dates, label) {
+  const own = WHO.isOwner();
+  if (!cur) return `<section class="card"><div class="empty">${esc(label)}のデータはまだありません（毎日の自動取得の日から貯まります）</div></section>`;
+  const tot = cur.tech + cur.free + cur.retail;
+  const line = (k, l, unit) => { const tg = periodTarget(pids, dates, k), v = cur[k];
+    return `<div class="dk"><span class="dk-l">${l}</span><b>${unit === 'yen' ? '¥' + fmt(v, 'yen') : fmt(v, 'n') + unit}</b>${tg ? `<span class="dk-t">目標 ${unit === 'yen' ? '¥' + fmt(tg, 'yen') : fmt(tg, 'n') + unit}・<b class="${v >= tg ? 'ok' : 'ng'}">${Math.round(v / tg * 100)}%</b></span>${progBar(v, tg, 1)}` : ''}</div>`; };
+  return `<section class="card"><div class="card-head"><h3>${esc(label)}</h3><span class="sub">総売上 <b style="font-size:18px;color:var(--ink)">¥${fmt(tot, 'yen')}</b></span></div>
+    <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${line('buyers', '店販購入', '人')}</div></section>`;
+}
+function dailyView() {
+  if (!S.dd) { const ds = Object.values(S.day).map(x => x.date).filter(Boolean).sort(); S.dd = ds.length ? ds[ds.length - 1] : ymdOf(new Date()); }
+  const own = WHO.isOwner(), dates = dRange(), pids = scopePids(), ym = S.dd.slice(0, 7);
+  const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : `${ymLabel(ym)}の月報`;
+  const cur = S.dp === 'm' ? sumMonth(pids, ym) : sumDays(pids, dates);
+  const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
+  const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
+  const pchips = `<div class="chips">${[['d', '日報'], ['w', '週報（水〜日）'], ['m', '月']].map(([id, l]) => `<button type="button" class="chip" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
+  const ppl = active().filter(p => !p.ownerOnly || own);
+  const schips = `<div class="chips">${AGG.map(([id, l]) => `<button type="button" class="chip" data-act="dsc" data-id="${id}" aria-pressed="${S.dsc === id}">${esc(l)}</button>`).join('')}<select class="field" data-chg="dscSel" style="width:auto;flex:1 1 9em" aria-label="個人"><option value="">個人を選ぶ</option>${ppl.map(p => `<option value="${p.id}" ${S.dsc === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
+  /* 月の累計（週報・日報のときの進捗） */
+  let monthLine = '';
+  if (S.dp !== 'm') { const mc = sumMonth(pids, ym), mt = pids.reduce((a, p) => a + (Number(T0(p, ym).tech) || 0), 0), pc = pace(ym);
+    if (mc) monthLine = `<section class="card"><div class="card-head"><h3>${ymLabel(ym)}の進捗（指名技術）</h3><span class="sub">${pc.label || ''}</span></div><div class="dk"><b>¥${fmt(mc.tech, 'yen')}</b>${mt ? `<span class="dk-t">月目標 ¥${fmt(mt, 'yen')}・<b class="${mc.tech >= mt * pc.ratio ? 'ok' : 'ng'}">${Math.round(mc.tech / mt * 100)}%</b>（ペース ${Math.round(pc.ratio * 100)}%）</span>${progBar(mc.tech, mt, pc.ratio)}` : ''}</div></section>`; }
+  /* 人別の表（全員・店舗のとき） */
+  let table = '';
+  if (pids.length > 1) {
+    const rows = ppl.filter(p => pids.includes(p.id)).map(p => ({ p, d: S.dp === 'm' ? sumMonth([p.id], ym) : sumDays([p.id], dates) })).filter(x => x.d);
+    if (own) rows.sort((a, b) => (b.d.tech || 0) - (a.d.tech || 0));
+    if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th><th>フリー</th><th>店販</th><th>客数</th><th>新規</th></tr></thead><tbody>${rows.map(({ p, d }) => `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td><td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td></tr>`).join('')}</tbody></table></div></section>`;
+  }
+  /* 店販 商品別 */
+  let rt = retailRows(pids, dates); let rtNote = '';
+  if (!rt && S.dp === 'm' && S.dsc === 'ALL' && S.retail['m_' + ym]) { rt = (S.retail['m_' + ym].items || []).map(a => ({ mid: a.m, name: a.n, qty: Number(a.q) || 0, sales: Number(a.s) || 0 })).filter(x => x.mid !== 'EC連携'); rtNote = '（全店合計のみ）'; }
+  let rhtml = '';
+  if (rt) {
+    const q = S.rq.trim().toLowerCase(); const items = rt.filter(x => x.qty && (!q || (x.name + ' ' + x.mid).toLowerCase().includes(q)));
     const tq = items.reduce((a, x) => a + x.qty, 0), ts = items.reduce((a, x) => a + x.sales, 0);
     const g = {}; items.forEach(x => (g[x.mid || 'その他'] ||= []).push(x));
     const groups = Object.entries(g).map(([m, arr]) => [m, arr.sort((a, b) => b.qty - a.qty || b.sales - a.sales)]).sort((a, b) => b[1].reduce((s, x) => s + x.qty, 0) - a[1].reduce((s, x) => s + x.qty, 0));
-    const range = r.kind === 'day' ? `${Number(r.date.slice(5, 7))}月${Number(r.date.slice(8))}日` : `${r.from ? Number(r.from.slice(8)) : 1}日〜${r.to ? Number(r.to.slice(8)) : ''}日`;
-    body = `<section class="card"><div class="card-head"><h3>${range}の店販</h3><span class="sub">${r.asOf ? new Date(r.asOf).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' 取得' : ''}</span></div>
-      <div class="rt-tot"><span>合計 <b>${fmt(tq, 'n')}</b> 個</span><span>${items.length} 商品</span>${own ? `<span>売上 <b>¥${fmt(ts, 'yen')}</b>（税抜）</span>` : ''}</div></section>
+    rhtml = `<section class="card"><div class="card-head"><h3>店販 商品別${rtNote}</h3><span class="sub">合計 <b style="font-size:18px;color:var(--ink)">${fmt(tq, 'n')}</b>個・${items.length}商品${own ? `・¥${fmt(ts, 'yen')}` : ''}</span></div>
+      <input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す"></section>
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
-  }
-  return `${mnav('ym')}${mode}${dayChips}<input class="field" id="rt-q" type="search" placeholder="商品名・中分類で探す" value="${esc(S.rq)}" aria-label="商品名で探す">${body}
-    <div class="sub">サロンアンサーの店販売上集計（商品ごと・全店合計・税抜）から自動で取り込んでいます。EC連携（ミルボンiD）分は除いています。</div>`;
+  } else rhtml = `<section class="card"><div class="empty" style="padding:10px">この期間の店販（商品別）はまだありません</div></section>`;
+  return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, `${scopeName}｜${label}`)}${monthLine}${table}${rhtml}
+    <div class="sub">サロンアンサー（明細担当・税抜・EC除く）から毎日自動で取り込み。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
 async function importRetail() {
@@ -435,6 +498,13 @@ async function importRetail() {
   try {
     const o = JSON.parse(decodeURIComponent(h.slice(8)));
     if (!o || !o.key || !Array.isArray(o.items)) throw new Error('形式が違います');
+    if (o.k === 'sd' || o.k === 'sm') {
+      const rows = o.items.map(a => ({ p: c2p(String(a[0])), m: a[1] || '', c: String(a[2] || ''), n: a[3] || '', q: Number(a[4]) || 0, s: Number(a[5]) || 0 }));
+      const ref = o.k === 'sd' ? db.doc('mr_rday/' + o.key) : db.doc('mr_rmon/' + o.key);
+      await ref.set(o.k === 'sd' ? { date: o.key, ym: o.key.slice(0, 7), rows, asOf: Date.now(), n: rows.length } : { ym: o.key, from: o.from || '', to: o.to || '', rows, asOf: Date.now(), n: rows.length });
+      window.__retailSaved = o.k + '_' + o.key + ':' + rows.length; toast('店販データを保存しました（' + rows.length + '行）');
+      history.replaceState(null, '', location.pathname + location.search); return;
+    }
     const kind = o.k === 'd' ? 'day' : 'month';
     const doc = { kind, items: o.items.map(a => Array.isArray(a) ? { m: a[0] || '', c: String(a[1] || ''), n: a[2] || '', q: Number(a[3]) || 0, s: Number(a[4]) || 0 } : a), asOf: Date.now(), src: 'サロンアンサー 店販売上集計（商品ごと・全店・税抜）', n: o.items.length };
     if (kind === 'day') { doc.date = o.key; doc.ym = o.key.slice(0, 7); } else { doc.ym = o.key; doc.from = o.from || ''; doc.to = o.to || ''; }
@@ -627,8 +697,9 @@ document.addEventListener('click', async ev => {
       case 'ym': S.ym = shiftYm(S.ym, Number(id)); render(); break;
       case 'year': S.year += Number(id); render(); break;
       case 'pick': S.pid = id; render(); break;
-      case 'rmode': S.rmode = id; render(); break;
-      case 'rday': S.rday = id; render(); break;
+      case 'dp': S.dp = id; render(); break;
+      case 'dsc': S.dsc = id; render(); window.scrollTo(0, 0); break;
+      case 'dnav': { const n = Number(id), d = S.dd || ymdOf(new Date()); S.dd = S.dp === 'd' ? addD(d, n) : S.dp === 'w' ? addD(wkStart(d), 7 * n) : shiftYm(d.slice(0, 7), n) + '-01'; render(); break; }
       case 'metric': S.metric = id; render(); break;
       case 'openP': S.pid = id; S.tab = 'person'; render(); window.scrollTo(0, 0); break;
       case 'saveTg': {
@@ -647,6 +718,7 @@ document.addEventListener('change', async ev => {
   if ((c === 'pstore' || c === 'plink') && !WHO.isOwner()) return;
   try {
     if (c === 'pickSel') { S.pid = el.value; el.blur(); render(); return; }
+    if (c === 'dscSel') { if (el.value) { S.dsc = el.value; render(); } return; }
     if (c === 'pstore') await db.doc('mr_people/' + el.dataset.id).update({ store: el.value });
     if (c === 'plink') await db.doc('mr_people/' + el.dataset.id).update({ personId: el.value });
   } catch (e) { toast(e.message); }
@@ -668,7 +740,11 @@ function listen() {
   db.collection('mr_target').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.targets = o; S.ready.add('t'); soft(); }, fail);
   db.collection('orders').orderBy('orderedAt', 'desc').limit(2000).onSnapshot(s => { S.orders = s.docs.map(d => d.data()); S.costReady = true; soft(); }, e => console.warn(e));
   db.collection('items').onSnapshot(s => { const o = {}; s.docs.forEach(d => { const x = d.data(); o[d.id] = { category: x.category || '', name: x.name || '' }; }); S.itemCat = o; soft(); }, e => console.warn(e));
-  db.collection('mr_retail').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.retail = o; if (S.tab === 'retail') soft(); }, () => {});
+  const sinceYm = shiftYm(nowYm(), -3);
+  db.collection('mr_day').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.day = o; if (S.tab === 'daily') soft(); }, () => {});
+  db.collection('mr_rday').where('ym', '>=', sinceYm).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.rdays = o; if (S.tab === 'daily') soft(); }, () => {});
+  db.collection('mr_rmon').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.rmons = o; if (S.tab === 'daily') soft(); }, () => {});
+  db.collection('mr_retail').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.retail = o; if (S.tab === 'daily') soft(); }, () => {});
   db.collection('mr_meta').onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.meta = o; S.ready.add('m'); soft(); }, fail);
 }
 (function init() {
