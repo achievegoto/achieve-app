@@ -1578,7 +1578,7 @@ document.addEventListener('click', async ev => {
     case 'month': S.monthOff = Math.min(0, (S.monthOff || 0) + Number(id)); render(); break;
     case 'confirmNo': S.confirm = ''; render(); break;
     case 'lineCancel': S.confirm = ''; cancelLine(id, Number(b.dataset.i)); break;
-    case 'cancelYes': S.confirm = ''; S.db.doc('orders/' + id).delete().then(() => toast('発注を取り消しました')).catch(fail); break;
+    case 'cancelYes': { S.confirm = ''; const o = S.orders.find(x => x.id === id); S.db.doc('orders/' + id).delete().then(() => { toast('発注を取り消しました'); if (o) logChange('order', o.store, '', null, null, { name: (o.dealerName || '') + ' の発注を取消', text: (o.lines || []).map(l => l.name + '×' + l.qty).join('、') }); }).catch(fail); break; }
     case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
