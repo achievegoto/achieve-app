@@ -972,7 +972,8 @@ function stockList() {
   /* 発注点・適正が0（未設定）で在庫も0の商品は、下にまとめて「発注しなくて大丈夫？」と確認する */
   /* 発注点・適正を0にした商品（在庫0・入荷待ちなし）は表示しない。未記入の商品は枠にまとめて確認する */
   const shown = all.filter(it => !isZeroIdle(it, S.store));
-  const quiet = [], list = shown; /* 未記入の商品は通常の一覧に表示 */
+  /* 未記入・在庫0の商品は通常の一覧に出しつつ、上の確認枠にもまとめて出す */
+  const quiet = shown.filter(it => isUnsetIdle(it, S.store)), list = shown;
   if (!shown.length) return '<div class="empty">条件に合う商品はありません。</div>';
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
@@ -1022,7 +1023,6 @@ function viewOrder() {
 }
 /* 発注タブ：発注点・適正0で在庫0の商品をまとめて確認（必要ならここから発注に追加） */
 function zeroOrderBox() {
-  return ''; /* 未記入は通常表示・発注点適正0は非表示にしたため、確認枠は使わない */
   if (S.store === 'tonari') return '';
   const quiet = S.items.filter(it => isUnsetIdle(it, S.store));
   if (!quiet.length) return '';
