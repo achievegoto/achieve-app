@@ -270,6 +270,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .late-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .late-d { display: flex; flex-direction: column; gap: 2px; } .late-d b { font-size: 13px; } .late-d span { color: var(--muted); }
 .due-acts .btn { flex: 1 1 140px; }
+.lc-row { grid-column: 1 / -1; margin-top: -4px; } .lc-row .lnk { font-size: 12px; color: var(--muted); }
+.lc-ask { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 0; }
 .zero-box { border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); padding: 2px 12px; }
 .zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 8px 0; font-size: 13px; }
 .zero-box > summary::-webkit-details-marker { display: none; }
@@ -1208,7 +1210,8 @@ function pendCard(o) {
     const got = open ? num(l.got) : num(l.qty);
     return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div></div>
       ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
-      <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : '✓'}</span>`}</div>`;
+      <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : l.cut ? '取消' : '✓'}</span>`}
+      ${left && !ro ? (S.confirm === 'lc-' + k ? `<div class="lc-ask"><span class="sub">${esc(l.name)} の残り${left}を発注から取り消しますか？（在庫は変わりません）</span><button type="button" class="btn small danger" data-act="lineCancel" data-id="${o.id}" data-i="${i}">取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button></div>` : `<div class="lc-row"><button type="button" class="lnk" id="lc-${o.id}-${i}" data-act="confirm" data-id="lc-${k}">この商品の発注を取り消す</button></div>`) : ''}</div>`;
   }).join('');
   const uKey = 'undo-' + o.id, cKey = 'cancel-' + o.id, hasR = (o.receipts || []).length || !open;
   let ctl = '';
@@ -1443,6 +1446,22 @@ async function receive(id, req) {
     toastUndo(done ? '入荷済みにしました' : '一部を入荷しました（残りは入荷待ち）', id); render();
   } catch (e) { fail(e); } finally { receiving.delete(id); }
 }
+/* 発注の1商品だけ取り消す（残り分を発注から外す。在庫は変えない） */
+async function cancelLine(id, i) {
+  const o = S.orders.find(x => x.id === id);
+  if (!o || o.status !== 'ordered' || !canRecv(o)) return;
+  let lines = (o.lines || []).map(l => ({ ...l })); const l = lines[i]; if (!l || leftOf(l) <= 0) return;
+  const name = l.name, left = leftOf(l), hasR = (o.receipts || []).length > 0;
+  if (!hasR) lines.splice(i, 1); else { l.qty = num(l.got); l.cut = true; }
+  const total = lines.reduce((a, x) => a + num(x.qty) * num(x.price), 0);
+  try {
+    if (!lines.some(x => num(x.qty) > 0) && !hasR) await S.db.doc('orders/' + id).delete();
+    else { const done = lines.every(x => leftOf(x) <= 0); await S.db.doc('orders/' + id).update({ lines, total, ...(done ? { status: 'received', receivedAt: Date.now() } : {}) }); }
+    if (S.pq) Object.keys(S.pq).filter(k => k.startsWith(id + ':')).forEach(k => delete S.pq[k]);
+    logChange('order', o.store, l.itemId, null, null, { name: (o.dealerName || '') + ' の発注を一部取消', text: name + ' 残り' + left + 'を取消' });
+    toast(name + ' の発注を取り消しました'); render();
+  } catch (e) { fail(e); }
+}
 /* 直前の入荷を取り消す：在庫から引き、TONARIから移した分は戻し、発注を入荷待ちに戻す */
 async function undoReceive(id) {
   const o = S.orders.find(x => x.id === id);
@@ -1538,6 +1557,7 @@ document.addEventListener('click', async ev => {
     case 'confirm': if (S.editing) readForm(); S.confirm = id; render(); break;
     case 'month': S.monthOff = Math.min(0, (S.monthOff || 0) + Number(id)); render(); break;
     case 'confirmNo': S.confirm = ''; render(); break;
+    case 'lineCancel': S.confirm = ''; cancelLine(id, Number(b.dataset.i)); break;
     case 'cancelYes': S.confirm = ''; S.db.doc('orders/' + id).delete().then(() => toast('発注を取り消しました')).catch(fail); break;
     case 'newItem': if (!canEdit()) break; armPin(); S.editing = { name: '', category: '', unit: '本', dealerId: '', price: 0, min: {}, par: {} }; S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'pinLock': S.pin = ''; S.editing = null; clearTimeout(pinT); render(); break;
