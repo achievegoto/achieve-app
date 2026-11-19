@@ -342,6 +342,7 @@ function onOrder(store, id) {
   return n;
 }
 const isUnset = (it, store) => it.min?.[store] === undefined && it.par?.[store] === undefined;
+const isUnsetIdle = (it, store) => !it.ended && isUnset(it, store) && qtyOf(store, it.id) === 0 && onOrder(store, it.id) === 0;
 const isZeroIdle = (it, store) => !it.ended && !isUnset(it, store) && num(it.min?.[store]) === 0 && num(it.par?.[store]) === 0 && qtyOf(store, it.id) === 0 && onOrder(store, it.id) === 0;
 const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 || num(it.par?.[store]) > 0;
 function statusOf(it, store) {
@@ -969,12 +970,14 @@ function stockList() {
     && catMatch(it)
     && (!S.onlyShort || needOf(it, S.store) > 0));
   /* 発注点・適正が0（未設定）で在庫も0の商品は、下にまとめて「発注しなくて大丈夫？」と確認する */
-  const quiet = all.filter(it => isZeroIdle(it, S.store)), list = all.filter(it => !isZeroIdle(it, S.store));
-  if (!all.length) return '<div class="empty">条件に合う商品はありません。</div>';
+  /* 発注点・適正を0にした商品（在庫0・入荷待ちなし）は表示しない。未記入の商品は枠にまとめて確認する */
+  const shown = all.filter(it => !isZeroIdle(it, S.store));
+  const quiet = shown.filter(it => isUnsetIdle(it, S.store)), list = shown.filter(it => !isUnsetIdle(it, S.store));
+  if (!shown.length) return '<div class="empty">条件に合う商品はありません。</div>';
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正0／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品はそのままでOKです。</span></summary>
+  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品は発注点・適正を0にすると表示されなくなります。</span></summary>
     ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('')}</details>` : '';
   return quietHtml + Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
 }
@@ -1020,7 +1023,7 @@ function viewOrder() {
 /* 発注タブ：発注点・適正0で在庫0の商品をまとめて確認（必要ならここから発注に追加） */
 function zeroOrderBox() {
   if (S.store === 'tonari') return '';
-  const quiet = S.items.filter(it => isZeroIdle(it, S.store));
+  const quiet = S.items.filter(it => isUnsetIdle(it, S.store));
   if (!quiet.length) return '';
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
   const row = it => {
@@ -1029,7 +1032,7 @@ function zeroOrderBox() {
     return `<div class="row"><div><div class="name">${esc(it.name)}</div><div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 0</span></div></div>
       ${S.readOnly ? '' : !did ? '<span class="pill sample">追加不可</span>' : inDraft ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small" id="zpick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 発注に追加</button>`}</div>`;
   };
-  return `<details class="zero-box"${S.zeroOpenO ? ' open' : ''} data-z="o"><summary><span class="zero-h">⚠️ 発注点・適正0／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">この商品は自動では発注に入りません。今回必要なものは「＋ 発注に追加」、ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。</span></summary>
+  return `<details class="zero-box"${S.zeroOpenO ? ' open' : ''} data-z="o"><summary><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">この商品は自動では発注に入りません。今回必要なものは「＋ 発注に追加」、ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。使わないものは発注点・適正を0にすると表示されなくなります。</span></summary>
     ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(row).join('')}</div></section>`).join('')}</details>`;
 }
 function orderCard(did, force) {
