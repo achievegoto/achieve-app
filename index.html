@@ -340,7 +340,7 @@ function onOrder(store, id) {
   return n;
 }
 const isUnset = (it, store) => it.min?.[store] === undefined && it.par?.[store] === undefined;
-const isZeroIdle = (it, store) => !it.ended && num(it.min?.[store]) === 0 && num(it.par?.[store]) === 0 && qtyOf(store, it.id) === 0 && onOrder(store, it.id) === 0;
+const isZeroIdle = (it, store) => !it.ended && !isUnset(it, store) && num(it.min?.[store]) === 0 && num(it.par?.[store]) === 0 && qtyOf(store, it.id) === 0 && onOrder(store, it.id) === 0;
 const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 || num(it.par?.[store]) > 0;
 function statusOf(it, store) {
   if (isUnset(it, store)) return 'unset';
