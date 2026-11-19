@@ -166,7 +166,10 @@ label .field { font-size: 15px; color: var(--ink); }
 .levels { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
 .levels .lv-h { font-size: 12px; color: var(--muted); }
 .levels .lv-s { font-family: var(--font-num); font-size: 15px; }
-.bk-head, .bk-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px; gap: 8px; align-items: center; }
+.bk-head, .bk-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 40px; gap: 8px; align-items: center; }
+.bk-clr { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; height: 38px; font-size: 11px; color: var(--muted); padding: 0; line-height: 1.1; }
+.bk-row.cleared input::placeholder { color: var(--bad, #b3261e); }
+.bk-allclr { align-self: flex-start; }
 .bk-head { font-size: 12px; color: var(--muted); padding: 0 2px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 2; padding-block: 6px; }
 .bk-row { padding: 6px 2px; border-bottom: 1px solid var(--line); }
 .bk-row .bk-n { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
@@ -1232,9 +1235,10 @@ function bulkView() {
     ${isBoss() ? `<div class="bk-stores" role="group" aria-label="店舗"><button type="button" class="chip" data-act="bulkStore" data-id="all" aria-pressed="${st === 'all'}">全店共通（hair・Liss・till）</button>${STORES.map(x => `<button type="button" class="chip" data-act="bulkStore" data-id="${x.id}" aria-pressed="${x.id === st}">${esc(x.short)}</button>`).join('')}</div>` : `<div class="sub">申請できるのは自分の店舗（<b>${esc(storeOf(st).short)}</b>）の発注点・適正だけです。</div>`}
   </section>
   <div class="tools"><input class="field" id="isearch" type="search" placeholder="商品名で探す" aria-label="商品名で探す" value="${esc(S.q)}">${catChips(false, true)}</div>
-  ${list.length ? `${st === 'all' ? '<div class="sub">全店共通：hair design・Liss・till の3店に同じ数字を入れます（TONARI在庫は別）。「バラバラ」は店ごとに違う数字が入っている欄で、触らなければそのままです。</div>' : ''}<div class="bk-head"><span>${st === 'all' ? '全店共通' : esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span></div>
+  ${list.length ? `<button type="button" class="btn small bk-allclr" data-act="bkClearAll">${S.confirm === 'bkClearAll' ? `もう一度押すと、表示中の${list.length}商品を${st === 'all' ? '全店' : esc(storeOf(st).short) + 'で'}未記入にします` : `表示中の商品（${list.length}）を全部未記入にする`}</button>${st === 'all' ? '<div class="sub">全店共通：hair design・Liss・till の3店に同じ数字を入れます（TONARI在庫は別）。「バラバラ」は店ごとに違う数字が入っている欄で、触らなければそのままです。</div>' : ''}<div class="bk-head"><span>${st === 'all' ? '全店共通' : esc(storeOf(st).short)}</span><span style="text-align:center">発注点</span><span style="text-align:center">適正</span><span></span></div>
   ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const A = st === 'all' ? bulkValAll(it, 'min') : { v: bulkVal(st, it, 'min') }, B = st === 'all' ? bulkValAll(it, 'par') : { v: bulkVal(st, it, 'par') }, a = A.v, b = B.v, ch = st === 'all' ? ALL3.some(x => (x + '|' + it.id) in S.bulkVals) : (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
-    return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}" ${A.mixed ? 'placeholder="バラバラ"' : ''}><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}" ${B.mixed ? 'placeholder="バラバラ"' : ''}></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
+    const clr = ch && a === '' && b === '';
+    return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}${clr ? ' cleared' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}" ${clr ? 'placeholder="未記入"' : A.mixed ? 'placeholder="バラバラ"' : ''}><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}" ${clr ? 'placeholder="未記入"' : B.mixed ? 'placeholder="バラバラ"' : ''}><button type="button" class="bk-clr" data-act="bkClear" data-id="${it.id}" aria-label="${esc(it.name)}の発注点・適正を未記入にする">未記入<br>に</button></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
   <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>${isBoss() ? 'まとめて保存' : 'まとめて申請'}${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
 }
 function viewItems() {
@@ -1523,6 +1527,14 @@ document.addEventListener('click', async ev => {
     case 'edit': if (!canEdit()) break; armPin(); S.editing = JSON.parse(JSON.stringify(S.items.find(i => i.id === id))); S.formErr = ''; S.confirm = ''; render(); window.scrollTo(0, 0); break;
     case 'bulkOpen': if (!canReq()) break; if (!isBoss() && !myStore()) { toast('所属店舗が未設定のため申請できません（後藤さんに設定を頼んでください）'); break; } armPin(); S.bulk = true; S.bulkStore = isBoss() ? (STORES.some(x => x.id === S.store) ? S.store : 'hair') : myStore(); S.bulkVals = {}; render(); window.scrollTo(0, 0); break;
     case 'bulkStore': if (!isBoss()) break; S.bulkStore = id; render(); break;
+    case 'bkClear': case 'bkClearAll': {
+      if (act === 'bkClearAll' && S.confirm !== 'bkClearAll') { S.confirm = 'bkClearAll'; render(); break; }
+      S.confirm = '';
+      const stores = S.bulkStore === 'all' ? ALL3 : [S.bulkStore], q = S.q.trim().toLowerCase();
+      const ids = act === 'bkClear' ? [id] : S.items.filter(it => (!q || it.name.toLowerCase().includes(q)) && catMatch(it)).map(it => it.id);
+      ids.forEach(iid => { const it = S.items.find(x => x.id === iid); if (!it) return; stores.forEach(st => { const k = st + '|' + iid; if (isUnset(it, st)) delete S.bulkVals[k]; else S.bulkVals[k] = { min: '', par: '' }; }); });
+      S.holdUntil = 0; render(); break;
+    }
     case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; b.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
     case 'bulkSave': {
       if (!canReq()) break; armPin();
