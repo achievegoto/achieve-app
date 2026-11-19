@@ -265,6 +265,15 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .late-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .late-d { display: flex; flex-direction: column; gap: 2px; } .late-d b { font-size: 13px; } .late-d span { color: var(--muted); }
 .due-acts .btn { flex: 1 1 140px; }
+.zero-box { border: 1px dashed var(--line); border-radius: 12px; background: var(--surface); padding: 4px 12px; }
+.zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.zero-box > summary::-webkit-details-marker { display: none; }
+.zero-box > summary::after { content: '開いて確認する ▼'; font-size: 12px; color: var(--accent); margin-top: 4px; }
+.zero-box[open] > summary::after { content: '閉じる ▲'; }
+.zero-h { font-weight: 700; } .zero-h b { color: var(--warn, #8a5a00); font-size: 18px; margin: 0 2px; }
+.zero-q { font-weight: 700; color: var(--warn, #8a5a00); }
+.zero-s { font-size: 12px; color: var(--muted); }
+.zero-box .group { margin-bottom: 12px; }
 .due.in .due-btn { display: none; } .due-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 
@@ -326,6 +335,7 @@ function onOrder(store, id) {
   return n;
 }
 const isUnset = (it, store) => it.min?.[store] === undefined && it.par?.[store] === undefined;
+const isZeroIdle = (it, store) => !it.ended && num(it.min?.[store]) === 0 && num(it.par?.[store]) === 0 && qtyOf(store, it.id) === 0 && onOrder(store, it.id) === 0;
 const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 || num(it.par?.[store]) > 0;
 function statusOf(it, store) {
   if (isUnset(it, store)) return 'unset';
@@ -947,14 +957,19 @@ function stockList() {
   if (!S.items.length) return '<div class="empty">商品がまだありません。「商品」タブから追加してください。</div>';
   if (!S.items.some(it => carried(it, S.store))) return '<div class="empty">この店舗で扱う商品が未設定です。「商品」タブで商品を開き、この店舗の発注点と適正在庫を入れてください。</div>';
   const q = S.q.trim().toLowerCase();
-  const list = S.items.filter(it => carried(it, S.store)
+  const all = S.items.filter(it => (carried(it, S.store) || qtyOf(S.store, it.id) > 0)
     && (!q || it.name.toLowerCase().includes(q))
     && catMatch(it)
     && (!S.onlyShort || needOf(it, S.store) > 0));
-  if (!list.length) return '<div class="empty">条件に合う商品はありません。</div>';
+  /* 発注点・適正が0（未設定）で在庫も0の商品は、下にまとめて「発注しなくて大丈夫？」と確認する */
+  const quiet = all.filter(it => isZeroIdle(it, S.store)), list = all.filter(it => !isZeroIdle(it, S.store));
+  if (!all.length) return '<div class="empty">条件に合う商品はありません。</div>';
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
-  return Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
+  const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
+  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">発注点・適正が0で在庫も0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品はそのままでOKです。</span></summary>
+    ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('')}</details>` : '';
+  return Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('') + quietHtml;
 }
 function pillOf(it) {
   if (it.ended) return '<span class="pill ended">取扱終了（発注しない）</span>';
@@ -1446,6 +1461,7 @@ async function clearSamples() {
   } catch (e) { fail(e); }
 }
 
+document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('zero-box')) S.zeroOpen = ev.target.open; }, true);
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const { act, id, did } = b.dataset;
