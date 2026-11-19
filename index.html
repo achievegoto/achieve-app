@@ -285,6 +285,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .zero-s { font-size: 12px; color: var(--muted); padding: 0 0 8px; }
 .zcat { border-top: 1px solid var(--line); } .zcat > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 0; font-weight: 500; font-size: 14px; } .zcat > summary::-webkit-details-marker { display: none; }
 .zcat > summary::after { content: '▼'; font-size: 10px; color: var(--muted); margin-left: auto; } .zcat[open] > summary::after { content: '▲'; }
+.zcat-sel { display: grid; grid-template-columns: minmax(0, 9em) minmax(0, 1fr); gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; font-weight: 500; } .zcat-sel .zc-n { margin-left: 6px; }
+@media (max-width: 420px) { .zcat-sel { grid-template-columns: 1fr; gap: 4px; } }
 .zc-n { font-size: 12px; color: var(--muted); font-weight: 400; } .zcat .list { margin-bottom: 10px; }
 .due.in .due-btn { display: none; } .due-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
@@ -983,7 +985,7 @@ function stockList() {
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const quietHtml = zeroSelect(quiet, 'stock');
+  const quietHtml = ''; /* 在庫タブには出さない（発注タブだけ） */
   return quietHtml + Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
 }
 function pillOf(it) {
@@ -1034,13 +1036,11 @@ function zeroOrderBox() {
 function zeroSelect(quiet, mode) {
   if (!quiet.length) return '';
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const oRow = it => { const d = dealerOf(it.dealerId || ''), did = d ? d.id : '', inD = did && draftValue(did, it.id) > 0;
-    return `<div class="row"><div><div class="name">${esc(it.name)}</div><div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 0</span></div></div>
-      ${S.readOnly ? '' : !did ? '<span class="pill sample">追加不可</span>' : inD ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small" id="zpick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 発注に追加</button>`}</div>`; };
   const zo = (S.zOpen ||= new Set()), key = mode + ':';
-  const cats = Object.entries(qg).map(([c, arr]) => `<details class="zcat" data-zk="${esc(key + c)}"${zo.has(key + c) ? ' open' : ''}><summary>${esc(c)}<span class="zc-n">${arr.length}</span></summary><div class="list">${arr.map(mode === 'order' ? oRow : it => stockRow(it).replace(/ id="[^"]*"/g, '')).join('')}</div></details>`).join('');
+  const opt = it => { const d = dealerOf(it.dealerId || ''), inD = d && draftValue(d.id, it.id) > 0; return `<option value="${it.id}"${!d || S.readOnly ? ' disabled' : ''}>${esc(it.name)}${inD ? `（追加済み ${draftValue(d.id, it.id)}）` : !d ? '（ディーラー未設定）' : ''}</option>`; };
+  const cats = Object.entries(qg).map(([c, arr]) => `<label class="zcat-sel"><span>${esc(c)}<span class="zc-n">${arr.length}</span></span><select class="field" data-chg="zPick" data-mode="order" aria-label="${esc(c)}の未記入商品"><option value="">選ぶと発注に追加</option>${arr.map(opt).join('')}</select></label>`).join('');
   return `<details class="zero-box" data-zk="${key}"${zo.has(key) ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span></summary>
-    <div class="zero-s">${mode === 'order' ? '今回必要なものは「＋ 発注に追加」。' : ''}ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。使わないものは発注点・適正を0にすると表示されなくなります。</div>${cats}</details>`;
+    <div class="zero-s">${mode === 'order' ? '今回必要なものはプルダウンで選ぶと発注に1個入ります。' : ''}ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。使わないものは発注点・適正を0にすると表示されなくなります。</div>${cats}</details>`;
 }
 function orderCard(did, force) {
   const d = dealerOf(did), rows = linesFor(did);
