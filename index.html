@@ -270,14 +270,14 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .late-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .late-d { display: flex; flex-direction: column; gap: 2px; } .late-d b { font-size: 13px; } .late-d span { color: var(--muted); }
 .due-acts .btn { flex: 1 1 140px; }
-.zero-box { border: 2px solid var(--warn, #8a5a00); border-radius: 12px; background: color-mix(in srgb, var(--warn, #8a5a00) 8%, var(--surface)); padding: 4px 12px; }
-.zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.zero-box { border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); padding: 2px 12px; }
+.zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 8px 0; font-size: 13px; }
 .zero-box > summary::-webkit-details-marker { display: none; }
-.zero-box > summary::after { content: '開いて確認する ▼'; font-size: 12px; color: var(--accent); margin-top: 4px; }
+.zero-box > summary::after { content: '確認 ▼'; font-size: 12px; color: var(--accent); margin-left: auto; }
 .zero-box[open] > summary::after { content: '閉じる ▲'; }
-.zero-h { font-weight: 700; } .zero-h b { color: var(--warn, #8a5a00); font-size: 18px; margin: 0 2px; }
-.zero-q { font-weight: 700; color: var(--warn, #8a5a00); }
-.zero-s { font-size: 12px; color: var(--muted); }
+.zero-h { font-weight: 500; color: var(--ink); } .zero-h b { color: var(--warn, #8a5a00); font-weight: 600; margin: 0 1px; }
+.zero-q { color: var(--warn, #8a5a00); font-size: 12px; }
+.zero-s { display: none; font-size: 12px; color: var(--muted); flex-basis: 100%; } .zero-box[open] .zero-s { display: block; }
 .zero-box .group { margin-bottom: 12px; }
 .due.in .due-btn { display: none; } .due-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
@@ -972,7 +972,7 @@ function stockList() {
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正が0で在庫も0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品はそのままでOKです。</span></summary>
+  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正0／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品はそのままでOKです。</span></summary>
     ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('')}</details>` : '';
   return quietHtml + Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
 }
