@@ -392,6 +392,10 @@ table.mx td .ok { color: var(--good); font-weight: 700; } table.mx td .ng { colo
 .dk-r { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
 .dk-r b { font-family: var(--font-num); font-size: 16px; color: var(--ink); font-weight: 500; margin-left: 4px; }
 .dk-tot span .dt { font-size: 12px; } .dk > b .dt { font-size: 11px; vertical-align: 2px; }
+.cline { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.cline b { font-family: var(--font-num); color: var(--ink); font-weight: 500; font-size: 14px; margin-left: 2px; }
+.cline-h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; } .cline-h b { font-size: 17px; } .cline-h small { font-size: 11px; }
+.cline-s { display: flex; flex-wrap: wrap; gap: 2px 12px; } .cline .dt { font-size: 10px; margin-left: 3px; }
 </style>
 </head>
 <body>
@@ -411,7 +415,8 @@ table.mx td .ok { color: var(--good); font-weight: 700; } table.mx td .ng { colo
 const STORES = [['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till'], ['free', '所属なし']];
 const M = [
   ['tech', '指名技術売上', 'yen', 'sum'], ['free', 'フリー技術売上', 'yen', 'sum'], ['retail', '店販売上', 'yen', 'sum'], ['cust', '客数', 'n', 'sum'], ['unit', '客単価', 'yen', 'calc'],
-  ['buyers', '購入者', 'n', 'sum'], ['buyRate', '店販購入率', 'pct', 'calc'], ['retRate', '店販売上比率', 'pct', 'calc'], ['repeat', '再来店率', 'pct', 'avg'], ['next', '次予率', 'pct', 'avg'], ['newc', '新規入客', 'n', 'sum'],
+  ['buyers', '購入者', 'n', 'sum'], ['buyRate', '店販購入率', 'pct', 'calc'], ['retRate', '店販売上比率', 'pct', 'calc'],
+  ['colorRate', 'カラー比率', 'pct', 'calc'], ['vlRate', 'ヴィラロドラ比率', 'pct', 'calc'], ['ptRate', 'プレトワ比率', 'pct', 'calc'], ['vpRate', 'ヴィラ&プレトワ比率', 'pct', 'calc'], ['orgRate', 'ヴィラ・プレトワ計', 'pct', 'calc'], ['repeat', '再来店率', 'pct', 'avg'], ['next', '次予率', 'pct', 'avg'], ['newc', '新規入客', 'n', 'sum'],
   ['over', '時間超過人数', 'n', 'sum', 'noyoy'], ['overRate', '時間超過率', 'pct', 'avg', 'noyoy'],
 ];
 const TG = [['tech', '指名技術売上'], ['free', 'フリー技術売上'], ['retail', '店販売上'], ['cust', '客数'], ['newc', '新規入客'], ['next', '次予率']];
@@ -433,7 +438,7 @@ const S = { user: undefined, ready: new Set(), people: [], data: {}, targets: {}
 const D0 = (pid, ym) => S.data[pid + '_' + ym] || null;
 const AGG = [['ALL', '全員']].concat([['hair', 'achieve'], ['liss', 'Liss'], ['till', 'till']].map(([id, l]) => ['S:' + id, l + ' 全体']));
 const GROUP = id => id === 'ALL' ? active().filter(p => !p.ownerOnly) : String(id).startsWith('S:') ? active().filter(p => p.store === id.slice(2) && !p.ownerOnly) : null;
-const SUMK = ['tech', 'free', 'retail', 'cust', 'custAll', 'buyers', 'newc', 'over'], WK = ['repeat', 'next', 'overRate'];
+const SUMK = ['tech', 'free', 'retail', 'cust', 'custAll', 'buyers', 'newc', 'over', 'techCust', 'colorCust', 'vlCust', 'ptCust', 'vpCust'], WK = ['repeat', 'next', 'overRate'];
 function D(pid, ym) {
   const g = GROUP(pid); if (!g) return D0(pid, ym);
   const rows = g.map(p => D0(p.id, ym)).filter(Boolean); if (!rows.length) return null;
@@ -446,6 +451,8 @@ function val(d, k) {
   if (!d) return null;
   if (k === 'unit') return d.unit != null ? d.unit : d.tech != null && d.cust ? (d.tech + (d.free || 0)) / d.cust : null;
   if (k === 'buyRate') { const c = d.custAll || d.cust; return d.buyers != null && c ? d.buyers / c * 100 : null; }
+  if (k === 'colorRate') return d.colorCust != null && d.techCust ? d.colorCust / d.techCust * 100 : null;
+  if (k === 'vlRate' || k === 'ptRate' || k === 'vpRate' || k === 'orgRate') { if (d.colorCust == null || !d.colorCust) return null; const v = k === 'orgRate' ? (d.vlCust || 0) + (d.ptCust || 0) + (d.vpCust || 0) : d[k.slice(0, 2) + 'Cust'] || 0; return v / d.colorCust * 100; }
   if (k === 'retRate') { const t = (d.tech || 0) + (d.free || 0) + (d.retail || 0); return d.retail != null && t ? d.retail / t * 100 : null; }
   return d[k] ?? null;
 }
@@ -467,7 +474,7 @@ function yearAgg(pid, y, k, kind) {
   const vals = []; for (let m = 1; m <= 12; m++) { const d = D(pid, `${y}-${pad(m)}`); const v = val(d, k); if (v != null) vals.push([v, d]); }
   if (!vals.length) return null;
   if (k === 'unit') { let t = 0, c = 0; vals.forEach(([, d]) => { t += d.tech || 0; c += d.cust || 0; }); return c ? t / c : null; }
-  if (k === 'buyRate' || k === 'retRate') { const o = { tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, buyers: 0 }; vals.forEach(([, d]) => Object.keys(o).forEach(x => o[x] += d[x] || 0)); return val(o, k); }
+  if (['buyRate', 'retRate', 'colorRate', 'vlRate', 'ptRate', 'vpRate', 'orgRate'].includes(k)) { const o = { techCust: 0, colorCust: 0, vlCust: 0, ptCust: 0, vpCust: 0, tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, buyers: 0 }; vals.forEach(([, d]) => Object.keys(o).forEach(x => o[x] += d[x] || 0)); return val(o, k); }
   const s = vals.reduce((a, x) => a + x[0], 0);
   return kind === 'avg' ? s / vals.length : s;
 }
@@ -511,22 +518,22 @@ function dRange() {
 }
 function scopePids() { const g = GROUP(S.dsc); return g ? g.map(p => p.id) : [S.dsc]; }
 function sumDays(pids, dates) {
-  const o = { tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
+  const o = { techCust: 0, colorCust: 0, vlCust: 0, ptCust: 0, vpCust: 0, tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
   pids.forEach(p => dates.forEach(dt => { const x = S.day[p + '_' + dt]; if (!x) return; any = true; Object.keys(o).forEach(k => o[k] += Number(x[k]) || 0); }));
   return any ? o : null;
 }
 function sumMonth(pids, ym) {
-  const o = { tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
+  const o = { techCust: 0, colorCust: 0, vlCust: 0, ptCust: 0, vpCust: 0, tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
   pids.forEach(p => { const x = D0(p, ym); if (!x) return; any = true; Object.keys(o).forEach(k => o[k] += Number(x[k]) || 0); });
   return any ? o : null;
 }
 const yearYms = y => Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}`);
 function sumYear(pids, y) {
-  const o = { tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
+  const o = { techCust: 0, colorCust: 0, vlCust: 0, ptCust: 0, vpCust: 0, tech: 0, free: 0, retail: 0, cust: 0, custAll: 0, newc: 0, buyers: 0 }; let any = false;
   yearYms(y).forEach(ym => { const m = sumMonth(pids, ym); if (!m) return; any = true; Object.keys(o).forEach(k => o[k] += m[k]); });
   return any ? o : null;
 }
-const ADDK = ['tech', 'free', 'retail', 'cust', 'custAll', 'newc', 'buyers'];
+const ADDK = ['tech', 'free', 'retail', 'cust', 'custAll', 'newc', 'buyers', 'techCust', 'colorCust', 'vlCust', 'ptCust', 'vpCust'];
 const scaleObj = (o, r) => { if (!o) return null; const x = {}; ADDK.forEach(k => x[k] = (o[k] || 0) * r); return x; };
 /* 前年同期：今年なら1月〜今月（今月は同じ日数分に換算）、過去の年なら1年分 */
 function prevYTD(pids, yr) {
@@ -556,7 +563,7 @@ function kpiCard(cur, pids, dates, scope, label, prev, prevLabel) {
   const hasBuy = cur.buyers > 0 || dates[0] >= '2026-11-01';
   return `<section class="card"><div class="card-head"><div><h3>${esc(scope)}</h3><div class="sub">${esc(label)}</div></div><div class="dk-tot"><span>総売上</span><b>¥${fmt(tot, 'yen')}</b>${prev ? (() => { const pt = prev.tech + prev.free + prev.retail; return pt ? `<span>${esc(prevLabel || '昨対')} ${diffTag(tot, pt, 'tot')}</span>` : ''; })() : ''}</div></div>
     <div class="dkg">${line('tech', '指名技術', 'yen')}${line('free', 'フリー技術', 'yen')}${line('retail', '店販', 'yen')}${line('cust', '客数（指名）', '人')}${line('newc', '新規', '人')}${hasBuy ? line('buyers', '店販購入', '人') : ''}</div>
-    <div class="dk-r">${hasBuy && (cur.custAll || cur.cust) ? `<span>店販購入率 <b>${(cur.buyers / (cur.custAll || cur.cust) * 100).toFixed(1)}%</b></span>` : ''}${cur.custAll ? `<span>総客数 <b>${fmt(cur.custAll, 'n')}人</b></span>` : ''}${tot ? `<span>店販売上比率 <b>${(cur.retail / tot * 100).toFixed(1)}%</b></span>` : ''}</div></section>`;
+    <div class="dk-r">${hasBuy && (cur.custAll || cur.cust) ? `<span>店販購入率 <b>${(cur.buyers / (cur.custAll || cur.cust) * 100).toFixed(1)}%</b></span>` : ''}${cur.custAll ? `<span>総客数 <b>${fmt(cur.custAll, 'n')}人</b></span>` : ''}${cur.techCust ? `<span>カラー比率 <b>${val(cur, 'colorRate').toFixed(1)}%</b></span><span>ヴィラロドラ <b>${val(cur, 'vlRate')?.toFixed(1) ?? '-'}%</b></span><span>プレトワ <b>${val(cur, 'ptRate')?.toFixed(1) ?? '-'}%</b></span><span>V&P <b>${val(cur, 'vpRate')?.toFixed(1) ?? '-'}%</b></span><span>ヴィラ・プレトワ計 <b>${val(cur, 'orgRate')?.toFixed(1) ?? '-'}%</b></span>` : ''}${tot ? `<span>店販売上比率 <b>${(cur.retail / tot * 100).toFixed(1)}%</b></span>` : ''}</div></section>`;
 }
 /* 古い月の日報データは見るときだけ読み込む */
 const DAYS = { since: '9999-99', oldD: {}, oldR: {}, liveD: {}, liveR: {}, done: new Set(), wk: new Set() };
@@ -604,7 +611,7 @@ function dailyView() {
   if (pids.length > 1) {
     const rows = ppl.filter(p => pids.includes(p.id)).map(p => ({ p, d: S.dp === 'm' ? sumMonth([p.id], ym) : S.dp === 'y' ? sumYear([p.id], yr) : sumDays([p.id], dates) })).filter(x => x.d);
     if (own) rows.sort((a, b) => (b.d.tech || 0) - (a.d.tech || 0));
-    if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th>${S.dp === 'y' || S.dp === 'm' ? '<th>総売上 昨対</th>' : ''}<th>フリー</th><th>店販</th><th>店販比</th><th>客数</th><th>新規</th>${rows.some(r => r.d.buyers) ? '<th>購入率</th>' : ''}</tr></thead><tbody>${rows.map(({ p, d }) => { const r = val(d, 'retRate'), br = val(d, 'buyRate'); return `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td>${S.dp === 'y' || S.dp === 'm' ? (() => { const q = prevOf([p.id]), a = d.tech + d.free + d.retail, b = q ? q.tech + q.free + q.retail : 0, yv = b ? yoy(a, b) : null; return `<td class="cell">${yv == null ? '-' : `<span class="${yv >= 0 ? 'ok' : 'ng'}">${yv >= 0 ? '+' : ''}${yv.toFixed(1)}%</span>`}</td>`; })() : ''}<td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${r == null ? '' : r.toFixed(1) + '%'}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td>${rows.some(x => x.d.buyers) ? `<td class="cell">${br == null ? '' : br.toFixed(1) + '%'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div></section>`;
+    if (rows.length) table = `<section class="card"><h3>人別</h3><div class="tbl-wrap"><table class="mx"><thead><tr><th>名前</th><th>指名技術</th>${S.dp === 'y' || S.dp === 'm' ? '<th>総売上 昨対</th>' : ''}<th>フリー</th><th>店販</th><th>店販比</th><th>客数</th><th>新規</th>${rows.some(r => r.d.buyers) ? '<th>購入率</th>' : ''}${rows.some(r => r.d.techCust) ? '<th>カラー比</th><th>ヴィラ・プレトワ</th>' : ''}</tr></thead><tbody>${rows.map(({ p, d }) => { const r = val(d, 'retRate'), br = val(d, 'buyRate'); return `<tr class="click" data-act="dsc" data-id="${p.id}"><td>${esc(p.name)}</td><td class="cell">${fmt(d.tech, 'yen')}</td>${S.dp === 'y' || S.dp === 'm' ? (() => { const q = prevOf([p.id]), a = d.tech + d.free + d.retail, b = q ? q.tech + q.free + q.retail : 0, yv = b ? yoy(a, b) : null; return `<td class="cell">${yv == null ? '-' : `<span class="${yv >= 0 ? 'ok' : 'ng'}">${yv >= 0 ? '+' : ''}${yv.toFixed(1)}%</span>`}</td>`; })() : ''}<td class="cell">${fmt(d.free, 'yen')}</td><td class="cell">${fmt(d.retail, 'yen')}</td><td class="cell">${r == null ? '' : r.toFixed(1) + '%'}</td><td class="cell">${fmt(d.cust, 'n')}</td><td class="cell">${fmt(d.newc, 'n')}</td>${rows.some(x => x.d.buyers) ? `<td class="cell">${br == null ? '' : br.toFixed(1) + '%'}</td>` : ''}${rows.some(x => x.d.techCust) ? `<td class="cell">${val(d, 'colorRate') == null ? '' : val(d, 'colorRate').toFixed(1) + '%'}</td><td class="cell">${val(d, 'orgRate') == null ? '' : val(d, 'orgRate').toFixed(1) + '%'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div></section>`;
   }
   /* 店販 商品別 */
   let rt = retailRows(pids, dates); let rtNote = '';
@@ -710,18 +717,24 @@ function monthView() {
     const mini = (k, l, ty) => { const v = val(d, k); return v == null ? '' : `<span>${l} <b>${ty === 'yen' ? '¥' : ''}${fmt(v, ty)}${ty === 'pct' ? '%' : ''}</b></span>`; };
     return `<button type="button" class="prow" data-act="openP" data-id="${p.id}"><div class="prow-top"><span class="prow-n">${esc(p.name)}</span><span class="prow-t">${tt == null ? '—' : '¥' + fmt(tt, 'yen')}${tq ? diffTag(tt, tq * pc.ratio, 'tot') : ''}</span></div>
       <div class="prow-g"><span>指名技術 <b>¥${fmt(tc, 'yen')}</b></span>${tg ? `<span class="prow-a ${tc >= tg * pc.ratio ? 'ok' : 'ng'}">目標 ¥${fmt(tg, 'yen')}・${Math.round(tc / tg * 100)}%</span>` : ''}</div>${tg ? progBar(tc, tg, pc.ratio) : ''}
-      <div class="prow-s">${mini('free', 'フリー', 'yen')}${mini('retail', '店販', 'yen')}${mini('cust', '客数', 'n')}${mini('unit', '客単価', 'yen')}${mini('next', '次予', 'pct')}${mini('newc', '新規', 'n')}${mini('buyRate', '店販購入率', 'pct')}${mini('retRate', '店販比率', 'pct')}</div></button>`;
+      <div class="prow-s">${mini('free', 'フリー', 'yen')}${mini('retail', '店販', 'yen')}${mini('cust', '客数', 'n')}${mini('unit', '客単価', 'yen')}${mini('next', '次予', 'pct')}${mini('newc', '新規', 'n')}${mini('buyRate', '店販購入率', 'pct')}${mini('retRate', '店販比率', 'pct')}${mini('colorRate', 'カラー比率', 'pct')}${mini('orgRate', 'ヴィラ・プレトワ', 'pct')}</div></button>`;
   }).join('')}</div></div>`).join('');
   const storeCards = `<div class="group"><h2>店舗別</h2><div class="stores">${AGG.slice(1).filter(a => GROUP(a[0]).length).map(([gid, l]) => {
     const d = D(gid, ym) || {}, q = D(gid, py) || {}, t = T(gid, ym);
     const one = (k, label, ty) => { const c = val(d, k), pv0 = val(q, k), pv = pv0 != null && !RATE(k) && k !== 'unit' ? pv0 * pc.ratio : pv0;
       return `<div class="kpi"><span class="kl">${label}</span><b>${c == null ? '—' : (ty === 'yen' ? '¥' : '') + fmt(c, ty)}${ty === 'pct' && c != null ? '<small>%</small>' : ''}</b><span class="ks">${diffTag(c, pv, k)}</span></div>`; };
     return `<button type="button" class="card pcard scard" data-act="openP" data-id="${gid}"><div class="card-head"><h3>${esc(l.replace(' 全体', ''))}</h3><span class="sub">${GROUP(gid).length}名${t.tech ? ` ・ 達成 ${((val(d, 'tech') || 0) / t.tech * 100).toFixed(0)}%` : ''}</span></div>${totTag(d, q, pc.ratio)}${costTag(gid, d, ym)}
-      <div class="kpis">${one('tech', '指名技術', 'yen')}${one('free', 'フリー技術', 'yen')}${one('retail', '店販売上', 'yen')}${one('cust', '客数', 'n')}${one('unit', '客単価', 'yen')}${one('next', '次予率', 'pct')}${one('newc', '新規', 'n')}${one('overRate', '時間超過率', 'pct')}${one('buyRate', '店販購入率', 'pct')}${one('retRate', '店販売上比率', 'pct')}</div></button>`;
+      <div class="kpis">${one('tech', '指名技術', 'yen')}${one('free', 'フリー技術', 'yen')}${one('retail', '店販売上', 'yen')}${one('cust', '客数', 'n')}${one('unit', '客単価', 'yen')}${one('next', '次予率', 'pct')}${one('newc', '新規', 'n')}${one('overRate', '時間超過率', 'pct')}${one('buyRate', '店販購入率', 'pct')}${one('retRate', '店販売上比率', 'pct')}</div>${colorLine(d, q)}</button>`;
   }).join('')}</div></div>`;
   return mnav('ym') + head + storeCards + cards + (WHO.isAdmin() ? `<div class="sub">数字の取り込みは、Claudeに「月報を更新して」と頼んでください（サロンアンサーから取得します）。</div>` : '');
 }
-const RATE = k => k === 'repeat' || k === 'next' || k === 'overRate' || k === 'buyRate' || k === 'retRate';
+/* カラー比率＝カラー客数÷技術客数。ヴィラロドラ・プレトワ・V&Pはカラー客数に対する割合 */
+function colorLine(d, q) {
+  if (val(d, 'colorRate') == null) return '';
+  const it = (k, l) => { const v = val(d, k); return v == null ? '' : `<span>${l} <b>${v.toFixed(1)}%</b>${q ? diffTag(v, val(q, k), k) : ''}</span>`; };
+  return `<div class="cline"><div class="cline-h">${it('colorRate', 'カラー比率')}<small>カラー${fmt(d.colorCust, 'n')}人／技術${fmt(d.techCust, 'n')}人</small></div><div class="cline-s">${it('vlRate', 'ヴィラロドラ')}${it('ptRate', 'プレトワ')}${it('vpRate', 'ヴィラ&プレトワ')}${it('orgRate', '合計')}</div></div>`;
+}
+const RATE = k => ['repeat', 'next', 'overRate', 'buyRate', 'retRate', 'colorRate', 'vlRate', 'ptRate', 'vpRate', 'orgRate'].includes(k);
 const last12 = ym => Array.from({ length: 12 }, (_, i) => shiftYm(ym, i - 11));
 function diffTag(c, p, k) {
   if (c == null || p == null) return '';
