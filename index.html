@@ -272,6 +272,9 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due-acts .btn { flex: 1 1 140px; }
 .lc-row { grid-column: 1 / -1; margin-top: -4px; } .lc-row .lnk { font-size: 12px; color: var(--muted); }
 .lc-ask { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 0; }
+.zero-sel { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); font-size: 13px; }
+.zero-sel .zero-q { margin-left: 4px; }
+.row.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color .3s; }
 .zero-box { border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); padding: 2px 12px; }
 .zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 8px 0; font-size: 13px; }
 .zero-box > summary::-webkit-details-marker { display: none; }
@@ -978,8 +981,7 @@ function stockList() {
   const groups = {};
   list.forEach(it => (groups[it.category || 'その他'] ||= []).push(it));
   const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const quietHtml = quiet.length ? `<details class="zero-box"${S.zeroOpen ? ' open' : ''}><summary><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">使う商品なら「商品」タブで発注点・適正在庫を入れてください。使わない商品は発注点・適正を0にすると表示されなくなります。</span></summary>
-    ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('')}</details>` : '';
+  const quietHtml = zeroSelect(quiet, 'stock');
   return quietHtml + Object.entries(groups).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(stockRow).join('')}</div></section>`).join('');
 }
 function pillOf(it) {
@@ -1024,17 +1026,15 @@ function viewOrder() {
 /* 発注タブ：発注点・適正0で在庫0の商品をまとめて確認（必要ならここから発注に追加） */
 function zeroOrderBox() {
   if (S.store === 'tonari') return '';
-  const quiet = S.items.filter(it => isUnsetIdle(it, S.store));
+  return zeroSelect(S.items.filter(it => isUnsetIdle(it, S.store)), 'order');
+}
+/* 発注点・適正が未記入で在庫0の商品：プルダウンで確認（在庫タブ＝その商品へ移動／発注タブ＝発注に追加） */
+function zeroSelect(quiet, mode) {
   if (!quiet.length) return '';
-  const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
-  const row = it => {
-    const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
-    const inDraft = did && draftValue(did, it.id) > 0;
-    return `<div class="row"><div><div class="name">${esc(it.name)}</div><div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 0</span></div></div>
-      ${S.readOnly ? '' : !did ? '<span class="pill sample">追加不可</span>' : inDraft ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small" id="zpick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 発注に追加</button>`}</div>`;
-  };
-  return `<details class="zero-box"${S.zeroOpenO ? ' open' : ''} data-z="o"><summary><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">この商品は自動では発注に入りません。今回必要なものは「＋ 発注に追加」、ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。使わないものは発注点・適正を0にすると表示されなくなります。</span></summary>
-    ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(row).join('')}</div></section>`).join('')}</details>`;
+  const opt = it => { const d = dealerOf(it.dealerId || ''), inD = d && draftValue(d.id, it.id) > 0;
+    return `<option value="${it.id}"${mode === 'order' && (!d || S.readOnly) ? ' disabled' : ''}>${esc(it.name)}${mode === 'order' ? (inD ? '（追加済み）' : !d ? '（ディーラー未設定）' : '') : ''}</option>`; };
+  return `<label class="zero-sel"><span class="zero-h">⚠️ 発注点・適正が未記入／在庫0 <b>${quiet.length}</b>点 <span class="zero-q">発注しなくて大丈夫ですか？</span></span>
+    <select class="field" data-chg="zPick" data-mode="${mode}" aria-label="発注点・適正が未記入で在庫0の商品"><option value="">${mode === 'order' ? '選ぶと発注に追加します' : '選ぶとその商品へ移動します'}（${quiet.length}点）</option>${catGroups(quiet, opt)}</select></label>`;
 }
 function orderCard(did, force) {
   const d = dealerOf(did), rows = linesFor(did);
@@ -1628,6 +1628,9 @@ document.addEventListener('change', ev => {
     const any = linesFor(did).some(r => r.qty > 0) || extraLines(did).length, m = $('msg-' + did), cp = $('copy-' + did), dn = $('done-' + did), gm = $('msg-__goto');
     if (m) m.value = any ? msgText(did) : ''; if (cp) cp.disabled = !any; if (dn) dn.disabled = S.readOnly || !any; if (gm) gm.value = gotoText(); return; }
   if (c === 'xShow' && el.value) { (S.xShow ||= new Set()).add(S.store + ':' + el.value); (S.oOpen ||= new Set()).add(el.value); S.oPick = el.value; render(); window.scrollTo(0, 0); return; }
+  if (c === 'zPick' && el.value) { const v = el.value; el.value = ''; el.blur();
+    if (el.dataset.mode === 'order') { const it = S.items.find(i => i.id === v), d = it && dealerOf(it.dealerId || ''); if (!d) { toast('ディーラーが未設定です'); return; } bumpDraft(d.id, v, 1); toast(it.name + 'を発注に追加しました'); render(); return; }
+    const r = $('q-' + v); const row = r && r.closest('.row'); if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1800); } return; }
   if (c === 'oPick') { S.oPick = el.value; el.blur(); render(); window.scrollTo(0, 0); return; }
   if (c === 'addLine' && el.value) { bumpDraft(did, el.value, 1); el.value = ''; el.blur(); render(); }
   if (c === 'addOther' && el.value) { const [d, i] = el.value.split('|'); bumpDraft(d, i, 1); el.value = ''; el.blur(); render(); }
