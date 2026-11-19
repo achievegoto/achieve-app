@@ -401,8 +401,8 @@ function monthTotal(store) {
 }
 const draftKey = did => S.store + ':' + did;
 const held = (did, id) => { const h = (S.hold || {})[draftKey(did)]; return !!(h && Date.now() < num(h.until) && Object.prototype.hasOwnProperty.call(h.ids || {}, id)); };
-/* 次の日曜 0:00（発注済みは日・月に押すルールなので、そこで保留を解除） */
-const nextSunday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7)); return d.getTime(); };
+/* 日・月に押したら次の日曜まで、火〜土に押したら翌週の日曜まで（例：木曜11/19 → 11/29） */
+const nextSunday = () => { const d = new Date(), w = d.getDay(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((7 - w) % 7 || 7) + (w >= 2 ? 7 : 0)); return d.getTime(); };
 function linesFor(did) {
   const draft = S.draft[draftKey(did)] || {};
   const rows = [];
