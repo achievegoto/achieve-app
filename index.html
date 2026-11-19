@@ -1013,7 +1013,22 @@ function viewOrder() {
   const cards = pick ? (pick === '__goto' ? gotoCard(true) : orderCard(pick, true)) : gotoCard() + ids.map(did => orderCard(did)).join('');
   const rest = S.dealers.filter(d => !ids.includes(d.id));
   const xsel = !S.readOnly && rest.length ? `<label class="lbl opick">ほかのディーラーに在庫にない商品を手打ちで発注<select class="field" data-chg="xShow"><option value="">ディーラーを選ぶ</option>${rest.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></label>` : '';
-  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + sel + cards + xsel + extra;
+  return WHO.badgeOffer() + (ids.length ? lockBar() : '') + body + zeroOrderBox() + sel + cards + xsel + extra;
+}
+/* 発注タブ：発注点・適正0で在庫0の商品をまとめて確認（必要ならここから発注に追加） */
+function zeroOrderBox() {
+  if (S.store === 'tonari') return '';
+  const quiet = S.items.filter(it => isZeroIdle(it, S.store));
+  if (!quiet.length) return '';
+  const qg = {}; quiet.forEach(it => (qg[it.category || 'その他'] ||= []).push(it));
+  const row = it => {
+    const d = dealerOf(it.dealerId || ''), did = d ? d.id : '';
+    const inDraft = did && draftValue(did, it.id) > 0;
+    return `<div class="row"><div><div class="name">${esc(it.name)}</div><div class="sub"><span>${d ? esc(d.name) : 'ディーラー未設定'}</span><span>在庫 0</span></div></div>
+      ${S.readOnly ? '' : !did ? '<span class="pill sample">追加不可</span>' : inDraft ? `<span class="pill ok">追加済み ${draftValue(did, it.id)}</span>` : `<button type="button" class="btn small" id="zpick-${it.id}" data-act="pickAdd" data-did="${did}" data-id="${it.id}">＋ 発注に追加</button>`}</div>`;
+  };
+  return `<details class="zero-box"${S.zeroOpenO ? ' open' : ''} data-z="o"><summary><span class="zero-h">⚠️ 発注点・適正0／在庫0の商品 <b>${quiet.length}</b>点</span><span class="zero-q">発注しなくて大丈夫ですか？</span><span class="zero-s">この商品は自動では発注に入りません。今回必要なものは「＋ 発注に追加」、ずっと使うものは「商品」タブで発注点・適正在庫を入れてください。</span></summary>
+    ${Object.entries(qg).map(([c, arr]) => `<section class="group"><h2>${esc(c)}</h2><div class="list">${arr.map(row).join('')}</div></section>`).join('')}</details>`;
 }
 function orderCard(did, force) {
   const d = dealerOf(did), rows = linesFor(did);
@@ -1467,7 +1482,7 @@ async function clearSamples() {
   } catch (e) { fail(e); }
 }
 
-document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('zero-box')) S.zeroOpen = ev.target.open; }, true);
+document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('zero-box')) { if (ev.target.dataset.z === 'o') S.zeroOpenO = ev.target.open; else S.zeroOpen = ev.target.open; } }, true);
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const { act, id, did } = b.dataset;
