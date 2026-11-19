@@ -266,7 +266,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due-s span { background: #fff; border: 1px solid #f3b3b5; border-radius: 99px; padding: 2px 8px; }
 .due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); overflow: hidden; }
+.due-card .late-list { overflow: auto; min-height: 60px; flex: 1 1 auto; } .due-card .due-acts { flex: 0 0 auto; }
 .late-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .late-d { display: flex; flex-direction: column; gap: 2px; } .late-d b { font-size: 13px; } .late-d span { color: var(--muted); }
 .due-acts .btn { flex: 1 1 140px; }
@@ -399,6 +400,9 @@ function monthTotal(store) {
     .reduce((a, o) => a + num(o.total), 0);
 }
 const draftKey = did => S.store + ':' + did;
+const held = (did, id) => { const h = (S.hold || {})[draftKey(did)]; return !!(h && Date.now() < num(h.until) && Object.prototype.hasOwnProperty.call(h.ids || {}, id)); };
+/* 次の日曜 0:00（発注済みは日・月に押すルールなので、そこで保留を解除） */
+const nextSunday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7)); return d.getTime(); };
 function linesFor(did) {
   const draft = S.draft[draftKey(did)] || {};
   const rows = [];
@@ -407,6 +411,7 @@ function linesFor(did) {
     if (did === XFER ? x <= 0 && !Object.prototype.hasOwnProperty.call(draft, it.id) : (it.dealerId || '') !== did) continue;
     const need = did === XFER ? x : Math.max(0, needOf(it, S.store) - x);
     const has = Object.prototype.hasOwnProperty.call(draft, it.id);
+    if (!has && held(did, it.id)) continue; /* 発注済みにしたとき「今回は発注しない」と減らした商品は次の日曜まで出さない */
     if (need > 0 || has) rows.push({ it, qty: has ? num(draft[it.id]) : need, auto: need, manual: has });
   }
   return rows;
@@ -1421,7 +1426,12 @@ async function markPlaced(did, quiet) {
   const lines = active.map(r => ({ itemId: r.it.id, name: r.it.name, unit: r.it.unit || '', qty: r.qty, price: num(r.it.price) }));
   try {
     await S.db.collection('orders').doc().set({ store: S.store, dealerId: did, dealerName: d.name, lines, total: lines.reduce((a, l) => a + l.qty * l.price, 0), status: 'ordered', orderedAt: Date.now(), extra: xt });
-    delete S.draft[draftKey(did)]; draftDoc(did).delete().catch(() => {});
+    /* 手で減らした・0にした商品は、発注済みのあとで自動の数として復活しないよう次の日曜まで保留にする */
+    const ids = {}; linesFor(did).forEach(r => { if (r.manual && r.qty < r.auto) ids[r.it.id] = r.auto - r.qty; });
+    const prevH = (S.hold || {})[draftKey(did)]; if (prevH && Date.now() < num(prevH.until)) Object.assign(ids, prevH.ids || {});
+    delete S.draft[draftKey(did)];
+    if (Object.keys(ids).length) { const h = { ids, until: nextSunday() }; (S.hold ||= {})[draftKey(did)] = h; draftDoc(did).set({ store: S.store, did, lines: {}, extra: '', hold: h, at: Date.now() }).catch(() => {}); }
+    else draftDoc(did).delete().catch(() => {});
     logChange('order', S.store, '', null, null, { name: d.name + ' に発注', text: lines.map(l => l.name + '×' + l.qty).concat(xt ? [xt.replace(/\n/g, '、')] : []).join('、') + '（' + lines.reduce((a, l) => a + l.qty * l.price, 0).toLocaleString() + '円）' });
     if (!quiet) { toast('発注済みにしました'); render(); }
   } catch (e) { fail(e); }
@@ -1923,7 +1933,7 @@ function listen(fs) {
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
-  fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; } }); S.draft = d; S.draftExtra = ex; scheduleRender(); }, () => {});
+  fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; scheduleRender(); }, () => {});
   fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
