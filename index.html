@@ -273,7 +273,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .greq-l { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; } .greq-l li { display: flex; justify-content: space-between; gap: 12px; } .greq-l li span { min-width: 0; }
 .sa-card .sa-list { display: flex; flex-direction: column; } .sa-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .sa-row.need { background: color-mix(in srgb, var(--warn, #8a5a00) 5%, transparent); } .sa-to { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; } .sa-to select { width: 100%; }
-.sa-btns { display: flex; gap: 8px; flex-wrap: wrap; } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
+.sa-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .sa-chips .chip { white-space: nowrap; } .sa-row .sa-warn { font-size: 12.5px; } .sa-q { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; } .sa-btns label.sa-q { display: inline-flex !important; flex-direction: row !important; margin: 0; } .sa-q input { width: 64px; padding: 6px 8px; } .sa-row.done { opacity: .6; } .sa-chips { flex-wrap: wrap; margin: 6px 0; } .sa-n { color: var(--pend); } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
 .cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; flex: 0 0 auto; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); overflow: hidden; }
@@ -659,58 +659,116 @@ function saGuess(name) {
 const saMapOf = c => (S.saMap || {})[c];
 const saKey = r => r.date + '|' + r.p + '|' + r.c;
 function saStoreOf(p) { const pp = (S.mrPeople || {})[p]; return pp && pp.store && DUE_STORES.includes(pp.store) ? pp.store : ''; }
-/* この店で反映待ちの販売行 */
-function saPending(store) {
+const saYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const saDate = s => new Date(s + 'T00:00:00');
+const saMon = s => { const d = saDate(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return saYmd(d); };
+const saAdd = (s, n) => { const d = saDate(s); d.setDate(d.getDate() + n); return saYmd(d); };
+const saMD = s => (+s.slice(5, 7)) + '/' + (+s.slice(8, 10));
+const SA_WD = ['日', '月', '火', '水', '木', '金', '土'];
+/* この店の販売行（反映済みも含む） */
+function saRows(store) {
   const out = [];
   /* 店舗別データ（mr_rsday）がある日はそれを使う。無い日は担当者の所属店で判断（mr_rday） */
   const sdays = new Set((S.saSDays || []).map(d => d.date));
   const src = (S.saSDays || []).filter(d => d.store === store).map(d => ({ ...d, byStore: true })).concat((S.saDays || []).filter(d => !sdays.has(d.date)));
   for (const d of src) for (const r of d.rows || []) {
-    if (r.m === 'EC連携' || !(num(r.q) > 0)) continue;
+    if (r.m === 'EC連携' || !(num(r.q) > 0) || d.date < SA_START) continue;
     const row = { date: d.date, p: d.byStore ? 'st:' + store + ':' + r.p : r.p, c: String(r.c), n: r.n, q: num(r.q) };
     const st = d.byStore ? store : saStoreOf(r.p); if (st && st !== store) continue;
-    const a = (S.saApplied || {})[saKey(row)]; const done = a ? num(a.q) : 0; if (a && a.skip) continue;
-    const left = row.q - done; if (left <= 0) continue;
     const m = saMapOf(row.c); if (m === '__skip') continue;
-    out.push({ ...row, left, unknownStore: !st, item: m && S.items.find(i => i.id === m) || null });
+    const a = (S.saApplied || {})[saKey(row)];
+    const done = a ? (a.skip ? row.q : Math.min(row.q, num(a.q))) : 0;
+    out.push({ ...row, done, left: row.q - done, a, unknownStore: !st, item: m && S.items.find(i => i.id === m) || null });
   }
-  return out.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return out;
+}
+function saPending(store) { return saRows(store).filter(r => r.left > 0); }
+/* 週・日の範囲で商品ごとにまとめる */
+function saGroups(rows) {
+  const g = new Map();
+  for (const r of rows) { let x = g.get(r.c); if (!x) g.set(r.c, x = { c: r.c, n: r.n, item: r.item, sold: 0, done: 0, took: 0, skipped: 0, left: 0, rows: [], unknownStore: false });
+    x.sold += r.q; x.done += r.done; x.left += r.left; x.rows.push(r); if (r.unknownStore) x.unknownStore = true;
+    if (r.a) { if (r.a.skip) x.skipped += r.q; else x.took += r.a.took != null ? num(r.a.took) : Math.min(r.q, num(r.a.q)); } }
+  return [...g.values()];
+}
+/* 期間中に手で在庫を減らした記録 */
+function saManual(store, itemId, from, to) {
+  const t0 = saDate(from).getTime(), t1 = saDate(saAdd(to, 1)).getTime();
+  return (S.logs || []).filter(l => l.kind === 'count' && l.store === store && l.itemId === itemId && num(l.to) < num(l.from) && l.at >= t0 && l.at < t1);
 }
 function saCard() {
   if (S.readOnly || !DUE_STORES.includes(S.store)) return '';
-  const L = saPending(S.store); if (!L.length) return '';
-  const ready = L.filter(r => r.item);
+  const all = saRows(S.store); if (!all.length) return '';
+  const today = saYmd(new Date()), thisWk = saMon(today);
+  const pend = all.filter(r => r.left > 0);
+  const weeks = [...new Set(all.map(r => saMon(r.date)).concat(thisWk))].sort().slice(-5);
+  if (!S.saWk || !weeks.includes(S.saWk)) { const pw = pend.map(r => saMon(r.date)).sort()[0]; S.saWk = pw || thisWk; S.saDay = ''; }
+  const wk = S.saWk, wkEnd = saAdd(wk, 6);
+  const wkRows = all.filter(r => saMon(r.date) === wk);
+  if (S.saDay && saMon(S.saDay) !== wk) S.saDay = '';
+  const from = S.saDay || wk, to = S.saDay || wkEnd;
+  const scope = wkRows.filter(r => r.date >= from && r.date <= to);
+  const G = saGroups(scope).sort((a, b) => (b.left > 0) - (a.left > 0) || (!a.item) - (!b.item) || a.n.localeCompare(b.n, 'ja'));
+  const P = G.filter(x => x.left > 0), D = G.filter(x => x.left <= 0), ready = P.filter(x => x.item);
+  S.saList = G;
+  const wkLabel = w => w === thisWk ? '今週' : w === saAdd(thisWk, -7) ? '前週' : saMD(w) + '〜';
+  const wkChips = weeks.map(w => { const n = new Set(pend.filter(r => saMon(r.date) === w).map(r => r.c)).size;
+    return `<button type="button" class="chip" data-act="saWk" data-id="${w}" aria-pressed="${w === wk}">${wkLabel(w)} ${saMD(w)}〜${saMD(saAdd(w, 6))} ${n ? `<b class="sa-n">${n}</b>` : wkRows.length || w !== thisWk ? '✓' : ''}</button>`; }).join('');
+  const dayChips = [0, 1, 2, 3, 4, 5, 6].map(i => { const d = saAdd(wk, i), rs = wkRows.filter(r => r.date === d); if (!rs.length) return '';
+    const n = new Set(rs.filter(r => r.left > 0).map(r => r.c)).size;
+    return `<button type="button" class="chip" data-act="saDay" data-id="${d}" aria-pressed="${S.saDay === d}">${saMD(d)}${SA_WD[saDate(d).getDay()]} ${n ? `<b class="sa-n">${n}</b>` : '✓'}</button>`; }).join('');
   const staff = p => { p = String(p).replace(/^st:[a-z]+:/, ''); const pp = (S.mrPeople || {})[p]; return pp ? pp.name || '' : p === 's0' ? 'フリー' : ''; };
-  const row = (r, i) => {
+  const row = (x, i) => {
+    const days = [...new Set(x.rows.map(r => r.date))].sort().map(saMD).join('・');
+    const who = [...new Set(x.rows.map(r => staff(r.p)).filter(Boolean))].join('・');
+    if (x.left <= 0) return `<div class="sa-row done"><div><div class="name">${esc(x.item ? x.item.name : x.n)}</div><div class="sub"><span>売れた ${x.sold}</span><span>✓ ${x.skipped && !x.took ? '反映しない' : '反映済み（引いた数 ' + x.took + '）'}</span><span>${days}</span></div></div></div>`;
+    const man = x.item ? saManual(S.store, x.item.id, from, to) : [];
+    const manTxt = man.length ? `<div class="sa-warn">⚠️ この期間に手入力で減らしています（${man.map(l => saMD(saYmd(new Date(l.at))) + ' ' + num(l.from) + '→' + num(l.to) + (l.byName ? ' ' + esc(l.byName) : '')).join('、')}）。二重に引かないよう、引く数を確認してください</div>` : '';
     let right;
-    if (r.item) right = `<div class="sa-to">→ ${esc(r.item.name)}<span class="sub">在庫 ${qtyOf(S.store, r.item.id)} → ${Math.max(0, qtyOf(S.store, r.item.id) - r.left)}</span><button type="button" class="lnk" data-act="saRemap" data-id="${esc(r.c)}">商品を選び直す</button></div>
-      <div class="sa-btns"><button type="button" class="btn small primary" data-act="saOne" data-i="${i}">反映</button><button type="button" class="btn small" data-act="saSkip" data-i="${i}">反映しない</button></div>`;
-    else { const g = saGuess(r.n), its = S.items.filter(it => !it.sample && !it.ended);
-      right = `<div class="sa-to"><select class="field" id="sam-${i}" aria-label="在庫アプリの商品を選ぶ"><option value="">在庫の商品を選ぶ…</option>${g ? `<option value="${g.id}" selected>候補：${esc((S.items.find(x => x.id === g.id) || {}).name || '')}</option>` : ''}${catGroups(its, it => `<option value="${it.id}">${esc(it.name)}</option>`)}<option value="__skip">在庫には無い商品（今後も引かない）</option></select></div>
-      <div class="sa-btns"><button type="button" class="btn small primary" data-act="saMapSet" data-i="${i}" data-id="${esc(r.c)}">この商品で決定</button><button type="button" class="btn small" data-act="saSkip" data-i="${i}">今回は反映しない</button></div>`; }
-    return `<div class="sa-row${r.item ? '' : ' need'}"><div><div class="name">${esc(r.n)} <b>×${r.left}</b></div><div class="sub"><span>${esc(r.date.slice(5).replace('-', '/'))}</span><span>${esc(staff(r.p))}</span>${r.unknownStore ? '<span class="sa-warn">担当の店舗が不明（この店で反映すると、この店の在庫から引きます）</span>' : ''}</div></div>${right}</div>`;
+    if (x.item) { const q = qtyOf(S.store, x.item.id);
+      right = `<div class="sa-to">→ ${esc(x.item.name)}<span class="sub">在庫 ${q}</span><button type="button" class="lnk" data-act="saRemap" data-id="${esc(x.c)}">商品を選び直す</button></div>
+      <div class="sa-btns"><label class="sa-q">引く数 <input class="field" type="number" inputmode="numeric" min="0" id="saq-${i}" value="${x.left}" aria-label="${esc(x.item.name)} を引く数"></label><button type="button" class="btn small primary" data-act="saOne" data-i="${i}">反映</button><button type="button" class="btn small" data-act="saSkip" data-i="${i}">反映しない</button></div>`; }
+    else { const g = saGuess(x.n), its = S.items.filter(it => !it.sample && !it.ended);
+      right = `<div class="sa-to"><select class="field" id="sam-${i}" aria-label="在庫アプリの商品を選ぶ"><option value="">在庫の商品を選ぶ…</option>${g ? `<option value="${g.id}" selected>候補：${esc((S.items.find(y => y.id === g.id) || {}).name || '')}</option>` : ''}${catGroups(its, it => `<option value="${it.id}">${esc(it.name)}</option>`)}<option value="__skip">在庫には無い商品（今後も引かない）</option></select></div>
+      <div class="sa-btns"><button type="button" class="btn small primary" data-act="saMapSet" data-i="${i}" data-id="${esc(x.c)}">この商品で決定</button><button type="button" class="btn small" data-act="saSkip" data-i="${i}">今回は反映しない</button></div>`; }
+    return `<div class="sa-row${x.item ? '' : ' need'}"><div><div class="name">${esc(x.n)}</div><div class="sub"><span>売れた <b>${x.sold}</b></span>${x.done ? `<span>反映済み ${x.done}</span>` : ''}<span>残り <b>${x.left}</b></span><span>${days}</span>${who ? `<span>${esc(who)}</span>` : ''}${x.unknownStore ? '<span class="sa-warn">担当の店舗が不明（この店で反映すると、この店の在庫から引きます）</span>' : ''}</div>${manTxt}</div>${right}</div>`;
   };
-  S.saList = L;
-  const open = (S.saOpen ??= true);
-  return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 <b>${L.length}</b>件</h3><span class="sub">サロンアンサーより</span></summary>
-    <div class="sub">サロンアンサーで売れた店販です。在庫から引いてください。${L.length - ready.length ? `<b>商品が決まっていない ${L.length - ready.length} 件</b>は、在庫の商品を選んで「決定」すると次から自動で対応します。` : ''}</div>
-    ${ready.length ? `<div class="actions"><button type="button" class="btn primary" data-act="saAll">まとめて反映（${ready.length}件）</button></div>` : ''}
-    <div class="sa-list">${L.map(row).join('')}</div></details>`;
+  const totalP = new Set(pend.map(r => r.date + r.c)).size;
+  const open = (S.saOpen ??= !!pend.length);
+  const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkEnd)}`;
+  return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sub">サロンアンサーより</span></summary>
+    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。反映した分は記録されるので、何度開いても二重には引きません。</div>
+    <div class="chips sa-chips">${wkChips}</div>
+    <div class="chips sa-chips"><button type="button" class="chip" data-act="saDay" data-id="" aria-pressed="${!S.saDay}">${wk === thisWk ? '今週' : 'この週'}まとめ</button>${dayChips}</div>
+    ${P.length ? `<div class="sub">${scopeTxt}：残り ${P.length}品${P.length - ready.length ? `（<b>商品が決まっていない ${P.length - ready.length}品</b>は、在庫の商品を選んで「決定」すると次から自動で対応します）` : ''}</div>` : `<div class="sub">${scopeTxt}：すべて反映済みです</div>`}
+    ${ready.length > 1 ? `<div class="actions"><button type="button" class="btn primary" data-act="saAll">まとめて反映（${ready.length}品）</button></div>` : ''}
+    <div class="sa-list">${G.map(row).join('')}</div></details>`;
 }
-async function saApply(rows) {
+/* 商品ごとに引く。引く数 v を在庫から引き、期間内の販売行はすべて処理済みにする */
+async function saApply(list) {
   const me = WHO.me || {}, at = Date.now(), upd = {}; let n = 0;
-  for (const r of rows) {
-    if (!r.item) continue;
-    const key = S.store + '_' + r.item.id, prev = S.stock[key] ?? 0, next = Math.max(0, prev - r.left);
-    S.stock[key] = next;
-    await S.db.doc('stock/' + key).set({ store: S.store, itemId: r.item.id, qty: next, at });
-    logChange('sale', S.store, r.item.id, prev, next, { text: `サロンアンサー店販 ${r.date.slice(5)} ${r.n}×${r.left}` });
-    const a = (S.saApplied || {})[saKey(r)];
-    upd[saKey(r)] = { q: (a ? num(a.q) : 0) + r.left, store: S.store, item: r.item.id, at, by: me.name || '' };
+  for (const { x, v } of list) {
+    if (!x.item || !(v >= 0)) continue;
+    const key = S.store + '_' + x.item.id, prev = S.stock[key] ?? 0, next = Math.max(0, prev - v);
+    const ds = [...new Set(x.rows.map(r => r.date))].sort();
+    if (v > 0) { S.stock[key] = next; await S.db.doc('stock/' + key).set({ store: S.store, itemId: x.item.id, qty: next, at });
+      logChange('sale', S.store, x.item.id, prev, next, { text: `サロンアンサー店販 ${saMD(ds[0])}${ds.length > 1 ? '〜' + saMD(ds[ds.length - 1]) : ''} ${x.n}×${v}${v !== x.left ? `（売れた残り${x.left}）` : ''}` }); }
+    let rest = v;
+    for (const r of x.rows.filter(r => r.left > 0).sort((a, b) => a.date < b.date ? -1 : 1)) {
+      const take = Math.min(rest, r.left); rest -= take;
+      const a = r.a && !r.a.skip ? r.a : null, prevTook = a ? (a.took != null ? num(a.took) : num(a.q)) : 0;
+      upd[saKey(r)] = { q: r.q, took: prevTook + take, store: S.store, item: x.item.id, at, by: me.name || '' };
+    }
     n++;
   }
-  for (const [k, v] of Object.entries(upd)) await S.db.doc('sa_applied/' + k.slice(0, 7)).set({ [k]: v }, { merge: true });
+  const byMon = {}; for (const [k, v] of Object.entries(upd)) (byMon[k.slice(0, 7)] ||= {})[k] = v;
+  for (const [m, o] of Object.entries(byMon)) await S.db.doc('sa_applied/' + m).set(o, { merge: true });
   return n;
+}
+async function saSkipGroup(x) {
+  const me = WHO.me || {}, at = Date.now(), byMon = {};
+  for (const r of x.rows.filter(r => r.left > 0)) (byMon[r.date.slice(0, 7)] ||= {})[saKey(r)] = { q: r.q, skip: true, store: S.store, at, by: me.name || '' };
+  for (const [m, o] of Object.entries(byMon)) await S.db.doc('sa_applied/' + m).set(o, { merge: true });
 }
 /* ---- 発注文をコピーしたのに「発注済み」が押されていない ---- */
 function markCopied(dids) {
@@ -1712,9 +1770,11 @@ document.addEventListener('click', async ev => {
     case 'cpDone': { const p = $('cp-pop'); if (p) p.remove(); const d0 = b.dataset.did;
       if (d0 === '__goto') { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
       if (isLateDay() && d0 !== XFER) { lateAsk([d0]); break; } markPlaced(d0); break; }
-    case 'saOne': { const r = (S.saList || [])[Number(b.dataset.i)]; if (!r) break; const n = await saApply([r]); if (n) toast(`${r.item.name} を${r.left}個 引きました`); render(); break; }
-    case 'saAll': { const rs = (S.saList || []).filter(r => r.item); const n = await saApply(rs); toast(`${n}件を在庫から引きました`); render(); break; }
-    case 'saSkip': { const r = (S.saList || [])[Number(b.dataset.i)]; if (!r) break; const me = WHO.me || {}; await S.db.doc('sa_applied/' + r.date.slice(0, 7)).set({ [saKey(r)]: { q: r.q, skip: true, store: S.store, at: Date.now(), by: me.name || '' } }, { merge: true }); toast('反映しないにしました'); break; }
+    case 'saOne': { const x = (S.saList || [])[Number(b.dataset.i)]; if (!x) break; const inp = $('saq-' + b.dataset.i), v = Math.max(0, Math.round(num(inp ? inp.value : x.left))); const n = await saApply([{ x, v }]); if (n) toast(v ? `${x.item.name} を${v}個 引きました` : `${x.item.name} は引かずに反映済みにしました`); render(); break; }
+    case 'saAll': { const L = (S.saList || []).map((x, i) => ({ x, i })).filter(o => o.x.item && o.x.left > 0).map(({ x, i }) => { const inp = $('saq-' + i); return { x, v: Math.max(0, Math.round(num(inp ? inp.value : x.left))) }; }); const n = await saApply(L); toast(`${n}品を在庫から引きました`); render(); break; }
+    case 'saSkip': { const x = (S.saList || [])[Number(b.dataset.i)]; if (!x) break; await saSkipGroup(x); toast('反映しないにしました'); render(); break; }
+    case 'saWk': S.saWk = id; S.saDay = ''; render(); break;
+    case 'saDay': S.saDay = id; render(); break;
     case 'saMapSet': { const sel = $('sam-' + b.dataset.i), v = sel ? sel.value : ''; if (!v) { toast('在庫の商品を選んでください'); break; } (S.saMap ||= {})[id] = v; await S.db.doc('settings/saMap').set({ map: { [id]: v } }, { merge: true }); toast(v === '__skip' ? '在庫には無い商品にしました' : '対応を決めました。反映を押してください'); render(); break; }
     case 'saRemap': { if (S.saMap) delete S.saMap[id]; await S.db.doc('settings/saMap').set({ map: { [id]: firebase.firestore.FieldValue.delete() } }, { merge: true }); render(); break; }
     case 'dUp': moveDealer(id, -1); break;
