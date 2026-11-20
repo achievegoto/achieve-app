@@ -513,21 +513,23 @@ function render() {
   m.innerHTML = S.tab === 'month' ? monthView() : S.tab === 'person' ? personView() : S.tab === 'daily' ? dailyView() : targetView();
 }
 /* ---- 店販 販売実績（サロンアンサー 店販売上集計・商品ごと・全店合計・税抜） ---- */
-/* ---- 日報・週報（日 / 週=水〜日 / 月）。各店・個人。店販は商品別個数 ---- */
+/* ---- 日報・週報（日 / 週=月〜日 / 月）。各店・個人。店販は商品別個数 ---- */
 const CODE2PID = { 1: 's01', 3: 'm01', 8: 'm02', 2: 'm03', 7: 'm04', 5: 'm05', 6: 'm06', 17: 'm07', 19: 'm08', 18: 'm09', 21: 'm10', 9: 'm11', 22: 's22', 25: 's25', 26: 's26', 27: 's27', 28: 's28', 29: 's29', 50: 's50' };
 const c2p = c => CODE2PID[c] || ('s' + c);
 const ymdOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const pdate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const addD = (s, n) => { const d = pdate(s); d.setDate(d.getDate() + n); return ymdOf(d); };
 const isOpen = s => { const w = pdate(s).getDay(); return w !== 1 && w !== 2; }; /* 月火は定休 */
-const wkStart = s => addD(s, -((pdate(s).getDay() + 4) % 7)); /* 水曜はじまり */
+const wkStart = s => addD(s, -((pdate(s).getDay() + 6) % 7)); /* 月曜はじまり（月〜日） */
+/* 週の表示の終わり：データのある最終日（無ければ今日か日曜の早い方） */
+const wkEndLabel = dates => { const has = dates.filter(dt => S.rdays && S.rdays[dt] || Object.keys(S.day || {}).some(k => k.endsWith('_' + dt))); if (has.length) return has[has.length - 1]; const t = ymdOf(new Date()); return t >= dates[0] && t <= dates[dates.length - 1] ? t : dates[dates.length - 1]; };
 const openDays = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) if (isOpen(`${ym}-${pad(d)}`)) n++; return n || 1; };
 const md2 = s => `${Number(s.slice(5, 7))}/${Number(s.slice(8))}`;
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 function dRange() {
   const d = S.dd || ymdOf(new Date());
   if (S.dp === 'd') return [d];
-  if (S.dp === 'w') { const w = wkStart(d); return [0, 1, 2, 3, 4].map(i => addD(w, i)); }
+  if (S.dp === 'w') { const w = wkStart(d); return [0, 1, 2, 3, 4, 5, 6].map(i => addD(w, i)); }
   if (S.dp === 'y') { const y = Number(d.slice(0, 4)), out = []; for (let m = 1; m <= 12; m++) for (let i = 1; i <= new Date(y, m, 0).getDate(); i++) out.push(`${y}-${pad(m)}-${pad(i)}`); return out; }
   const ym = d.slice(0, 7), [y, m] = ym.split('-').map(Number); const out = []; for (let i = 1; i <= new Date(y, m, 0).getDate(); i++) out.push(`${ym}-${pad(i)}`); return out;
 }
@@ -565,7 +567,7 @@ function retailRows(pids, dates) {
   const add = (r, p) => { if (!set.has(p)) return; const key = r.n; const a = acc[key] ||= { mid: r.m, name: r.n, qty: 0, sales: 0 }; a.qty += Number(r.q) || 0; a.sales += Number(r.s) || 0; };
   if (S.dp === 'm') { const ym = dates[0].slice(0, 7), mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }
   else if (S.dp === 'y') { yearYms(dates[0].slice(0, 4)).forEach(ym => { const mm = S.rmons[ym]; if (mm) { src = 1; (mm.rows || []).forEach(r => add(r, r.p)); } }); }
-  else if (S.dp === 'w' && S.rwks[dates[0]] && dates.some(dt => !S.rdays[dt])) { src = 1; (S.rwks[dates[0]].rows || []).forEach(r => add(r, r.p)); }
+  else if (S.dp === 'w' && (S.rwks[dates[0]] || S.rwks[dates[2]]) && dates.some(dt => isOpen(dt) && !S.rdays[dt])) { src = 1; ((S.rwks[dates[0]] || S.rwks[dates[2]]).rows || []).forEach(r => add(r, r.p)); }
   else dates.forEach(dt => { const x = S.rdays[dt]; if (x) { src = 1; (x.rows || []).forEach(r => add(r, r.p)); } });
   return src ? Object.values(acc) : null;
 }
@@ -597,11 +599,11 @@ function dailyView() {
   const own = WHO.isOwner(), dates = dRange(), pids = scopePids(), ym = S.dd.slice(0, 7);
   const yr = S.dd.slice(0, 4);
   if (S.dp !== 'y') ensureDays([...new Set(dates.map(d => d.slice(0, 7)))]);
-  const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(dates[4])} の週報（水〜日）` : S.dp === 'y' ? `${yr}年の年間累計` : `${ymLabel(ym)}の月報`;
+  const label = S.dp === 'd' ? `${md2(dates[0])}（${WD[pdate(dates[0]).getDay()]}）の日報` : S.dp === 'w' ? `${md2(dates[0])}〜${md2(wkEndLabel(dates))} の週報（月〜日）` : S.dp === 'y' ? `${yr}年の年間累計` : `${ymLabel(ym)}の月報`;
   const cur = S.dp === 'm' ? sumMonth(pids, ym) : S.dp === 'y' ? sumYear(pids, yr) : sumDays(pids, dates);
   const prevC = S.dp === 'y' ? prevYTD(pids, Number(yr)) : S.dp === 'm' ? scaleObj(sumMonth(pids, shiftYm(ym, -12)), ym === nowYm() ? pace(ym).ratio : 1) : null;
   const scopeName = S.dsc === 'ALL' ? '全員' : S.dsc.startsWith('S:') ? (STORES.find(x => x[0] === S.dsc.slice(2)) || [, ''])[1] : ((S.people.find(p => p.id === S.dsc) || {}).name || '');
-  const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(dates[4]) : S.dp === 'y' ? yr + '年' : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
+  const nav = `<div class="mnav"><button type="button" class="btn small" data-act="dnav" data-id="-1" aria-label="前">‹</button><b>${S.dp === 'd' ? md2(dates[0]) + '（' + WD[pdate(dates[0]).getDay()] + '）' : S.dp === 'w' ? md2(dates[0]) + '〜' + md2(wkEndLabel(dates)) : S.dp === 'y' ? yr + '年' : ymLabel(ym)}</b><button type="button" class="btn small" data-act="dnav" data-id="1" aria-label="次">›</button></div>`;
   const pchips = `<div class="seg4">${[['d', '日報'], ['w', '週報'], ['m', '月'], ['y', '年間']].map(([id, l]) => `<button type="button" data-act="dp" data-id="${id}" aria-pressed="${S.dp === id}">${l}</button>`).join('')}</div>`;
   const ppl = active().filter(p => !p.ownerOnly || own);
   const schips = `<div class="chips scroll">${AGG.map(([id, l]) => `<button type="button" class="chip" data-act="dsc" data-id="${id}" aria-pressed="${S.dsc === id}">${esc(l.replace(' 全体', ''))}</button>`).join('')}<select class="field chip-sel" data-chg="dscSel" aria-label="個人"><option value="">個人を選ぶ</option>${ppl.map(p => `<option value="${p.id}" ${S.dsc === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
@@ -641,13 +643,21 @@ function dailyView() {
       ${groups.map(([m, arr]) => `<section class="group"><h2>${esc(m)}<span>${arr.reduce((s, x) => s + x.qty, 0)}個</span></h2><div class="rt-list">${arr.map(x => `<div class="rt-row"><span class="rt-n">${esc(x.name)}</span><span class="rt-q"><b>${x.qty}</b>個</span>${own ? `<span class="rt-s">¥${fmt(x.sales, 'yen')}</span>` : ''}</div>`).join('')}</div></section>`).join('')}`;
   } else rhtml = `<section class="card"><div class="empty" style="padding:10px">${S.dp === 'd' && dates[0] < '2026-11-01' ? 'この日の店販（商品別）はありません。週報・月で見られます' : 'この期間の店販（商品別）はまだありません'}</div></section>`;
   return `${pchips}${nav}${schips}${kpiCard(cur, pids, dates, scopeName.replace(' 全体', ''), label, prevC, S.dp === 'y' ? '前年同期比' : '昨対')}${monthLine}${table}${rhtml}
-    <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は水曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
+    <div class="sub">サロンアンサー（明細担当・税抜）から毎日自動で取り込み。店販のEC連携はミルボンiDの担当付き販売分です。週は月曜〜日曜、目標は月の目標を営業日（水〜日）で割って計算しています。</div>`;
 }
 /* サロンアンサーのタブから #retail=… で渡されたデータを保存 */
 async function importRetail() {
   const h = location.hash; if (!h.startsWith('#retail=')) return;
   try {
     const o = JSON.parse(decodeURIComponent(h.slice(8)));
+    if (o && o.k === 'ssm' && Array.isArray(o.list)) { /* 店舗別の店販を複数日まとめて：o.list = [{store, key, items}] */
+      const b = db.batch(), done = [];
+      for (const x of o.list) { if (!['hair', 'liss', 'till'].includes(x.store) || !/^\d{4}-\d\d-\d\d$/.test(x.key || '') || !Array.isArray(x.items)) throw new Error('形式が違います');
+        const rows = x.items.map(a => ({ p: c2p(String(a[0])), m: a[1] || '', c: String(a[2] || ''), n: a[3] || '', q: Number(a[4]) || 0 }));
+        b.set(db.doc('mr_rsday/' + x.key + '_' + x.store), { date: x.key, store: x.store, rows, asOf: Date.now(), n: rows.length }); done.push(x.key + '_' + x.store + ':' + rows.length); }
+      await b.commit(); window.__retailSaved = 'ss_' + done.join(','); toast('店舗別の店販を保存しました（' + done.join('、') + '）');
+      history.replaceState(null, '', location.pathname + location.search); return;
+    }
     if (!o || !o.key || (!Array.isArray(o.items) && o.k !== 'cs')) throw new Error('形式が違います');
     if (o.k === 'cs') { /* 店舗比較月報（店舗別の月合計）：o.key = YYYY-MM, o.stores = {hair:{tech,free,retail,cust,custAll,newc,buyers},...} */
       const b = db.batch(); let n = 0;
