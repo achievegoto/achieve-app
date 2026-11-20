@@ -226,6 +226,7 @@ label .field { font-size: 15px; color: var(--ink); }
 .dealer-row { display: flex; gap: 8px; align-items: center; padding: 8px 14px; }
 .dealer-row + .dealer-row { border-top: 1px solid var(--line); }
 .dealer-row .field { flex: 1; }
+.dmv { display: flex; gap: 4px; } .dmv .btn { padding: 4px 9px; min-width: 0; } .dfix { display: flex; align-items: center; color: var(--muted); background: var(--bg); }
 nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .tabs { display: grid; grid-template-columns: repeat(4, 1fr); }
 .tabs button { position: relative; border: 0; background: transparent; padding: 15px 0; font-size: 14px; color: var(--muted); }
@@ -568,6 +569,18 @@ function confirmOther() {
 function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
 /* ロック中に＋−を押したとき：ロック解除の場所を教える */
 function lockHint() { toast('ロック中です。上の「変更する」を押すと＋−が使えます'); const lb = $('lockbar'); if (lb) { lb.scrollIntoView({ behavior: 'smooth', block: 'center' }); lb.classList.add('flash'); setTimeout(() => lb.classList.remove('flash'), 1800); } }
+/* ディーラーの表示順：settings/dealerOrder に保存（TONARIからの移動も並べ替え対象）。未設定のものは TOPY→移動→登録順 */
+function dealerOrder() {
+  const top = S.dealers.filter(d => /TOPY/i.test(d.name)).map(d => d.id);
+  const def = top.concat([XFER]).concat(S.dealers.map(d => d.id).filter(id => !top.includes(id)));
+  const saved = (S.dOrder || []).filter(id => def.includes(id));
+  return saved.concat(def.filter(id => !saved.includes(id)));
+}
+function moveDealer(id, dir) {
+  const L = dealerOrder(), i = L.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= L.length) return;
+  [L[i], L[j]] = [L[j], L[i]]; S.dOrder = L; render();
+  S.db.doc('settings/dealerOrder').set({ ids: L, at: Date.now() }).catch(fail);
+}
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
   { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing); }
@@ -1056,9 +1069,8 @@ function stockRow(it) {
 
 function viewOrder() {
   if (S.gotoView) return viewGotoReqs();
-  const top = S.dealers.filter(d => /TOPY/i.test(d.name)).map(d => d.id); /* TOPYを一番上に */
   const xs = (S.xShow ||= new Set());
-  const ids = top.concat(S.store === 'tonari' ? [] : [XFER]).concat(S.dealers.map(d => d.id).filter(id => !top.includes(id))).filter(did => linesFor(did).length || extraLines(did).length || xs.has(S.store + ':' + did));
+  const ids = dealerOrder().filter(id => id !== XFER || S.store !== 'tonari').filter(did => linesFor(did).length || extraLines(did).length || xs.has(S.store + ':' + did));
   const unassigned = shortItems(S.store).filter(it => !dealerOf(it.dealerId || ''));
   const st = storeOf(S.store);
   const extra = S.readOnly ? '' : addPicker();
@@ -1353,9 +1365,13 @@ function viewItems() {
       ? `<button type="button" class="btn small danger" id="s2" data-act="clearSamples" ${dis}>サンプルを全部削除する</button><button type="button" class="btn small" id="sn" data-act="confirmNo">戻る</button>`
       : `<button type="button" class="btn small" id="s1" data-act="confirm" data-id="samples" ${dis}>サンプルを削除</button>`}</div></div></div>`;
 
-  const dealers = S.dealers.map(d => {
-    const used = S.items.some(i => i.dealerId === d.id);
-    return `<div class="dealer-row"><input class="field" id="dn-${d.id}" value="${esc(d.name)}" data-chg="dealerName" data-id="${d.id}" aria-label="ディーラー名" ${dis}>
+  const DL = dealerOrder();
+  const mv = (id, i) => `<span class="dmv"><button type="button" class="btn small" data-act="dUp" data-id="${id}" aria-label="上へ" ${dis || i === 0 ? 'disabled' : ''}>↑</button><button type="button" class="btn small" data-act="dDown" data-id="${id}" aria-label="下へ" ${dis || i === DL.length - 1 ? 'disabled' : ''}>↓</button></span>`;
+  const dealers = DL.map((id, i) => {
+    if (id === XFER) return `<div class="dealer-row">${mv(id, i)}<span class="field dfix">${esc(XFER_D.name)}</span><span></span></div>`;
+    const d = dealerOf(id); if (!d) return '';
+    const used = S.items.some(it => it.dealerId === d.id);
+    return `<div class="dealer-row">${mv(id, i)}<input class="field" id="dn-${d.id}" value="${esc(d.name)}" data-chg="dealerName" data-id="${d.id}" aria-label="ディーラー名" ${dis}>
     <button type="button" class="btn small danger" id="dd-${d.id}" data-act="delDealer" data-id="${d.id}" ${used || S.readOnly ? 'disabled' : ''} ${used ? 'title="使用中の商品があるため削除できません"' : ''}>削除</button></div>`;
   }).join('');
   return `${pinBar()}${sampleBar}
@@ -1365,7 +1381,7 @@ function viewItems() {
     ${catChips(false, true)}
   </div>
   <div id="item-list" style="display:flex;flex-direction:column;gap:16px">${S.items.length ? itemList() : '<div class="empty">商品がまだありません。</div>'}</div>
-  ${S.dealers.length ? `<div class="group"><h2>ディーラー</h2><div class="list">${dealers}</div></div>` : ''}`;
+  ${S.dealers.length ? `<div class="group"><h2>ディーラー</h2><div class="sub" style="margin:-4px 0 8px">↑↓で発注タブの並び順を変えられます（全店共通）</div><div class="list">${dealers}</div></div>` : ''}`;
 }
 function catOptions(cats, cur) {
   const used = new Set(), out = [];
@@ -1624,6 +1640,8 @@ document.addEventListener('click', async ev => {
     case 'cpDone': { const p = $('cp-pop'); if (p) p.remove(); const d0 = b.dataset.did;
       if (d0 === '__goto') { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
       if (isLateDay() && d0 !== XFER) { lateAsk([d0]); break; } markPlaced(d0); break; }
+    case 'dUp': moveDealer(id, -1); break;
+    case 'dDown': moveDealer(id, 1); break;
     case 'gotoView': S.gotoView = true; render(); window.scrollTo(0, 0); break;
     case 'gotoBack': S.gotoView = false; render(); window.scrollTo(0, 0); break;
     case 'gotoDone': { const me = WHO.me || {}; S.db.doc('orders/' + id).update({ gotoDone: { at: Date.now(), by: me.name || '' } }).then(() => toast('手配済みにしました')).catch(fail); break; }
@@ -2016,6 +2034,7 @@ function listen(fs) {
   fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}, cp = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; if (v.copiedAt) cp[v.store + ':' + v.did] = { at: v.copiedAt, by: v.copiedBy || '' }; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; S.copied = cp; scheduleRender(); }, () => {});
   fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
+  fs.doc('settings/dealerOrder').onSnapshot(x => { S.dOrder = (x.data() || {}).ids || []; scheduleRender(); }, () => {});
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
   fs.collection('stock').onSnapshot(s => {
     const next = {};
