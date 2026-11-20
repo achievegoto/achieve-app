@@ -265,6 +265,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due-s { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; } .due-s b { font-size: 13px; margin-right: 2px; }
 .due-s span { background: #fff; border: 1px solid #f3b3b5; border-radius: 99px; padding: 2px 8px; }
 .due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
+.gosep > summary { cursor: pointer; font-size: 13px; color: var(--accent); padding: 4px 0; } .gosep[open] > summary { margin-bottom: 8px; }
 .cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; flex: 0 0 auto; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); overflow: hidden; }
@@ -1112,7 +1113,13 @@ function orderCard(did, force) {
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>AI用の指示文をコピー</button>
       <a class="btn" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
-    </div>` : isGotoDid(did) ? `<div class="sub gonote">後藤さんへのLINEは、一番上の「後藤さん宛て（まとめて）」に1つの文章でまとまっています。そこでコピー・発注済みにしてください。</div>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
+    </div>` : isGotoDid(did) ? `<div class="sub gonote">ふだんは一番上の「後藤さん宛て（まとめて）」でまとめて送れます。この分だけ別に送りたいときは、下のボタンを使ってください。</div>
+    <details class="gosep"><summary>この分だけ別のLINEで送る</summary>
+    <textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
+    <div class="actions">
+      <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>この分だけコピー</button>
+      <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? 'この分だけ依頼済みにする' : 'この分だけ発注済みにする'}</button>
+    </div></details>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
     <div class="actions">
       <button type="button" class="btn primary" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>発注文をコピー</button>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>${xf ? '移動をお願いしたので依頼済みにする' : 'LINEで送ったので発注済みにする'}</button>
