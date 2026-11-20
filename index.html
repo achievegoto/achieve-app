@@ -265,6 +265,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due-s { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; } .due-s b { font-size: 13px; margin-right: 2px; }
 .due-s span { background: #fff; border: 1px solid #f3b3b5; border-radius: 99px; padding: 2px 8px; }
 .due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
+.cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); overflow: hidden; }
 .due-card .late-list { overflow: auto; min-height: 60px; flex: 1 1 auto; } .due-card .due-acts { flex: 0 0 auto; }
@@ -584,7 +585,7 @@ function render() {
   if (S.failed) { m.innerHTML = `<div class="empty">${esc(S.failed)}</div>`; return; }
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
   const a = document.activeElement, fid = a && a.id;
-  m.innerHTML = notes() + dueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
+  m.innerHTML = notes() + copyBanner() + dueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
@@ -620,6 +621,41 @@ function dueBanner() {
   }
   return html;
 }
+/* ---- 発注文をコピーしたのに「発注済み」が押されていない ---- */
+function markCopied(dids) {
+  const me = WHO.me || {}, at = Date.now();
+  dids.forEach(d => { (S.copied ||= {})[S.store + ':' + d] = { at, by: me.name || '' }; draftDoc(d).set({ store: S.store, did: d, copiedAt: at, copiedBy: me.name || '' }, { merge: true }).catch(() => {}); });
+}
+function copyAsk(did, ai, ok) {
+  const old = $('cp-pop'); if (old) old.remove();
+  const name = did === '__goto' ? '後藤さん宛て（まとめて）' : (dealerOf(did) || {}).name || '';
+  const el = document.createElement('div'); el.id = 'cp-pop'; el.className = 'due-pop';
+  el.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true" aria-labelledby="cp-h">
+    <div class="due-h" id="cp-h">${ok ? '📋 コピーしました' : '📋 文章を選択しました（コピーしてください）'}</div>
+    <div class="due-b"><b>${esc(name)}</b><br>${ai ? 'AIに貼り付けてサイトで注文したら' : 'LINEに貼り付けて送ったら'}、<b>必ず「発注済み」を押してください。</b><br>押さないと在庫の計算がずれて、同じ商品をもう一度発注してしまいます。</div>
+    <div class="due-acts cp-acts"><button type="button" class="btn primary" data-act="cpDone" data-did="${did}">${ai ? '注文したので発注済みにする' : '送ったので発注済みにする'}</button><button type="button" class="btn" data-act="cpLater">まだ送っていない（あとで押す）</button></div></div>`;
+  document.body.appendChild(el);
+}
+function copyList() {
+  const now = Date.now(), out = [];
+  const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
+  for (const [k, c] of Object.entries(S.copied || {})) {
+    if (!c || !c.at || now - c.at < 3600e3) continue;
+    const [st, did] = k.split(':'); if (!stores.includes(st) || !dealerOf(did)) continue;
+    const prev = S.store; S.store = st;
+    try { if (!(linesFor(did).some(r => r.qty > 0) || extraLines(did).length)) continue; } finally { S.store = prev; }
+    out.push({ st, did, at: c.at, by: c.by });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+function copyBanner() {
+  const L = copyList(); if (!L.length) return '';
+  const ago = t => { const h = Math.floor((Date.now() - t) / 3600e3); return h >= 24 ? Math.floor(h / 24) + '日' : h + '時間'; };
+  return `<section class="due cpb"><div class="due-h">⚠️ 発注文をコピーしたのに「発注済み」が押されていません</div>
+    <div class="due-b">送ったなら「開く」から<b>発注済み</b>を押してください。送っていないなら「送っていない」で消せます。</div>
+    ${L.map(x => `<div class="cpb-r"><div><b>${esc(storeOf(x.st).short)}</b> ${esc(dealerOf(x.did).name)}<div class="sub">${ago(x.at)}前にコピー${x.by ? '・' + esc(x.by) : ''}</div></div><button type="button" class="btn small primary" data-act="cpOpen" data-id="${x.st}|${x.did}">開く</button><button type="button" class="btn small" data-act="cpClear" data-id="${x.st}|${x.did}">送っていない</button></div>`).join('')}</section>`;
+}
+setInterval(() => { const n = copyList().length; if (n !== S.cpN) { S.cpN = n; scheduleRender(); } }, 60000);
 setInterval(() => { const w = dueWindow(); if (w !== S.dueW) { S.dueW = w; scheduleRender(); } }, 60000);
 function scheduleRender() {
   if (S.holdUntil && Date.now() < S.holdUntil) { clearTimeout(S.holdT); S.holdT = setTimeout(scheduleRender, S.holdUntil - Date.now() + 50); return; }
@@ -1546,11 +1582,20 @@ document.addEventListener('click', async ev => {
     case 'odec': armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
     case 'copy': {
       const text = did === '__goto' ? gotoText() : msgText(did), ai = did !== '__goto' && !!(dealerOf(did) || {}).url;
-      try { await navigator.clipboard.writeText(text); toast(ai ? 'コピーしました。AIに貼り付けてください' : 'コピーしました。LINEに貼り付けてください'); }
-      catch (e) { const t = $('msg-' + did); t.focus(); t.select(); toast('自動でコピーできません。選択された文章をコピーしてください'); }
+      let ok = true;
+      try { await navigator.clipboard.writeText(text); }
+      catch (e) { ok = false; const t = $('msg-' + did); t.focus(); t.select(); }
+      markCopied(did === '__goto' ? gotoIds() : [did]);
+      copyAsk(did, ai, ok);
       break;
     }
     case 'placed': if (isLateDay() && did !== XFER) { lateAsk([did]); break; } markPlaced(did); break;
+    case 'cpDone': { const p = $('cp-pop'); if (p) p.remove(); const d0 = b.dataset.did;
+      if (d0 === '__goto') { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
+      if (isLateDay() && d0 !== XFER) { lateAsk([d0]); break; } markPlaced(d0); break; }
+    case 'cpLater': { const p = $('cp-pop'); if (p) p.remove(); toast('送ったら必ず「発注済み」を押してください'); break; }
+    case 'cpOpen': { const [st, d1] = (b.dataset.id || '').split('|'); S.allView = false; S.store = st; S.tab = 'order'; S.pend = false; S.oPick = d1; (S.oOpen ||= new Set()).add(d1); try { localStorage.setItem('achieve-store', st); } catch (e) {} render(); window.scrollTo(0, 0); break; }
+    case 'cpClear': { const [st, d1] = (b.dataset.id || '').split('|'); S.db.doc('order_drafts/' + (st + '__' + d1).replace(/\//g, '_')).set({ copiedAt: firebase.firestore.FieldValue.delete() }, { merge: true }).catch(fail); if (S.copied) delete S.copied[st + ':' + d1]; toast('お知らせを消しました'); render(); break; }
     case 'lateNo': { const p = $('late-pop'); if (p) p.remove(); break; }
     case 'lateOk': { const p = $('late-pop'); if (p) p.remove(); const ids = (b.dataset.dids || '').split(',').filter(Boolean);
       if (ids.length === 1) { markPlaced(ids[0]); break; }
@@ -1933,7 +1978,7 @@ function listen(fs) {
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
-  fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; scheduleRender(); }, () => {});
+  fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}, cp = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; if (v.copiedAt) cp[v.store + ':' + v.did] = { at: v.copiedAt, by: v.copiedBy || '' }; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; S.copied = cp; scheduleRender(); }, () => {});
   fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
   fs.collection('dealers').onSnapshot(s => { S.dealers = docs(s); arrive('dealers', s.metadata.fromCache); }, onErr);
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
