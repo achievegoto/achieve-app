@@ -712,8 +712,9 @@ function saCard() {
   const P = G.filter(x => x.left > 0), D = G.filter(x => x.left <= 0), ready = P.filter(x => x.item);
   S.saList = G;
   const wkLabel = w => w === thisWk ? '今週' : w === saAdd(thisWk, -7) ? '前週' : saMD(w) + '〜';
+  const wkLast = w => { const ds = all.filter(r => saMon(r.date) === w).map(r => r.date).sort(); return ds.length ? ds[ds.length - 1] : (w === thisWk ? today : saAdd(w, 6)); };
   const wkChips = weeks.map(w => { const n = new Set(pend.filter(r => saMon(r.date) === w).map(r => r.c)).size;
-    return `<button type="button" class="chip" data-act="saWk" data-id="${w}" aria-pressed="${w === wk}">${wkLabel(w)} ${saMD(w)}〜${saMD(saAdd(w, 6))} ${n ? `<b class="sa-n">${n}</b>` : wkRows.length || w !== thisWk ? '✓' : ''}</button>`; }).join('');
+    return `<button type="button" class="chip" data-act="saWk" data-id="${w}" aria-pressed="${w === wk}">${wkLabel(w)} ${saMD(w)}〜${saMD(wkLast(w))} ${n ? `<b class="sa-n">${n}</b>` : wkRows.length || w !== thisWk ? '✓' : ''}</button>`; }).join('');
   const dayChips = [0, 1, 2, 3, 4, 5, 6].map(i => { const d = saAdd(wk, i), rs = wkRows.filter(r => r.date === d); if (!rs.length) return '';
     const n = new Set(rs.filter(r => r.left > 0).map(r => r.c)).size;
     return `<button type="button" class="chip" data-act="saDay" data-id="${d}" aria-pressed="${S.saDay === d}">${saMD(d)}${SA_WD[saDate(d).getDay()]} ${n ? `<b class="sa-n">${n}</b>` : '✓'}</button>`; }).join('');
@@ -735,7 +736,7 @@ function saCard() {
   };
   const totalP = new Set(pend.map(r => r.date + r.c)).size;
   const open = (S.saOpen ??= !!pend.length);
-  const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkEnd)}`;
+  const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
   return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sub">サロンアンサーより</span></summary>
     <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。反映した分は記録されるので、何度開いても二重には引きません。</div>
     <div class="chips sa-chips">${wkChips}</div>
