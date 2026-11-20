@@ -342,6 +342,8 @@ const num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) && n 
 const storeOf = id => STORES.find(s => s.id === id) || { id, short: id, full: id };
 const XFER = '__tonari', XFER_D = { id: XFER, name: 'TONARIから移動（店舗間）' };
 const dealerOf = id => id === XFER ? XFER_D : S.dealers.find(d => d.id === id);
+/* 移動元の店（TONARI、または店舗間移動の発注に入っている fromStore） */
+const srcOf = o => o.dealerId === XFER ? 'tonari' : (o.fromStore || '');
 const dateStr = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 let toastT;
@@ -1666,11 +1668,11 @@ async function receive(id, req) {
       S.stock[key] = next;
       logChange('receive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の発注を入荷' });
       await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at });
-      if (o.dealerId === XFER) {
-        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, take = Math.min(tp, r.qty), tn = tp - take;
+      if (srcOf(o)) {
+        const src = srcOf(o), tk = src + '_' + l.itemId, tp = S.stock[tk] ?? 0, take = Math.min(tp, r.qty), tn = tp - take;
         r.tonari = take; S.stock[tk] = tn;
-        logChange('receive', 'tonari', l.itemId, tp, tn, { text: storeOf(o.store).short + 'へ移動' });
-        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at });
+        logChange('receive', src, l.itemId, tp, tn, { text: storeOf(o.store).short + 'へ移動' });
+        await S.db.doc('stock/' + tk).set({ store: src, itemId: l.itemId, qty: tn, at });
       }
     }
     const receipts = (o.receipts || []).concat([{ at, by: me.id || '', byName: me.name || '', lines: rec }]);
@@ -1702,7 +1704,7 @@ async function undoReceive(id) {
   if (!canRecv(o)) { toast('この発注は変更できません'); return; }
   const lines = (o.lines || []).map(l => ({ ...l })), rs = (o.receipts || []).slice();
   let last = rs.pop();
-  if (!last) { if (o.status !== 'received') return; last = { lines: lines.map((l, i) => ({ i, qty: num(l.qty), tonari: o.dealerId === XFER ? num(l.qty) : 0 })) }; lines.forEach(l => l.got = num(l.qty)); }
+  if (!last) { if (o.status !== 'received') return; last = { lines: lines.map((l, i) => ({ i, qty: num(l.qty), tonari: srcOf(o) ? num(l.qty) : 0 })) }; lines.forEach(l => l.got = num(l.qty)); }
   receiving.add(id);
   try {
     const at = Date.now();
@@ -1712,11 +1714,11 @@ async function undoReceive(id) {
       S.stock[key] = next; l.got = Math.max(0, num(l.got) - num(r.qty));
       logChange('unreceive', o.store, l.itemId, prev, next, { text: (o.dealerName || '') + 'の入荷を取り消し' });
       await S.db.doc('stock/' + key).set({ store: o.store, itemId: l.itemId, qty: next, at });
-      if (o.dealerId === XFER && num(r.tonari)) {
-        const tk = 'tonari_' + l.itemId, tp = S.stock[tk] ?? 0, tn = tp + num(r.tonari);
+      if (srcOf(o) && num(r.tonari)) {
+        const src = srcOf(o), tk = src + '_' + l.itemId, tp = S.stock[tk] ?? 0, tn = tp + num(r.tonari);
         S.stock[tk] = tn;
-        logChange('unreceive', 'tonari', l.itemId, tp, tn, { text: storeOf(o.store).short + 'への移動を取り消し' });
-        await S.db.doc('stock/' + tk).set({ store: 'tonari', itemId: l.itemId, qty: tn, at });
+        logChange('unreceive', src, l.itemId, tp, tn, { text: storeOf(o.store).short + 'への移動を取り消し' });
+        await S.db.doc('stock/' + tk).set({ store: src, itemId: l.itemId, qty: tn, at });
       }
     }
     await S.db.doc('orders/' + id).update({ lines, status: 'ordered', receivedAt: null, receipts: rs });
