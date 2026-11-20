@@ -648,7 +648,13 @@ async function importRetail() {
   const h = location.hash; if (!h.startsWith('#retail=')) return;
   try {
     const o = JSON.parse(decodeURIComponent(h.slice(8)));
-    if (!o || !o.key || !Array.isArray(o.items)) throw new Error('形式が違います');
+    if (!o || !o.key || (!Array.isArray(o.items) && o.k !== 'cs')) throw new Error('形式が違います');
+    if (o.k === 'cs') { /* 店舗比較月報（店舗別の月合計）：o.key = YYYY-MM, o.stores = {hair:{tech,free,retail,cust,custAll,newc,buyers},...} */
+      const b = db.batch(); let n = 0;
+      for (const st of ['hair', 'liss', 'till']) { const v = (o.stores || {})[st]; if (!v) continue; const doc = { store: st, ym: o.key, asOf: Date.now(), src: 'サロンアンサー 店舗比較月報' }; ['tech', 'free', 'retail', 'cust', 'custAll', 'newc', 'buyers', 'techAll'].forEach(k => { if (v[k] != null && isFinite(v[k])) doc[k] = Number(v[k]); }); b.set(db.doc('mr_smonth/' + st + '_' + o.key), doc); n++; }
+      await b.commit(); window.__retailSaved = 'cs_' + o.key + ':' + n; toast('店舗別の月合計を保存しました');
+      history.replaceState(null, '', location.pathname + location.search); return;
+    }
     if (o.k === 'ss') { /* 店舗別の店販（在庫アプリで在庫から引く用）：o.store = hair/liss/till */
       if (!['hair', 'liss', 'till'].includes(o.store)) throw new Error('店舗が違います');
       const rows = o.items.map(a => ({ p: c2p(String(a[0])), m: a[1] || '', c: String(a[2] || ''), n: a[3] || '', q: Number(a[4]) || 0 }));
