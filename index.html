@@ -277,7 +277,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .lc-ask { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 0; }
 .zero-sel { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); font-size: 13px; }
 .zero-sel .zero-q { margin-left: 4px; }
-.row.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color .3s; }
+.row.flash, .lockbar.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color .3s; }
 .zero-box { border: 1px solid color-mix(in srgb, var(--warn, #8a5a00) 35%, var(--line, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--warn, #8a5a00) 4%, var(--surface)); padding: 2px 12px; }
 .zero-box > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 8px 0; font-size: 13px; }
 .zero-box > summary::-webkit-details-marker { display: none; }
@@ -561,6 +561,8 @@ function confirmOther() {
   return ok;
 }
 function armLock() { clearTimeout(lockT); if (S.unlocked) lockT = setTimeout(() => { S.unlocked = false; if (S.tab === 'stock' || S.tab === 'order') scheduleRender(); }, 300000); }
+/* ロック中に＋−を押したとき：ロック解除の場所を教える */
+function lockHint() { toast('ロック中です。上の「変更する」を押すと＋−が使えます'); const lb = $('lockbar'); if (lb) { lb.scrollIntoView({ behavior: 'smooth', block: 'center' }); lb.classList.add('flash'); setTimeout(() => lb.classList.remove('flash'), 1800); } }
 const lockBar = () => S.readOnly ? '' : `<button type="button" class="lockbar${S.unlocked ? ' open' : ''}" id="lockbar" data-act="lock">${S.unlocked ? '<span><b>数量を変更できます</b><br>5分操作がないと自動でロックします</span><span class="sw">ロックする</span>' : '<span><b>ロック中</b><br>押し間違い防止のため＋−は使えません</span><span class="sw">変更する</span>'}</button>`;
 function shell() {
   { const vb = $('vbtn'); if (vb) vb.hidden = !(S.items.length && !S.login && !(window.WHO && WHO.gate && WHO.gate()) && !S.bulk && !S.editing); }
@@ -1101,9 +1103,9 @@ function orderCard(did, force) {
       <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(uTxt(r.it.unit))}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div>
       ${r.manual ? `<div class="manual"><span class="pill mpill">手入力</span><span>自動なら ${r.auto}</span>${S.readOnly ? '' : `<button type="button" class="lnk" data-act="oreset" data-did="${did}" data-id="${r.it.id}">自動に戻す</button>`}</div>` : ''}</div>
       <div class="stepper${S.unlocked ? '' : ' locked'}">
-        <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす" ${S.unlocked ? '' : 'disabled'}>−</button>
+        <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす">−</button>
         <input id="oq-${r.it.id}" type="number" min="0" inputmode="numeric" value="${r.qty}" data-chg="oqty" data-did="${did}" data-id="${r.it.id}" aria-label="${esc(r.it.name)}の発注数" ${S.unlocked ? '' : 'disabled'}>
-        <button type="button" id="op-${r.it.id}" data-act="oinc" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1増やす" ${S.unlocked ? '' : 'disabled'}>＋</button>
+        <button type="button" id="op-${r.it.id}" data-act="oinc" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1増やす">＋</button>
       </div></div>`).join('')}</div>
     ${others.length ? `<select class="field" id="add-${did}" data-chg="addLine" data-did="${did}" aria-label="商品を追加"><option value="">＋ 商品を追加</option>${catGroups(others, i => `<option value="${i.id}">${esc(i.name)}</option>`)}</select>` : ''}
     ${xbox}
@@ -1585,8 +1587,8 @@ document.addEventListener('click', async ev => {
     case 'goDue': { const p = $('due-pop'); if (p) p.remove(); if (id && id !== S.store) { S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} } S.tab = 'order'; S.oPick = ''; render(); window.scrollTo(0, 0); break; }
     case 'closeDue': { const p = $('due-pop'); if (p) p.remove(); break; }
     case 'oreset': resetDraft(did, id); render(); break;
-    case 'oinc': armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
-    case 'odec': armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
+    case 'oinc': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
+    case 'odec': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
     case 'copy': {
       const text = did === '__goto' ? gotoText() : msgText(did), ai = did !== '__goto' && !!(dealerOf(did) || {}).url;
       let ok = true;
