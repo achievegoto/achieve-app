@@ -662,10 +662,13 @@ function saStoreOf(p) { const pp = (S.mrPeople || {})[p]; return pp && pp.store 
 /* この店で反映待ちの販売行 */
 function saPending(store) {
   const out = [];
-  for (const d of S.saDays || []) for (const r of d.rows || []) {
+  /* 店舗別データ（mr_rsday）がある日はそれを使う。無い日は担当者の所属店で判断（mr_rday） */
+  const sdays = new Set((S.saSDays || []).map(d => d.date));
+  const src = (S.saSDays || []).filter(d => d.store === store).map(d => ({ ...d, byStore: true })).concat((S.saDays || []).filter(d => !sdays.has(d.date)));
+  for (const d of src) for (const r of d.rows || []) {
     if (r.m === 'EC連携' || !(num(r.q) > 0)) continue;
-    const row = { date: d.date, p: r.p, c: String(r.c), n: r.n, q: num(r.q) };
-    const st = saStoreOf(r.p); if (st && st !== store) continue;
+    const row = { date: d.date, p: d.byStore ? 'st:' + store + ':' + r.p : r.p, c: String(r.c), n: r.n, q: num(r.q) };
+    const st = d.byStore ? store : saStoreOf(r.p); if (st && st !== store) continue;
     const a = (S.saApplied || {})[saKey(row)]; const done = a ? num(a.q) : 0; if (a && a.skip) continue;
     const left = row.q - done; if (left <= 0) continue;
     const m = saMapOf(row.c); if (m === '__skip') continue;
@@ -677,7 +680,7 @@ function saCard() {
   if (S.readOnly || !DUE_STORES.includes(S.store)) return '';
   const L = saPending(S.store); if (!L.length) return '';
   const ready = L.filter(r => r.item);
-  const staff = p => { const pp = (S.mrPeople || {})[p]; return pp ? pp.name || '' : p === 's0' ? 'フリー' : ''; };
+  const staff = p => { p = String(p).replace(/^st:[a-z]+:/, ''); const pp = (S.mrPeople || {})[p]; return pp ? pp.name || '' : p === 's0' ? 'フリー' : ''; };
   const row = (r, i) => {
     let right;
     if (r.item) right = `<div class="sa-to">→ ${esc(r.item.name)}<span class="sub">在庫 ${qtyOf(S.store, r.item.id)} → ${Math.max(0, qtyOf(S.store, r.item.id) - r.left)}</span><button type="button" class="lnk" data-act="saRemap" data-id="${esc(r.c)}">商品を選び直す</button></div>
@@ -2111,6 +2114,7 @@ function listen(fs) {
   fs.doc('settings/saMap').onSnapshot(x => { S.saMap = (x.data() || {}).map || {}; scheduleRender(); }, () => {});
   fs.collection('sa_applied').where(firebase.firestore.FieldPath.documentId(), '>=', SA_START.slice(0, 7)).onSnapshot(x => { const m = {}; x.docs.forEach(d => Object.assign(m, d.data())); S.saApplied = m; scheduleRender(); }, () => {});
   fs.collection('mr_rday').where(firebase.firestore.FieldPath.documentId(), '>=', SA_START).onSnapshot(x => { S.saDays = x.docs.map(d => d.data()); scheduleRender(); }, () => {});
+  fs.collection('mr_rsday').where(firebase.firestore.FieldPath.documentId(), '>=', SA_START).onSnapshot(x => { S.saSDays = x.docs.map(d => d.data()); scheduleRender(); }, () => {});
   fs.collection('mr_people').onSnapshot(x => { const m = {}; x.docs.forEach(d => m[d.id] = d.data()); S.mrPeople = m; scheduleRender(); }, () => {});
   fs.doc('settings/dealerOrder').onSnapshot(x => { S.dOrder = (x.data() || {}).ids || []; scheduleRender(); }, () => {});
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);

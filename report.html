@@ -634,6 +634,13 @@ async function importRetail() {
   try {
     const o = JSON.parse(decodeURIComponent(h.slice(8)));
     if (!o || !o.key || !Array.isArray(o.items)) throw new Error('形式が違います');
+    if (o.k === 'ss') { /* 店舗別の店販（在庫アプリで在庫から引く用）：o.store = hair/liss/till */
+      if (!['hair', 'liss', 'till'].includes(o.store)) throw new Error('店舗が違います');
+      const rows = o.items.map(a => ({ p: c2p(String(a[0])), m: a[1] || '', c: String(a[2] || ''), n: a[3] || '', q: Number(a[4]) || 0 }));
+      await db.doc('mr_rsday/' + o.key + '_' + o.store).set({ date: o.key, store: o.store, rows, asOf: Date.now(), n: rows.length });
+      window.__retailSaved = 'ss_' + o.key + '_' + o.store + ':' + rows.length; toast('店舗別の店販を保存しました（' + rows.length + '行）');
+      history.replaceState(null, '', location.pathname + location.search); return;
+    }
     if (o.k === 'sd' || o.k === 'sm') {
       const rows = o.items.map(a => ({ p: c2p(String(a[0])), m: a[1] || '', c: String(a[2] || ''), n: a[3] || '', q: Number(a[4]) || 0, s: Number(a[5]) || 0 }));
       const ref = o.k === 'sd' ? db.doc('mr_rday/' + o.key) : db.doc('mr_rmon/' + o.key);
@@ -901,6 +908,7 @@ function listen() {
 })();
 
 document.addEventListener('input', ev => { if (ev.target.id === 'rt-q') { S.rq = ev.target.value; const pos = ev.target.selectionStart; render(); const e = $('rt-q'); if (e) { e.focus(); try { e.setSelectionRange(pos, pos); } catch (x) {} } } });
+
 </script>
 </body>
 </html>
