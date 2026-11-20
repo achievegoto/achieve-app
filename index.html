@@ -1441,7 +1441,7 @@ function draftValue(did, id) {
   const r = linesFor(did).find(x => x.it.id === id); return r ? r.qty : 0;
 }
 /* 発注済みは日曜・月曜に押すルール。それ以外の曜日は、今の在庫で数が計算し直されているので確認を出す */
-const isLateDay = () => { const w = new Date().getDay(); return w !== 0 && w !== 1; };
+const isLateDay = () => false; /* 日・月以外の確認は使わない（2026-11-20 オーナー指示）。戻すときは曜日判定を復活 */
 function lateAsk(dids) {
   const old = $('late-pop'); if (old) old.remove();
   const rows = dids.map(did => { const d = dealerOf(did), ls = linesFor(did).filter(r => r.qty > 0), xt = extraLines(did);
