@@ -614,7 +614,7 @@ function render() {
   const a = document.activeElement, fid = a && a.id;
   m.innerHTML = notes() + copyBanner() + dueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
-  if (S.tab === 'stock') { $('stock-list').innerHTML = stockList(); fillScan(); }
+  if (S.tab === 'stock' && $('stock-list')) { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
   S.dirty = false;
 }
