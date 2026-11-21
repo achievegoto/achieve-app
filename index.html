@@ -274,7 +274,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .sa-card .sa-list { display: flex; flex-direction: column; } .sa-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .sa-row.need { background: color-mix(in srgb, var(--warn, #8a5a00) 5%, transparent); } .sa-to { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; } .sa-to select { width: 100%; }
 .pend-d > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; } .pend-d > summary::-webkit-details-marker { display: none; } .pend-d .caret { color: var(--accent, #4b2c7a); font-weight: 600; } .pend-d[open] > summary { padding-bottom: 6px; border-bottom: 1px dashed var(--line); margin-bottom: 6px; }
-.sa-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .sa-chips .chip { white-space: nowrap; } .sa-row .sa-warn { font-size: 12.5px; } .sa-q { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; } .sa-btns label.sa-q { display: inline-flex !important; flex-direction: row !important; margin: 0; } .sa-q input { width: 64px; padding: 6px 8px; } .sa-row.done { opacity: .6; } .sa-chips { flex-wrap: wrap; margin: 6px 0; } .sa-n { color: var(--pend); } .sa-got { font-weight: 600; } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
+.sa-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .sa-chips .chip { white-space: nowrap; } .sa-row .sa-warn { font-size: 12.5px; } .sa-q { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; } .sa-btns label.sa-q { display: inline-flex !important; flex-direction: row !important; margin: 0; } .sa-q input { width: 64px; padding: 6px 8px; } .sa-row.done { opacity: .6; } .sa-chips { flex-wrap: wrap; margin: 6px 0; } .sa-n { color: var(--pend); } .sa-got { font-weight: 600; } .sa-card > summary { list-style: none; cursor: pointer; } .sa-card > summary::-webkit-details-marker { display: none; } .sa-tog { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; white-space: nowrap; } .pend-d .caret { padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
 .cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; flex: 0 0 auto; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .due-card { background: var(--surface); border-radius: 16px; padding: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 32px); overflow: hidden; }
@@ -744,7 +744,7 @@ function saCard() {
   const open = (S.saOpen ??= !!pend.length);
   const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーから取り込み：${saTs(gotAt)}</span>` : '';
   const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
-  return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sub">サロンアンサーより</span></summary>
+  return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sa-tog">${open ? '▴ 閉じる' : '▾ 開く'}</span></summary>
     <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。反映した分は記録されるので、何度開いても二重には引きません。</div>
     <div class="chips sa-chips">${wkChips}</div>
     <div class="chips sa-chips"><button type="button" class="chip" data-act="saDay" data-id="" aria-pressed="${!S.saDay}">${wk === thisWk ? '今週' : 'この週'}まとめ</button>${dayChips}</div>
@@ -1457,7 +1457,7 @@ function pendCard(o) {
   const nLeft = open ? lines.reduce((t, l) => t + leftOf(l), 0) : 0, isOpen = (S.pOpen ||= new Set()).has(o.id);
   return `<details class="row pend-d" style="grid-template-columns:minmax(0,1fr)" data-pend="${o.id}"${isOpen ? ' open' : ''}><summary>
     <div class="card-head"><div class="name">${esc(o.dealerName)}</div><span class="amount">${yen(num(o.total))}</span></div>
-    <div class="sub"><span>${lines.length}品${open ? `・残り${nLeft}` : ''}</span><span class="caret">${isOpen ? '▴ 閉じる' : '▾ 中身を見る'}</span></div>
+    <div class="sub"><span>${lines.length}品${open ? `・残り${nLeft}` : ''}</span><span class="caret">${isOpen ? '▴ 閉じる' : '▾ 開く'}</span></div>
     <div class="sub"><span class="pill ${open ? 'ordering' : 'ok'}">${open ? (part ? '一部入荷' : '発注済み') : '入荷済み'}</span><span>${esc(storeOf(o.store).short)}</span><span>${dateStr(o.orderedAt)} 発注</span>${open ? `<span class="${days >= 7 ? 'late' : ''}">${days}日経過</span>` : `<span>${dateStr(lastRcpt(o).at)} 入荷</span>`}</div></summary>
     <div>${rows}</div>
     ${o.extra ? `<div class="sub">手打ち：${esc(o.extra.replace(/\n/g, '、'))}（在庫には入りません）</div>` : ''}
@@ -1744,8 +1744,8 @@ async function clearSamples() {
   } catch (e) { fail(e); }
 }
 
-document.addEventListener('toggle', ev => { if (ev.target.dataset && ev.target.dataset.sa) S.saOpen = ev.target.open; }, true);
-document.addEventListener('toggle', ev => { const id = ev.target.dataset && ev.target.dataset.pend; if (!id) return; const st = (S.pOpen ||= new Set()); ev.target.open ? st.add(id) : st.delete(id); const c = ev.target.querySelector('summary .caret'); if (c) c.textContent = ev.target.open ? '▴ 閉じる' : '▾ 中身を見る'; }, true);
+document.addEventListener('toggle', ev => { if (ev.target.dataset && ev.target.dataset.sa) { S.saOpen = ev.target.open; const c = ev.target.querySelector('summary .sa-tog'); if (c) c.textContent = ev.target.open ? '▴ 閉じる' : '▾ 開く'; } }, true);
+document.addEventListener('toggle', ev => { const id = ev.target.dataset && ev.target.dataset.pend; if (!id) return; const st = (S.pOpen ||= new Set()); ev.target.open ? st.add(id) : st.delete(id); const c = ev.target.querySelector('summary .caret'); if (c) c.textContent = ev.target.open ? '▴ 閉じる' : '▾ 開く'; }, true);
 document.addEventListener('toggle', ev => { const k = ev.target.dataset && ev.target.dataset.zk; if (k == null) return; const z = (S.zOpen ||= new Set()); ev.target.open ? z.add(k) : z.delete(k); }, true);
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
