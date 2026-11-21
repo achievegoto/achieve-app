@@ -1493,7 +1493,7 @@ function bulkView() {
   ${Object.entries(g).map(([c, arr]) => `<section class="group"><h2>${esc(c)}（${arr.length}）</h2><div>${arr.map(it => { const A = st === 'all' ? bulkValAll(it, 'min') : { v: bulkVal(st, it, 'min') }, B = st === 'all' ? bulkValAll(it, 'par') : { v: bulkVal(st, it, 'par') }, a = A.v, b = B.v, ch = st === 'all' ? ALL3.some(x => (x + '|' + it.id) in S.bulkVals) : (st + '|' + it.id) in S.bulkVals, bad = a !== '' && b !== '' && num(b) < num(a);
     const clr = ch && a === '' && b === '';
     return `<div class="bk-row${ch ? ' changed' : ''}${bad ? ' bad' : ''}${clr ? ' cleared' : ''}" data-bkrow="${it.id}"><span class="bk-n">${esc(it.name)}</span><input class="field" data-bk="min" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の発注点" value="${a}" ${clr ? 'placeholder="未記入"' : A.mixed ? 'placeholder="バラバラ"' : ''}><input class="field" data-bk="par" data-id="${it.id}" type="number" min="0" inputmode="numeric" enterkeyhint="next" aria-label="${esc(it.name)}の適正" value="${b}" ${clr ? 'placeholder="未記入"' : B.mixed ? 'placeholder="バラバラ"' : ''}><button type="button" class="bk-clr" data-act="bkClear" data-id="${it.id}" aria-label="${esc(it.name)}の発注点・適正を未記入にする">未記入<br>に</button></div>`; }).join('')}</div></section>`).join('')}` : '<div class="empty">条件に合う商品はありません。</div>'}
-  <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave" ${n ? '' : 'disabled'}>${isBoss() ? 'まとめて保存' : 'まとめて申請'}${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
+  <div class="bk-bar"><button type="button" class="btn primary" data-act="bulkSave">${isBoss() ? 'まとめて保存' : 'まとめて申請'}${n ? `（${n}件）` : ''}</button><button type="button" class="btn" data-act="bulkClose">${n ? '保存せずに戻る' : '戻る'}</button></div>`;
 }
 function viewItems() {
   if (S.bulk && canReq()) return bulkView();
@@ -1842,6 +1842,7 @@ document.addEventListener('click', async ev => {
     case 'bulkClose': if (Object.keys(S.bulkVals).length && S.confirm !== 'bulkClose') { S.confirm = 'bulkClose'; b.textContent = 'もう一度押すと変更を捨てて戻る'; break; } S.bulk = false; S.bulkVals = {}; S.confirm = ''; render(); break;
     case 'bulkSave': {
       if (!canReq()) break; armPin();
+      if (!Object.keys(S.bulkVals).length) { toast('変更がありません（入れた数字が今の数字と同じです）'); break; }
       const rows = [];
       for (const [k, v] of Object.entries(S.bulkVals)) { const [st, iid] = k.split('|'); const it = S.items.find(x => x.id === iid); if (!it) continue;
         const oMin = it.min?.[st] ?? '', oPar = it.par?.[st] ?? '';
@@ -1850,7 +1851,7 @@ document.addEventListener('click', async ev => {
         if (a !== '' && c === '' || a === '' && c !== '') { toast(`${it.name}（${storeOf(st).short}）は発注点と適正を両方入れてください`); S.bulkStore = st; render(); return; }
         if (!lvStores().includes(st)) continue;
         rows.push({ id: iid, name: it.name, store: st, oldMin: oMin, oldPar: oPar, min: a, par: c }); }
-      if (!rows.length) break;
+      if (!rows.length) { toast('この店舗の発注点・適正は変更できません'); break; }
       try {
         b.disabled = true;
         const nItems = new Set(rows.map(r => r.id)).size;
@@ -1919,7 +1920,7 @@ document.addEventListener('input', ev => {
     });
     const row = el.closest('.bk-row'), a = row.querySelector('[data-bk=min]').value, b = row.querySelector('[data-bk=par]').value;
     row.classList.toggle('changed', stores.some(st => (st + '|' + el.dataset.id) in S.bulkVals)); row.classList.toggle('bad', a !== '' && b !== '' && Number(b) < Number(a));
-    const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.disabled = !n; sv.textContent = (isBoss() ? 'まとめて保存' : 'まとめて申請') + (n ? `（${n}件）` : ''); }
+    const n = new Set(Object.keys(S.bulkVals).map(k => k.split('|')[1])).size, sv = document.querySelector('[data-act=bulkSave]'); if (sv) { sv.textContent = (isBoss() ? 'まとめて保存' : 'まとめて申請') + (n ? `（${n}件）` : ''); }
   }
 });
 document.addEventListener('keydown', ev => {
