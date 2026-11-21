@@ -742,7 +742,7 @@ function saCard() {
   };
   const totalP = new Set(pend.map(r => r.date + r.c)).size;
   const open = (S.saOpen ??= !!pend.length);
-  const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーから取り込み：${saTs(gotAt)}</span>` : '';
+  const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーからの最終取り込み：${saTs(gotAt)}</span>` : '';
   const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
   return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sa-tog">${open ? '▴ 閉じる' : '▾ 開く'}</span></summary>
     <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。反映した分は記録されるので、何度開いても二重には引きません。</div>
