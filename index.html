@@ -454,7 +454,7 @@ function gotoCard(force) {
     <summary class="card-head"><h3>後藤さん宛て（まとめて）</h3><span class="osum"><span class="ocnt">${n}品</span><span class="amount">${yen(total)}</span><span class="chev" aria-hidden="true"></span></span></summary>
     <div class="sub">${g.map(did => esc(dealerOf(did).name)).join('・')} の ${g.length} 件です。<b>「後藤さんに依頼する」を押すだけでOK</b>（LINEは不要。後藤さんのアプリにまとめて表示されます）。</div>
     <div class="actions">
-      <button type="button" class="btn primary" id="done-__goto" data-act="placedGoto" ${S.readOnly ? 'disabled' : ''}>後藤さんに全部まとめて依頼する</button>
+      ${S.confirm === 'gotoAll' ? `<div class="sub" style="width:100%"><b>${g.length}件をまとめて後藤さんに依頼します。よろしいですか？</b></div><button type="button" class="btn primary" id="done-__goto" data-act="placedGoto" ${S.readOnly ? 'disabled' : ''}>はい、依頼する</button><button type="button" class="btn" data-act="confirmNo">やめる</button>` : `<button type="button" class="btn primary" id="done-__goto" data-act="placedGoto" ${S.readOnly ? 'disabled' : ''}>後藤さんに全部まとめて依頼する</button>`}
     </div>
     <details class="gosep"><summary>LINEでも送る場合</summary>
     <textarea class="field msg" id="msg-__goto" readonly aria-label="後藤さん宛てのまとめた発注文">${esc(gotoText())}</textarea>
@@ -1290,7 +1290,7 @@ function orderCard(did, force) {
       <a class="btn" id="site-${did}" href="${esc(d.url)}" target="_blank" rel="noopener">発注サイトを開く</a>
       <button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>サイトで注文したので発注済みにする</button>
     </div>` : isGotoDid(did) ? `<div class="sub gonote">後藤さん宛ては、一番上の「後藤さん宛て（まとめて）」でまとめて依頼できます。この分だけ先に依頼することもできます。</div>
-    <div class="actions"><button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>この分だけ後藤さんに依頼する</button></div>
+    <div class="actions">${S.confirm === 'goto-' + did ? `<div class="sub" style="width:100%"><b>${esc(dealerOf(did).name)}を後藤さんに依頼します。よろしいですか？</b></div><button type="button" class="btn primary" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>はい、依頼する</button><button type="button" class="btn" data-act="confirmNo">やめる</button>` : `<button type="button" class="btn" id="done-${did}" data-act="placed" data-did="${did}" ${dis}>この分だけ後藤さんに依頼する</button>`}</div>
     <details class="gosep"><summary>この分だけLINEでも送る場合</summary>
     <textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
     <div class="actions"><button type="button" class="btn" id="copy-${did}" data-act="copy" data-did="${did}" ${any ? '' : 'disabled'}>この分だけコピー</button></div></details>` : `<textarea class="field msg" id="msg-${did}" readonly aria-label="LINEに貼る発注文">${esc(any ? lineText(did) : '')}</textarea>
@@ -1778,7 +1778,7 @@ document.addEventListener('click', async ev => {
       copyAsk(did, ai, ok);
       break;
     }
-    case 'placed': if (isLateDay() && did !== XFER) { lateAsk([did]); break; } markPlaced(did); break;
+    case 'placed': if (isGotoDid(did) && S.confirm !== 'goto-' + did) { S.confirm = 'goto-' + did; render(); break; } S.confirm = ''; if (isLateDay() && did !== XFER) { lateAsk([did]); break; } markPlaced(did); break;
     case 'cpDone': { const p = $('cp-pop'); if (p) p.remove(); const d0 = b.dataset.did;
       if (d0 === '__goto') { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
       if (isLateDay() && d0 !== XFER) { lateAsk([d0]); break; } markPlaced(d0); break; }
@@ -1814,7 +1814,7 @@ document.addEventListener('click', async ev => {
     case 'janCam': $('jan-file').click(); break;
     case 'scanAdd': S.scan.rows.push({ text: '', qty: 1, id: '' }); render(); break;
     case 'scanApply': applyScanNow(); break;
-    case 'placedGoto': { if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
+    case 'placedGoto': { if (S.confirm !== 'gotoAll') { S.confirm = 'gotoAll'; render(); break; } S.confirm = ''; if (isLateDay() && gotoIds().length) { lateAsk(gotoIds()); break; } const g = gotoIds(); for (const x of g) await markPlaced(x, true); if (g.length) { toast(`${g.length}件を発注済みにしました`); render(); } break; }
     case 'receive': receive(id, null); break;
     case 'recvLine': { const i = Number(b.dataset.i), el = $(`pq-${id}-${i}`), k = id + ':' + i; const v = S.pq && S.pq[k] !== undefined ? S.pq[k] : el ? num(el.value) : 0; receive(id, { [i]: v }); break; }
     case 'undoRecv': $('toast').hidden = true; undoReceive(id); break;
