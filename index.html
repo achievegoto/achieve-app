@@ -264,6 +264,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .due { background: #fff1f0; border: 2px solid #e5484d; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; color: #7a1418; }
 .due-h { font-weight: 700; font-size: 15px; } .due-b { font-size: 13px; }
 .due-s { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; } .due-s b { font-size: 13px; margin-right: 2px; }
+.due-st { display: grid; gap: 8px; margin-top: 10px; } .due-sh { font-weight: 800; font-size: 15px; } .due-r { background: #fff; border: 1px solid #f3b3b5; border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; color: #3a1416; } .due-n { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; } .due-n span { font-size: 12px; color: #7a3b3e; } .due-bs { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; } .due-ask { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 13px; font-weight: 600; }
 .due-s span { background: #fff; border: 1px solid #f3b3b5; border-radius: 99px; padding: 2px 8px; }
 .due-btn { align-self: flex-start; background: #e5484d; color: #fff; border-color: #e5484d; }
 .gosep > summary { cursor: pointer; font-size: 13px; color: var(--accent); padding: 4px 0; } .gosep[open] > summary { margin-bottom: 8px; }
@@ -431,6 +432,7 @@ function linesFor(did) {
   const draft = S.draft[draftKey(did)] || {};
   const rows = [];
   for (const it of S.items) {
+    if (did !== XFER && (it.dealerId || '') !== did) continue;
     const x = xferOf(it, S.store), mv = did === XFER || (it.dealerId || '') === did ? manualMove(it) : 0;
     if (did === XFER ? x + mv <= 0 && !Object.prototype.hasOwnProperty.call(draft, it.id) : (it.dealerId || '') !== did) continue;
     const need = did === XFER ? x + mv : Math.max(0, needOf(it, S.store) - x);
@@ -632,30 +634,48 @@ function render() {
 }
 /* ---- 日曜19時の発注締め：発注済みになっていない発注があれば警告 ---- */
 const DUE_STORES = ['hair', 'liss', 'till'];
-function dueWindow() { const d = new Date(), w = d.getDay(), m = d.getHours() * 60 + d.getMinutes(); return (w === 0 && m >= 18 * 60 + 30) || w === 1 || w === 2 || (w === 3 && m < 11 * 60); } /* 日曜18:30〜水曜11:00 */
-function pendingOf(store) {
+/* 直近の発注締め（日曜18:30）。締めのあと、次の締めまでずっと「未発注」をチェックする */
+function lastDeadline() { const d = new Date(); d.setHours(18, 30, 0, 0); d.setDate(d.getDate() - d.getDay()); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 7); return d.getTime(); }
+const dueWeek = () => { const d = new Date(lastDeadline()); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+function dueWindow() { return true; }
+function pendingIds(store) {
   const prev = S.store; S.store = store;
-  try { return [XFER].concat(S.dealers.map(d => d.id)).filter(did => dealerOf(did) && (linesFor(did).some(r => r.qty > 0) || extraLines(did).length)).map(did => dealerOf(did).name); }
+  try { return [XFER].concat(S.dealers.map(d => d.id)).filter(did => dealerOf(did) && (linesFor(did).some(r => r.qty > 0) || extraLines(did).length)); }
   finally { S.store = prev; }
 }
+function pendingOf(store) { return pendingIds(store).map(did => dealerOf(did).name); }
+/* 締めのあとも発注されていないディーラー：締めの3日前（木曜18:30）以降にその店・ディーラーの発注が無く、今も発注する商品があるもの。「今週は発注しない」にしたものは除く */
+let dueCache = null;
 function dueList() {
-  if (!dueWindow() || S.store === 'tonari' && !WHO.isOwner()) return [];
-  const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
-  return stores.map(st => ({ st, names: pendingOf(st) })).filter(x => x.names.length);
+  if (S.store === 'tonari' && !WHO.isOwner()) return [];
+  const ck = S.store + '|' + (WHO.isOwner() ? 1 : 0);
+  if (dueCache && dueCache.k === ck && dueCache.o === S.orders && dueCache.s === S.dueSkip && dueCache.st === S.stock && Date.now() - dueCache.t < 5000) return dueCache.v;
+  const v = dueList0(); dueCache = { k: ck, o: S.orders, s: S.dueSkip, st: S.stock, t: Date.now(), v }; return v;
 }
+function dueList0() {
+  const from = lastDeadline() - 3 * 86400e3, wk = dueWeek(), skip = S.dueSkip || {};
+  const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
+  return stores.map(st => ({ st, items: pendingIds(st).filter(did => skip[st + ':' + did] !== wk && !S.orders.some(o => o.store === st && o.dealerId === did && num(o.orderedAt) >= from)).map(did => ({ did, name: dealerOf(did).name })) })).filter(x => x.items.length);
+}
+function dueSum(st, did) { const prev = S.store; S.store = st; try { const rs = linesFor(did).filter(r => r.qty > 0); return { n: rs.length + extraLines(did).length, yen: rs.reduce((a, r) => a + r.qty * num(r.it.price), 0) }; } finally { S.store = prev; } }
 function dueBanner() {
   const L = dueList(); if (!L.length) return '';
-  const html = `<section class="due"><div class="due-h">⚠️ 日曜18:30の発注締めを過ぎています</div>
-    <div class="due-b">まだ「発注済み」になっていない発注があります。<br><b>発注したら「発注済み」ボタンを押してください。</b></div>
-    ${L.map(x => `<div class="due-s"><b>${esc(storeOf(x.st).short)}</b>${x.names.map(n => `<span>${esc(n)}</span>`).join('')}</div>`).join('')}
-    ${S.tab !== 'order' ? `<button type="button" class="btn due-btn" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button>` : ''}</section>`;
+  const row = (st, x) => { const k = st + '|' + x.did, sm = dueSum(st, x.did), goto = isGotoDid(x.did);
+    const ask = S.confirm === 'dueP-' + k ? `<div class="due-ask"><span>${esc(x.name)}（${sm.n}品${sm.yen ? ' ' + yen(sm.yen) : ''}）を${goto ? '後藤さんに依頼済み' : '発注済み'}にします。よろしいですか？</span><button type="button" class="btn small primary" data-act="duePlaced" data-id="${k}">はい</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : '';
+    const askS = S.confirm === 'dueS-' + k ? `<div class="due-ask"><span>${esc(x.name)}は今週は発注しない、でよろしいですか？</span><button type="button" class="btn small primary" data-act="dueSkip" data-id="${k}">はい</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : '';
+    return `<div class="due-r"><div class="due-n"><b>${esc(x.name)}</b><span>${sm.n}品${sm.yen ? '・' + yen(sm.yen) : ''}</span></div>
+      <div class="due-bs"><button type="button" class="btn small" data-act="dueOpen" data-id="${k}">まだ → 開いて${goto ? '依頼' : '発注'}する</button><button type="button" class="btn small" data-act="dueAskP" data-id="${k}">${goto ? '依頼' : '発注'}したのに押し忘れた</button><button type="button" class="lnk" data-act="dueAskS" data-id="${k}">今週は発注しない</button></div>${ask}${askS}</div>`; };
+  const late = Date.now() - lastDeadline();
+  const html = `<section class="due"><div class="due-h">⚠️ 日曜18:30の発注締めのあと、まだ発注されていません</div>
+    <div class="due-b">ディーラーごとに、どれか1つを押してください。押すまでこの表示は消えません（${Math.floor(late / 86400e3) ? Math.floor(late / 86400e3) + '日' : Math.floor(late / 3600e3) + '時間'}経過）。</div>
+    ${L.map(x => `<div class="due-st"><div class="due-sh">${esc(storeOf(x.st).short)}</div>${x.items.map(it => row(x.st, it)).join('')}</div>`).join('')}</section>`;
   /* 1日1回（店舗ごと）ポップアップでも知らせる */
   const key = 'dueShown:' + new Date().toDateString() + ':' + L.map(x => x.st).join(',');
   let shown = false; try { shown = localStorage.getItem(key) === '1'; } catch (e) {}
   if (!shown && !document.getElementById('due-pop')) {
     try { localStorage.setItem(key, '1'); } catch (e) {}
     setTimeout(() => { const d = document.createElement('div'); d.id = 'due-pop'; d.className = 'due-pop';
-      d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true">${html.replace('<section class="due">', '<div class="due in">').replace(/<\/section>$/, '</div>')}<div class="due-acts"><button type="button" class="btn primary" data-act="goDue" data-id="${L[0].st}">発注ページを開く</button><button type="button" class="btn" data-act="closeDue">あとで</button></div></div>`;
+      d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true"><div class="due in"><div class="due-h">⚠️ 日曜18:30の発注締めのあと、まだ発注されていません</div><div class="due-s">${L.map(x => `<b>${esc(storeOf(x.st).short)}</b>${x.items.map(i => `<span>${esc(i.name)}</span>`).join('')}`).join('')}</div><div class="due-b">在庫タブの上の赤い枠で、ディーラーごとに「まだ」「押し忘れ」「今週は発注しない」を選んでください。</div></div><div class="due-acts"><button type="button" class="btn primary" data-act="closeDue">確認する</button></div></div>`;
       document.body.appendChild(d); }, 300);
   }
   return html;
@@ -1785,6 +1805,11 @@ document.addEventListener('click', async ev => {
     case 'big': S.big = S.big === id ? '' : id; S.cat = ''; render(); break;
     case 'goDue': { const p = $('due-pop'); if (p) p.remove(); if (id && id !== S.store) { S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} } S.tab = 'order'; S.oPick = ''; render(); window.scrollTo(0, 0); break; }
     case 'closeDue': { const p = $('due-pop'); if (p) p.remove(); break; }
+    case 'dueOpen': { const [st, d1] = id.split('|'); S.allView = false; S.pend = false; if (st !== S.store) { S.store = st; S.unlocked = false; try { localStorage.setItem('achieve-store', st); } catch (e) {} } S.tab = 'order'; S.oPick = d1; (S.oOpen ||= new Set()).add(d1); S.confirm = ''; render(); window.scrollTo(0, 0); break; }
+    case 'dueAskP': S.confirm = 'dueP-' + id; render(); break;
+    case 'dueAskS': S.confirm = 'dueS-' + id; render(); break;
+    case 'duePlaced': { const [st, d1] = id.split('|'), prev = S.store; S.confirm = ''; S.store = st; try { await markPlaced(d1, true); } finally { S.store = prev; } toast(isGotoDid(d1) ? '依頼済みにしました' : '発注済みにしました'); render(); break; }
+    case 'dueSkip': { const [st, d1] = id.split('|'), me = WHO.me || {}; S.confirm = ''; (S.dueSkip ||= {})[st + ':' + d1] = dueWeek(); await S.db.doc('settings/dueSkip').set({ map: { [st + ':' + d1]: dueWeek() }, log: { [st + ':' + d1 + ':' + dueWeek()]: { at: Date.now(), by: me.name || '' } } }, { merge: true }).catch(fail); logChange('order', st, '', null, null, { name: dealerOf(d1).name + ' を今週は発注しない', text: dueWeek() + ' 週' }); toast('今週は発注しないにしました'); render(); break; }
     case 'oreset': resetDraft(did, id); render(); break;
     case 'oinc': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
     case 'odec': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
@@ -2214,6 +2239,7 @@ function listen(fs) {
   fs.collection('mr_rday').where(firebase.firestore.FieldPath.documentId(), '>=', SA_START).onSnapshot(x => { S.saDays = x.docs.map(d => d.data()); scheduleRender(); }, () => {});
   fs.collection('mr_rsday').where(firebase.firestore.FieldPath.documentId(), '>=', SA_START).onSnapshot(x => { S.saSDays = x.docs.map(d => d.data()); scheduleRender(); }, () => {});
   fs.collection('mr_people').onSnapshot(x => { const m = {}; x.docs.forEach(d => m[d.id] = d.data()); S.mrPeople = m; scheduleRender(); }, () => {});
+  fs.doc('settings/dueSkip').onSnapshot(x => { S.dueSkip = (x.data() || {}).map || {}; scheduleRender(); }, () => {});
   fs.doc('settings/dealerOrder').onSnapshot(x => { S.dOrder = (x.data() || {}).ids || []; scheduleRender(); }, () => {});
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
   fs.collection('stock').onSnapshot(s => {
