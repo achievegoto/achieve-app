@@ -274,6 +274,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .sa-card .sa-list { display: flex; flex-direction: column; } .sa-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .sa-row.need { background: color-mix(in srgb, var(--warn, #8a5a00) 5%, transparent); } .sa-to { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; } .sa-to select { width: 100%; }
 .pend-d > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; } .pend-d > summary::-webkit-details-marker { display: none; } .pend-d .caret { color: var(--accent, #4b2c7a); font-weight: 600; } .pend-d[open] > summary { padding-bottom: 6px; border-bottom: 1px dashed var(--line); margin-bottom: 6px; }
+.greq-l .gq { display: flex; align-items: center; gap: 10px; } .greq-l .gq-n { flex: 1; min-width: 0; display: flex; flex-direction: column; } .greq-l .gq.on .gq-t { color: var(--muted); text-decoration: line-through; } .gchk { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); color: var(--accent-ink); font-weight: 800; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; } .gchk[aria-pressed=true], .gq.on .gchk { background: var(--accent); } .gchk.ro { cursor: default; opacity: .8; }
 .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .sa-chips .chip { white-space: nowrap; } .sa-row .sa-warn { font-size: 12.5px; } .sa-q { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; } .sa-btns label.sa-q { display: inline-flex !important; flex-direction: row !important; margin: 0; } .sa-q input { width: 64px; padding: 6px 8px; } .sa-row.done { opacity: .6; } .sa-chips { flex-wrap: wrap; margin: 6px 0; } .sa-n { color: var(--pend); } .sa-got { font-weight: 600; } .sa-card > summary { list-style: none; cursor: pointer; } .sa-card > summary::-webkit-details-marker { display: none; } .sa-tog { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; white-space: nowrap; } .pend-d .caret { padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
 .cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; flex: 0 0 auto; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -1235,14 +1236,17 @@ function gotoReqButton() {
   const n = gotoReqs().length;
   return `<button type="button" class="greq-btn${n ? ' has' : ''}" data-act="gotoView">📥 後藤さん宛ての依頼 <b>${n}</b>件 ›</button>`;
 }
+/* 後藤さん宛て依頼の明細（チェックリスト用）：[キー, 名前, 数量] */
+const gotoKeys = o => (o.lines || []).map((l, i) => [String(i), l.name, '×' + num(l.qty) + uTxt(l.unit), num(l.qty)]).filter(x => x[3] > 0).concat((o.extra || '').split('\n').map(t => t.trim()).filter(Boolean).map((t, j) => ['x' + j, t, '手打ち']));
 function viewGotoReqs() {
   const open = gotoReqs(), done = S.orders.filter(o => o.gotoDone && isGotoOrder(o) && Date.now() - num(o.gotoDone.at) < 7 * 86400e3);
   const byD = {}; open.forEach(o => (byD[o.dealerName || ''] ||= []).push(o));
   const card = (o, isDone) => `<div class="greq-o"><div class="greq-h"><b>${esc(storeOf(o.store).short)}</b><span class="sub">${dateStr(o.orderedAt)} 依頼</span><span class="amount">${yen(num(o.total))}</span></div>
-    <ul class="greq-l">${(o.lines || []).filter(l => num(l.qty) > 0).map(l => `<li><span>${esc(l.name)}</span><b>×${num(l.qty)}${esc(uTxt(l.unit))}</b></li>`).join('')}${o.extra ? o.extra.split('\n').filter(Boolean).map(t => `<li><span>${esc(t)}</span><b>手打ち</b></li>`).join('') : ''}</ul>
-    ${isDone ? `<div class="actions"><span class="sub">✓ 手配済み ${dateStr(o.gotoDone.at)}</span>${WHO.isOwner() ? `<button type="button" class="btn small" data-act="gotoUndo" data-id="${o.id}">戻す</button>` : ''}</div>` : (WHO.isOwner() ? `<div class="actions"><button type="button" class="btn small primary" data-act="gotoDone" data-id="${o.id}">手配した</button></div>` : '<div class="sub">⏳ 後藤さんの手配待ち</div>')}</div>`;
+    <ul class="greq-l">${gotoKeys(o).map(([k, name, q]) => { const c = (o.gotoChk || {})[k], on = !!c || isDone; return `<li class="gq${on ? ' on' : ''}">${WHO.isOwner() && !isDone ? `<button type="button" class="gchk" data-act="gotoChk" data-id="${o.id}" data-k="${k}" aria-pressed="${on}" aria-label="${esc(name)} を発注済みにする">${on ? '✓' : ''}</button>` : `<span class="gchk ro" aria-hidden="true">${on ? '✓' : ''}</span>`}<span class="gq-n"><span class="gq-t">${esc(name)}</span>${c ? `<span class="sub">${dateStr(c.at)} 発注済み</span>` : ''}</span><b>${esc(q)}</b></li>`; }).join('')}</ul>
+    ${!isDone ? (() => { const ks = gotoKeys(o), nOn = ks.filter(([k]) => (o.gotoChk || {})[k]).length; return `<div class="sub">発注済み <b>${nOn}</b> / ${ks.length}</div>`; })() : ''}
+    ${isDone ? `<div class="actions"><span class="sub">✓ 手配済み ${dateStr(o.gotoDone.at)}</span>${WHO.isOwner() ? `<button type="button" class="btn small" data-act="gotoUndo" data-id="${o.id}">戻す</button>` : ''}</div>` : (WHO.isOwner() ? `<div class="actions"><button type="button" class="btn small" data-act="gotoDone" data-id="${o.id}">全部まとめて手配済みにする</button></div>` : '<div class="sub">⏳ 後藤さんの手配待ち</div>')}</div>`;
   return `<section class="card"><div class="card-head"><h3>後藤さん宛ての依頼（全店）</h3><button type="button" class="btn small" data-act="gotoBack">‹ 発注に戻る</button></div>
-    <div class="sub">各店が「後藤さんに依頼する」を押した分です。後藤さんが注文・手配すると「手配した」になり、この一覧から消えます（店の入荷待ちはそのまま。届いたら店で「入荷」）。</div></section>
+    <div class="sub">各店が「後藤さんに依頼する」を押した分です。後藤さんが商品ごとに □ をタップして発注済みにします。全部チェックすると手配済みになり、この一覧から消えます（店の入荷待ちはそのまま。届いたら店で「入荷」）。</div></section>
     ${open.length ? Object.entries(byD).map(([dn, os]) => `<section class="card"><div class="card-head"><h3>${esc(dn)}</h3><span class="amount">${yen(os.reduce((a, o) => a + num(o.total), 0))}</span></div>${os.map(o => card(o, false)).join('')}</section>`).join('') : '<div class="card"><div class="empty">未手配の依頼はありません</div></div>'}
     ${done.length ? `<details class="card"><summary class="card-head"><h3>最近手配したもの（7日）</h3><span class="sub">${done.length}件</span></summary>${done.map(o => `<div class="sub" style="margin-top:8px"><b>${esc(o.dealerName || '')}</b></div>` + card(o, true)).join('')}</details>` : ''}`;
 }
@@ -1793,6 +1797,12 @@ document.addEventListener('click', async ev => {
     case 'dDown': moveDealer(id, 1); break;
     case 'gotoView': S.gotoView = true; render(); window.scrollTo(0, 0); break;
     case 'gotoBack': S.gotoView = false; render(); window.scrollTo(0, 0); break;
+    case 'gotoChk': { if (!WHO.isOwner()) break; const o = S.orders.find(x => x.id === id), k = b.dataset.k; if (!o) break; const me = WHO.me || {}, cur = { ...(o.gotoChk || {}) };
+      if (cur[k]) delete cur[k]; else cur[k] = { at: Date.now(), by: me.name || '' };
+      const all = gotoKeys(o).every(([kk]) => cur[kk]), upd = { gotoChk: cur };
+      if (all) upd.gotoDone = { at: Date.now(), by: me.name || '' };
+      o.gotoChk = cur; if (all) o.gotoDone = upd.gotoDone; render();
+      S.db.doc('orders/' + id).update(upd).then(() => { if (all) toast('全部チェックしたので手配済みにしました'); }).catch(fail); break; }
     case 'gotoDone': { const me = WHO.me || {}; S.db.doc('orders/' + id).update({ gotoDone: { at: Date.now(), by: me.name || '' } }).then(() => toast('手配済みにしました')).catch(fail); break; }
     case 'gotoUndo': S.db.doc('orders/' + id).update({ gotoDone: firebase.firestore.FieldValue.delete() }).then(() => toast('依頼一覧に戻しました')).catch(fail); break;
     case 'cpLater': { const p = $('cp-pop'); if (p) p.remove(); toast('送ったら必ず「発注済み」を押してください'); break; }
