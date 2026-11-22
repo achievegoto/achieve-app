@@ -1279,6 +1279,7 @@ function orderCard(did, force) {
     ${xf ? '<div class="sub">TONARIに在庫がある商品です。ディーラーには発注せず、TONARIから持ってきます。金額はこの店舗の発注金額に入り、届いたら「入荷」でTONARIの在庫（金額）から差し引かれます。</div>' : ''}
     <div class="lines">${rows.map(r => `<div class="row"><div><div class="name">${esc(r.it.name)}</div>
       <div class="sub"><span>在庫 ${qtyOf(S.store, r.it.id)}${esc(uTxt(r.it.unit))}</span><span>単価 ${yen(num(r.it.price))}</span>${xf ? `<span>TONARI 残り${tonariFree(r.it.id)}</span>` : ''}</div>
+      ${did !== XFER && S.store !== 'tonari' && r.qty > 0 && tonariFree(r.it.id) > 0 ? `<div class="sub sa-warn">⚠️ TONARIに在庫 ${tonariFree(r.it.id)} あり。TONARIから移動するなら、ここは0にして「TONARIから移動」に入れてください</div>` : ''}
       ${r.manual ? `<div class="manual"><span class="pill mpill">手入力</span><span>自動なら ${r.auto}</span>${S.readOnly ? '' : `<button type="button" class="lnk" data-act="oreset" data-did="${did}" data-id="${r.it.id}">自動に戻す</button>`}</div>` : ''}</div>
       <div class="stepper${S.unlocked ? '' : ' locked'}">
         <button type="button" id="om-${r.it.id}" data-act="odec" data-did="${did}" data-id="${r.it.id}" aria-label="発注数を1減らす">−</button>
