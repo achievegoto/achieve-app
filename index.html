@@ -525,6 +525,8 @@ function setQty(store, id, qty) {
     const value = S.stock[key];
     const from = p.from; p.from = undefined;
     if (from !== value) logChange('count', store, id, from, value);
+    /* 入荷待ちがある商品を手で増やした：届いた分なら「入荷」を押してもらう（押さないと入荷待ちが残り、在庫が二重に数えられる） */
+    if (value > from && store !== 'tonari' && onOrder(store, id) > 0) { const it = S.items.find(x => x.id === id); const t = $('toast'); t.innerHTML = `${esc(it ? it.name : '')} は入荷待ちがあります。届いた分なら手で増やさず「入荷」を押してください<button type="button" data-act="pendOpen">入荷待ちを開く</button>`; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 9000); }
     p.chain = p.chain.then(() => S.db.doc('stock/' + key).set({ store, itemId: id, qty: value, at: Date.now() })).catch(fail);
   }, 450);
   pending.set(key, p);
