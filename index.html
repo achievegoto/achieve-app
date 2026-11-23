@@ -277,6 +277,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .pend-d > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; } .pend-d > summary::-webkit-details-marker { display: none; } .pend-d .caret { color: var(--accent, #4b2c7a); font-weight: 600; } .pend-d[open] > summary { padding-bottom: 6px; border-bottom: 1px dashed var(--line); margin-bottom: 6px; }
 .greq-l .gq { display: flex; align-items: center; gap: 10px; } .greq-l .gq-n { flex: 1; min-width: 0; display: flex; flex-direction: column; } .greq-l .gq.on .gq-t { color: var(--muted); text-decoration: line-through; } .gchk { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); color: var(--accent-ink); font-weight: 800; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; } .gchk[aria-pressed=true], .gq.on .gchk { background: var(--accent); } .gchk.ro { cursor: default; opacity: .8; }
 .ai-cart { margin: 4px 0 10px; border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; } .ai-cart > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; } .ai-cart > summary::-webkit-details-marker { display: none; } .ai-cart[open] .sa-tog::after { content: ''; } .adj { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: #fff1d6; color: #8a5a00; font-size: 12px; font-weight: 700; } .gship-p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; } .gship { margin: 6px 0; padding: 6px 10px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; font-weight: 600; } .gship.other { background: #e6f0ff; color: #0b3d91; } .gship b { display: block; font-weight: 700; }
+.lship { display: inline-block; align-self: flex-start; margin: 2px 0 0 6px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); font-size: 12px; font-weight: 700; } .lship.other { background: #e6f0ff; color: #0b3d91; } .otools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; } .otools .lship-sel.field { width: auto; max-width: 100%; padding: 4px 8px; font-size: 12px; min-height: 0; height: auto; } .greq-l .gq { align-items: flex-start; } .greq-l .gchk { margin-top: 2px; }
 .gnote { margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: #fff7e0; color: #5a3d00; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 2px; } .gnote .sub { font-size: 11px; } .gnote-ed textarea { width: 100%; margin-top: 6px; }
 .gq-ask { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 8px 10px; margin: 2px 0 6px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; } .gq-st { display: inline-flex; align-items: center; gap: 6px; flex: none; } .gq-st .btn { min-width: 34px; padding: 4px 0; }
 .ai-st { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); } .ai-t { width: 100%; font-size: 13px; line-height: 1.5; margin-top: 6px; resize: vertical; }
@@ -1278,15 +1279,28 @@ function gotoReqButton() {
 /* 依頼ごとのコメント（後藤さんが書く・みんなに見える）例：「2個はLiss分。hairにまとめて届きます」 */
 const noteView = o => o.gotoNote && o.gotoNote.text ? `<div class="gnote">💬 ${esc(o.gotoNote.text).replace(/\n/g, '<br>')}<span class="sub">${esc(o.gotoNote.by || '')} ${dtStr(o.gotoNote.at)}</span></div>` : '';
 /* 届け先：後藤さんがワンタップで設定。依頼した店と違う店に届くなら「取りに行く」ことが分かるように */
+const SHIP_SHORT = { hair: 'アチーブ', liss: 'リス', till: 'ティル' };
+const lineShip = (o, l) => (l && l.ship) || (o.gotoShip && o.gotoShip.store) || '';
+const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp) return ''; const other = sp !== o.store; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く${other ? '（取りに行く）' : ''}</span>`; };
+/* 後藤さんだけ：商品ごとの届け先と数量（依頼一覧・入荷待ちの両方で使う） */
+function ownerLineTools(o, i) {
+  if (!WHO.isOwner() || !isGotoOrder(o) || o.status !== 'ordered') return '';
+  const l = o.lines[i]; if (!l) return '';
+  const sp = l.ship || '', k = String(i), ed = S.gqEdit && S.gqEdit.id === o.id && S.gqEdit.k === k ? S.gqEdit : null;
+  const sel = `<select class="field lship-sel" data-chg="lShip" data-id="${o.id}" data-i="${i}" aria-label="${esc(l.name)}の届け先"><option value="">届け先：未設定</option>${['hair', 'liss', 'till'].map(st => `<option value="${st}"${sp === st ? ' selected' : ''}>${SHIP_SHORT[st]}に届く</option>`).join('')}</select>`;
+  const qty = ed ? `<span class="gq-st"><button type="button" class="btn small" data-act="gqStep" data-d="-1" aria-label="1減らす">−</button><b>×${ed.v}${esc(uTxt(l.unit))}</b><button type="button" class="btn small" data-act="gqStep" data-d="1" aria-label="1増やす">＋</button></span>` : `<button type="button" class="btn small" data-act="gqEdit" data-id="${o.id}" data-k="${k}">数を変える</button>`;
+  const ask = ed ? `<div class="gq-ask"><span>${ed.v === num(l.qty) ? '＋／−で数を変えてから押してください' : `<b>${esc(l.name)}</b> を ${num(l.qty)} → <b>${ed.v}</b> に変更します。よろしいですか？`}</span><button type="button" class="btn small primary" data-act="gotoQty" data-id="${o.id}" data-k="${k}" ${ed.v === num(l.qty) ? 'disabled' : ''}>変更する</button><button type="button" class="btn small" data-act="gqCancel">やめる</button></div>` : '';
+  return `<div class="otools">${sel}${qty}</div>${ask}`;
+}
 const SHIP_NAME = { hair: 'achieve（hair design）', liss: 'Liss', till: 'till' };
 const shipView = o => { const sp = o.gotoShip && o.gotoShip.store; if (!sp) return ''; const other = sp !== o.store; return `<div class="gship${other ? ' other' : ''}">📦 ${esc(SHIP_NAME[sp] || sp)}に届きます${other ? `<b>（${esc(storeOf(o.store).short)}の分。届いたら取りに行ってください）</b>` : ''}</div>`; };
 function shipPick(o) {
-  const sp = o.gotoShip && o.gotoShip.store;
-  return `<div class="gship-p"><span class="sub">届け先</span>${['hair', 'liss', 'till'].map(st => `<button type="button" class="chip" data-act="gShip" data-id="${o.id}" data-st="${st}" aria-pressed="${sp === st}">${st === 'hair' ? 'アチーブ' : st === 'liss' ? 'リス' : 'ティル'}に届く</button>`).join('')}</div>`;
+  const ss = [...new Set((o.lines || []).map(l => lineShip(o, l)))], sp = ss.length === 1 ? ss[0] : '';
+  return `<div class="gship-p"><span class="sub">届け先を全部まとめて</span>${['hair', 'liss', 'till'].map(st => `<button type="button" class="chip" data-act="gShip" data-id="${o.id}" data-st="${st}" aria-pressed="${sp === st}">${st === 'hair' ? 'アチーブ' : st === 'liss' ? 'リス' : 'ティル'}に届く</button>`).join('')}</div>`;
 }
 function gotoNoteBox(o, isDone) {
-  if (!WHO.isOwner() || isDone) return shipView(o) + noteView(o);
-  if (S.gnEdit !== o.id) return shipPick(o) + shipView(o) + gotoNoteBox0(o);
+  if (!WHO.isOwner() || isDone) return noteView(o);
+  if (S.gnEdit !== o.id) return shipPick(o) + gotoNoteBox0(o);
   return shipPick(o) + gotoNoteBox0(o);
 }
 function gotoNoteBox0(o) {
@@ -1322,9 +1336,7 @@ function viewGotoReqs() {
   const open = gotoReqs(), done = S.orders.filter(o => o.gotoDone && isGotoOrder(o) && Date.now() - num(o.gotoDone.at) < 7 * 86400e3);
   const byD = {}; open.forEach(o => (byD[o.dealerName || ''] ||= []).push(o));
   const card = (o, isDone) => `<div class="greq-o"><div class="greq-h"><b>${esc(storeOf(o.store).short)}</b><span class="sub">${dtStr(o.orderedAt)} 依頼${o.orderedBy ? '（' + esc(o.orderedBy) + '）' : ''}</span><span class="amount">${yen(num(o.total))}</span></div>
-    <ul class="greq-l">${gotoKeys(o).map(([k, name, q]) => { const c = (o.gotoChk || {})[k], on = !!c || isDone; return `<li class="gq${on ? ' on' : ''}">${WHO.isOwner() && !isDone ? `<button type="button" class="gchk" data-act="gotoChk" data-id="${o.id}" data-k="${k}" aria-pressed="${on}" aria-label="${esc(name)} を発注済みにする">${on ? '✓' : ''}</button>` : `<span class="gchk ro" aria-hidden="true">${on ? '✓' : ''}</span>`}<span class="gq-n"><span class="gq-t">${esc(name)}</span>${k[0] !== 'x' ? adjTag(o.lines[Number(k)]) : ''}${c ? `<span class="sub">${dtStr(c.at)} 発注済み</span>` : ''}</span>${WHO.isOwner() && !isDone && k[0] !== 'x' && o.status === 'ordered' ? (() => { const ed = S.gqEdit && S.gqEdit.id === o.id && S.gqEdit.k === k ? S.gqEdit : null, l = o.lines[Number(k)];
-        if (!ed) return `<span class="gq-st"><b>${esc(q)}</b><button type="button" class="btn small" data-act="gqEdit" data-id="${o.id}" data-k="${k}">数を変える</button></span>`;
-        return `<span class="gq-st"><button type="button" class="btn small" data-act="gqStep" data-d="-1" aria-label="1減らす">−</button><b>×${ed.v}${esc(uTxt(l.unit))}</b><button type="button" class="btn small" data-act="gqStep" data-d="1" aria-label="1増やす">＋</button></span>`; })() : `<b>${esc(q)}</b>`}</li>${S.gqEdit && S.gqEdit.id === o.id && S.gqEdit.k === k ? (() => { const l = o.lines[Number(k)], v = S.gqEdit.v; return `<li class="gq-ask"><span>${v === num(l.qty) ? '＋／−で数を変えてから保存してください' : `<b>${esc(name)}</b> を ${num(l.qty)} → <b>${v}</b> に変更します。よろしいですか？`}</span><button type="button" class="btn small primary" data-act="gotoQty" data-id="${o.id}" data-k="${k}" ${v === num(l.qty) ? 'disabled' : ''}>変更する</button><button type="button" class="btn small" data-act="gqCancel">やめる</button></li>`; })() : ''}`; }).join('')}</ul>
+    <ul class="greq-l">${gotoKeys(o).map(([k, name, q]) => { const c = (o.gotoChk || {})[k], on = !!c || isDone, li = k[0] !== 'x' ? Number(k) : -1; return `<li class="gq${on ? ' on' : ''}">${WHO.isOwner() && !isDone ? `<button type="button" class="gchk" data-act="gotoChk" data-id="${o.id}" data-k="${k}" aria-pressed="${on}" aria-label="${esc(name)} を発注済みにする">${on ? '✓' : ''}</button>` : `<span class="gchk ro" aria-hidden="true">${on ? '✓' : ''}</span>`}<span class="gq-n"><span class="gq-t">${esc(name)}</span>${li >= 0 ? adjTag(o.lines[li]) + shipBadge(o, o.lines[li]) : ''}${c ? `<span class="sub">${dtStr(c.at)} 発注済み</span>` : ''}${li >= 0 && !isDone ? ownerLineTools(o, li) : ''}</span><b>${esc(q)}</b></li>`; }).join('')}</ul>
     ${!isDone ? (() => { const ks = gotoKeys(o), nOn = ks.filter(([k]) => (o.gotoChk || {})[k]).length; return `<div class="sub">発注済み <b>${nOn}</b> / ${ks.length}</div>`; })() : ''}
     ${gotoNoteBox(o, isDone)}
     ${isDone ? `<div class="actions"><span class="sub">✓ 手配済み ${dtStr(o.gotoDone.at)}</span>${WHO.isOwner() ? `<button type="button" class="btn small" data-act="gotoUndo" data-id="${o.id}">戻す</button>` : ''}</div>` : (WHO.isOwner() ? (S.confirm === 'gdone-' + o.id ? `<div class="gq-ask"><span>チェックしていない商品も含めて、この依頼を<b>全部手配済み</b>にします。よろしいですか？</span><button type="button" class="btn small primary" data-act="gotoDone" data-id="${o.id}">はい、手配済みにする</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : `<div class="actions"><button type="button" class="btn small" data-act="confirm" data-id="gdone-${o.id}">全部まとめて手配済みにする</button></div>`) : '<div class="sub">⏳ 後藤さんの手配待ち</div>')}</div>`;
@@ -1528,7 +1540,7 @@ function pendCard(o) {
   const rows = lines.map((l, i) => {
     const left = open ? leftOf(l) : 0, k = o.id + ':' + i, v = S.pq && S.pq[k] !== undefined ? S.pq[k] : left;
     const got = open ? num(l.got) : num(l.qty);
-    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div></div>
+    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${isGotoOrder(o) ? shipBadge(o, l) : ''}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div>${left ? ownerLineTools(o, i) : ''}</div>
       ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
       <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : l.cut ? '取消' : '✓'}</span>`}
       ${left && !ro ? (S.confirm === 'lc-' + k ? `<div class="lc-ask"><span class="sub">${esc(l.name)} の残り${left}を発注から取り消しますか？（在庫は変わりません）</span><button type="button" class="btn small danger" data-act="lineCancel" data-id="${o.id}" data-i="${i}">取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button></div>` : `<div class="lc-row"><button type="button" class="lnk" id="lc-${o.id}-${i}" data-act="confirm" data-id="lc-${k}">この商品の発注を取り消す</button></div>`) : ''}</div>`;
@@ -1549,7 +1561,7 @@ function pendCard(o) {
     <div class="sub"><span class="pill ${open ? 'ordering' : 'ok'}">${open ? (part ? '一部入荷' : '発注済み') : '入荷済み'}</span><span>${esc(storeOf(o.store).short)}</span><span>${dtStr(o.orderedAt)} ${isGotoOrder(o) ? '依頼' : '発注'}${o.orderedBy ? '（' + esc(o.orderedBy) + '）' : ''}</span>${open ? `<span class="${days >= 7 ? 'late' : ''}">${days}日経過</span>` : `<span>${dtStr(lastRcpt(o).at)} 入荷</span>`}</div></summary>
     <div>${rows}</div>
     ${o.extra ? `<div class="sub">手打ち：${esc(o.extra.replace(/\n/g, '、'))}（在庫には入りません）</div>` : ''}
-    ${shipView(o)}${noteView(o)}
+    ${isGotoOrder(o) && open && WHO.isOwner() ? gotoNoteBox(o, false) : noteView(o)}
     ${ctl ? `<div class="actions">${ctl}</div>` : ''}</details>`;
 }
 const orderRow = o => pendCard(o);
@@ -1899,9 +1911,10 @@ document.addEventListener('click', async ev => {
     case 'gotoBack': S.gotoView = false; render(); window.scrollTo(0, 0); break;
     case 'aiCopy': { const t = $(id); if (!t) break; try { await navigator.clipboard.writeText(t.value); toast('コピーしました。AIに貼り付けてください'); } catch (e) { t.focus(); t.select(); toast('選択しました。コピーしてください'); } break; }
     case 'gShip': { if (!WHO.isOwner()) break; const o = S.orders.find(x => x.id === id), st = b.dataset.st, me = WHO.me || {}; if (!o) break;
-      const off = o.gotoShip && o.gotoShip.store === st, val = off ? firebase.firestore.FieldValue.delete() : { store: st, by: me.name || '', at: Date.now() };
-      if (off) delete o.gotoShip; else o.gotoShip = val; render();
-      S.db.doc('orders/' + id).update({ gotoShip: val }).then(() => toast(off ? '届け先を外しました' : (SHIP_NAME[st] || st) + 'に届く、にしました')).catch(fail); break; }
+      const lines = (o.lines || []).map(l => ({ ...l })), off = lines.every(l => lineShip(o, l) === st);
+      lines.forEach(l => { if (off) delete l.ship; else l.ship = st; });
+      o.lines = lines; delete o.gotoShip; render();
+      S.db.doc('orders/' + id).update({ lines, gotoShip: firebase.firestore.FieldValue.delete() }).then(() => toast(off ? '届け先を外しました' : '全部 ' + (SHIP_SHORT[st] || st) + 'に届く、にしました')).catch(fail); break; }
     case 'gnEdit': S.gnEdit = id; render(); { const t = $('gn-' + id); if (t) t.focus(); } break;
     case 'gnCancel': S.gnEdit = null; render(); break;
     case 'gnSave': case 'gnDel': { if (!WHO.isOwner()) break; const t = $('gn-' + id), v = act === 'gnDel' ? '' : (t ? t.value.trim() : ''), me = WHO.me || {}, o = S.orders.find(x => x.id === id);
@@ -2021,6 +2034,10 @@ document.addEventListener('change', ev => {
   const { id, did } = el.dataset;
   if (c === 'qty') { setQty(S.store, id, num(el.value)); el.blur(); render(); }
   if (c === 'pq') { (S.pq ||= {})[id] = Math.min(num(el.value), num(el.max, Infinity)); return; }
+  if (c === 'lShip') { if (!WHO.isOwner()) return; const o = S.orders.find(x => x.id === el.dataset.id), i = Number(el.dataset.i); if (!o) return; const lines = (o.lines || []).map(l => ({ ...l })); if (!lines[i]) return;
+    const gs = o.gotoShip && o.gotoShip.store; if (gs) lines.forEach(l => { if (!l.ship) l.ship = gs; });
+    if (el.value) lines[i].ship = el.value; else delete lines[i].ship; o.lines = lines; delete o.gotoShip; render();
+    S.db.doc('orders/' + o.id).update({ lines, gotoShip: firebase.firestore.FieldValue.delete() }).then(() => toast(el.value ? (SHIP_SHORT[el.value] + 'に届く、にしました') : '届け先を外しました')).catch(fail); return; }
   if (c === 'oqty') { const r0 = linesFor(did).find(x => x.it.id === id); bumpDraft(did, id, num(el.value) + ((r0 && r0.moved) || 0)); el.blur(); render(); }
   if (c === 'oextra') { S.holdUntil = Date.now() + 700; const k = draftKey(did); (S.draftExtra ||= {})[k] = el.value; const me = WHO.me || {}; draftDoc(did).set({ store: S.store, did, extra: el.value, at: Date.now(), by: me.id || '', byName: me.name || '' }, { merge: true }).catch(fail);
     /* ここで再描画するとコピーボタンの押下が消えるので、文章欄とボタンだけ更新 */
