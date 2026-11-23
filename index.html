@@ -276,7 +276,8 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .sa-row.need { background: color-mix(in srgb, var(--warn, #8a5a00) 5%, transparent); } .sa-to { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; } .sa-to select { width: 100%; }
 .pend-d > summary { list-style: none; cursor: pointer; display: grid; gap: 4px; } .pend-d > summary::-webkit-details-marker { display: none; } .pend-d .caret { color: var(--accent, #4b2c7a); font-weight: 600; } .pend-d[open] > summary { padding-bottom: 6px; border-bottom: 1px dashed var(--line); margin-bottom: 6px; }
 .greq-l .gq { display: flex; align-items: center; gap: 10px; } .greq-l .gq-n { flex: 1; min-width: 0; display: flex; flex-direction: column; } .greq-l .gq.on .gq-t { color: var(--muted); text-decoration: line-through; } .gchk { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); color: var(--accent-ink); font-weight: 800; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; } .gchk[aria-pressed=true], .gq.on .gchk { background: var(--accent); } .gchk.ro { cursor: default; opacity: .8; }
-.ai-cart { margin: 4px 0 10px; border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; } .ai-cart > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; } .ai-cart > summary::-webkit-details-marker { display: none; } .ai-cart[open] .sa-tog::after { content: ''; } .ai-st { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); } .ai-t { width: 100%; font-size: 13px; line-height: 1.5; margin-top: 6px; resize: vertical; }
+.ai-cart { margin: 4px 0 10px; border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; } .ai-cart > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; } .ai-cart > summary::-webkit-details-marker { display: none; } .ai-cart[open] .sa-tog::after { content: ''; } .adj { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: #fff1d6; color: #8a5a00; font-size: 12px; font-weight: 700; } .gq-st { display: inline-flex; align-items: center; gap: 6px; flex: none; } .gq-st .btn { min-width: 34px; padding: 4px 0; }
+.ai-st { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); } .ai-t { width: 100%; font-size: 13px; line-height: 1.5; margin-top: 6px; resize: vertical; }
 .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .sa-chips .chip { white-space: nowrap; } .sa-row .sa-warn { font-size: 12.5px; } .sa-q { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; } .sa-btns label.sa-q { display: inline-flex !important; flex-direction: row !important; margin: 0; } .sa-q input { width: 64px; padding: 6px 8px; } .sa-row.done { opacity: .6; } .sa-chips { flex-wrap: wrap; margin: 6px 0; } .sa-n { color: var(--pend); } .sa-got { font-weight: 600; } .sa-card > summary { list-style: none; cursor: pointer; } .sa-card > summary::-webkit-details-marker { display: none; } .sa-tog { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; white-space: nowrap; } .pend-d .caret { padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); } .sa-warn { color: var(--warn, #8a5a00); } .sa-card summary h3 b { color: var(--pend); }
 .cpb-r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); } .cp-acts { flex-direction: column; } .cp-acts .btn { width: 100%; flex: 0 0 auto; }
 .due-pop { position: fixed; inset: 0; z-index: 60; background: rgba(20,10,10,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -1272,12 +1273,14 @@ function gotoReqButton() {
   return `<button type="button" class="greq-btn${n ? ' has' : ''}" data-act="gotoView">📥 後藤さん宛ての依頼 <b>${n}</b>件 ›</button>`;
 }
 /* 後藤さん宛て依頼の明細（チェックリスト用）：[キー, 名前, 数量] */
-const gotoKeys = o => (o.lines || []).map((l, i) => [String(i), l.name, '×' + num(l.qty) + uTxt(l.unit), num(l.qty)]).filter(x => x[3] > 0).concat((o.extra || '').split('\n').map(t => t.trim()).filter(Boolean).map((t, j) => ['x' + j, t, '手打ち']));
+/* 後藤さんが依頼後に数量を変えた行：みんなに分かるように表示 */
+const adjTag = l => { if (l.origQty == null || num(l.qty) === num(l.origQty)) return ''; const d = num(l.qty) - num(l.origQty); return `<span class="adj">後藤さんが${d > 0 ? '+' + d : d}（${num(l.origQty)}→${num(l.qty)}）</span>`; };
+const gotoKeys = o => (o.lines || []).map((l, i) => [String(i), l.name, '×' + num(l.qty) + uTxt(l.unit), num(l.qty), l.origQty != null]).filter(x => x[3] > 0 || x[4]).concat((o.extra || '').split('\n').map(t => t.trim()).filter(Boolean).map((t, j) => ['x' + j, t, '手打ち']));
 /* AIにカートまで入れてもらう指示文（未チェックの商品を店舗まとめで） */
 function aiCartText(os) {
   const d = dealerOf(os[0].dealerId) || { name: os[0].dealerName || '' }, m = new Map(), extra = [];
   for (const o of os) {
-    for (const [k, name, q, n] of gotoKeys(o)) { if ((o.gotoChk || {})[k]) continue;
+    for (const [k, name, q, n] of gotoKeys(o)) { if ((o.gotoChk || {})[k] || (k[0] !== 'x' && !(n > 0))) continue;
       if (k[0] === 'x') { extra.push(name.replace(/^[・\-]\s*/, '') + `（${storeOf(o.store).short}）`); continue; }
       const l = o.lines[Number(k)], it = S.items.find(x => x.id === l.itemId) || {}, key = l.itemId || name;
       const e = m.get(key) || { name, unit: l.unit || it.unit || '', jan: String(it.jan || '').split(',')[0].trim(), n: 0, by: [] };
@@ -1299,7 +1302,7 @@ function viewGotoReqs() {
   const open = gotoReqs(), done = S.orders.filter(o => o.gotoDone && isGotoOrder(o) && Date.now() - num(o.gotoDone.at) < 7 * 86400e3);
   const byD = {}; open.forEach(o => (byD[o.dealerName || ''] ||= []).push(o));
   const card = (o, isDone) => `<div class="greq-o"><div class="greq-h"><b>${esc(storeOf(o.store).short)}</b><span class="sub">${dtStr(o.orderedAt)} 依頼${o.orderedBy ? '（' + esc(o.orderedBy) + '）' : ''}</span><span class="amount">${yen(num(o.total))}</span></div>
-    <ul class="greq-l">${gotoKeys(o).map(([k, name, q]) => { const c = (o.gotoChk || {})[k], on = !!c || isDone; return `<li class="gq${on ? ' on' : ''}">${WHO.isOwner() && !isDone ? `<button type="button" class="gchk" data-act="gotoChk" data-id="${o.id}" data-k="${k}" aria-pressed="${on}" aria-label="${esc(name)} を発注済みにする">${on ? '✓' : ''}</button>` : `<span class="gchk ro" aria-hidden="true">${on ? '✓' : ''}</span>`}<span class="gq-n"><span class="gq-t">${esc(name)}</span>${c ? `<span class="sub">${dtStr(c.at)} 発注済み</span>` : ''}</span><b>${esc(q)}</b></li>`; }).join('')}</ul>
+    <ul class="greq-l">${gotoKeys(o).map(([k, name, q]) => { const c = (o.gotoChk || {})[k], on = !!c || isDone; return `<li class="gq${on ? ' on' : ''}">${WHO.isOwner() && !isDone ? `<button type="button" class="gchk" data-act="gotoChk" data-id="${o.id}" data-k="${k}" aria-pressed="${on}" aria-label="${esc(name)} を発注済みにする">${on ? '✓' : ''}</button>` : `<span class="gchk ro" aria-hidden="true">${on ? '✓' : ''}</span>`}<span class="gq-n"><span class="gq-t">${esc(name)}</span>${k[0] !== 'x' ? adjTag(o.lines[Number(k)]) : ''}${c ? `<span class="sub">${dtStr(c.at)} 発注済み</span>` : ''}</span>${WHO.isOwner() && !isDone && k[0] !== 'x' && o.status === 'ordered' ? `<span class="gq-st"><button type="button" class="btn small" data-act="gotoQty" data-id="${o.id}" data-k="${k}" data-d="-1" aria-label="${esc(name)}を1減らす">−</button><b>${esc(q)}</b><button type="button" class="btn small" data-act="gotoQty" data-id="${o.id}" data-k="${k}" data-d="1" aria-label="${esc(name)}を1増やす">＋</button></span>` : `<b>${esc(q)}</b>`}</li>`; }).join('')}</ul>
     ${!isDone ? (() => { const ks = gotoKeys(o), nOn = ks.filter(([k]) => (o.gotoChk || {})[k]).length; return `<div class="sub">発注済み <b>${nOn}</b> / ${ks.length}</div>`; })() : ''}
     ${isDone ? `<div class="actions"><span class="sub">✓ 手配済み ${dtStr(o.gotoDone.at)}</span>${WHO.isOwner() ? `<button type="button" class="btn small" data-act="gotoUndo" data-id="${o.id}">戻す</button>` : ''}</div>` : (WHO.isOwner() ? `<div class="actions"><button type="button" class="btn small" data-act="gotoDone" data-id="${o.id}">全部まとめて手配済みにする</button></div>` : '<div class="sub">⏳ 後藤さんの手配待ち</div>')}</div>`;
   return `<section class="card"><div class="card-head"><h3>後藤さん宛ての依頼（全店）</h3><button type="button" class="btn small" data-act="gotoBack">‹ 発注に戻る</button></div>
@@ -1502,7 +1505,7 @@ function pendCard(o) {
   const rows = lines.map((l, i) => {
     const left = open ? leftOf(l) : 0, k = o.id + ':' + i, v = S.pq && S.pq[k] !== undefined ? S.pq[k] : left;
     const got = open ? num(l.got) : num(l.qty);
-    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div></div>
+    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div></div>
       ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
       <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : l.cut ? '取消' : '✓'}</span>`}
       ${left && !ro ? (S.confirm === 'lc-' + k ? `<div class="lc-ask"><span class="sub">${esc(l.name)} の残り${left}を発注から取り消しますか？（在庫は変わりません）</span><button type="button" class="btn small danger" data-act="lineCancel" data-id="${o.id}" data-i="${i}">取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button></div>` : `<div class="lc-row"><button type="button" class="lnk" id="lc-${o.id}-${i}" data-act="confirm" data-id="lc-${k}">この商品の発注を取り消す</button></div>`) : ''}</div>`;
@@ -1871,6 +1874,17 @@ document.addEventListener('click', async ev => {
     case 'gotoView': S.gotoView = true; render(); window.scrollTo(0, 0); break;
     case 'gotoBack': S.gotoView = false; render(); window.scrollTo(0, 0); break;
     case 'aiCopy': { const t = $(id); if (!t) break; try { await navigator.clipboard.writeText(t.value); toast('コピーしました。AIに貼り付けてください'); } catch (e) { t.focus(); t.select(); toast('選択しました。コピーしてください'); } break; }
+    case 'gotoQty': { if (!WHO.isOwner()) break; const o = S.orders.find(x => x.id === id); if (!o || o.status !== 'ordered') break; const i = Number(b.dataset.k), dd = Number(b.dataset.d), me = WHO.me || {};
+      const lines = (o.lines || []).map(l => ({ ...l })), l = lines[i]; if (!l) break;
+      const nq = Math.max(num(l.got), num(l.qty) + dd); if (nq === num(l.qty)) break;
+      if (l.origQty == null) l.origQty = num(l.qty);
+      l.qty = nq; l.adjBy = me.name || ''; l.adjAt = Date.now();
+      if (num(l.qty) === num(l.origQty)) { delete l.origQty; delete l.adjBy; delete l.adjAt; }
+      const total = lines.reduce((a, x) => a + num(x.qty) * num(x.price), 0);
+      o.lines = lines; o.total = total; render();
+      S.db.doc('orders/' + id).update({ lines, total }).catch(fail);
+      logChange('order', o.store, l.itemId || '', null, null, { name: (o.dealerName || '') + ' の依頼数を変更', text: `${l.name} ${l.origQty ?? nq - dd}→${nq}（後藤さん）` });
+      break; }
     case 'gotoChk': { if (!WHO.isOwner()) break; const o = S.orders.find(x => x.id === id), k = b.dataset.k; if (!o) break; const me = WHO.me || {}, cur = { ...(o.gotoChk || {}) };
       if (cur[k]) delete cur[k]; else cur[k] = { at: Date.now(), by: me.name || '' };
       const all = gotoKeys(o).every(([kk]) => cur[kk]), upd = { gotoChk: cur };
