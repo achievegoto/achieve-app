@@ -1678,8 +1678,14 @@ function lateAsk(dids) {
     <div class="due-acts"><button type="button" class="btn" data-act="lateNo">戻って数を直す</button><button type="button" class="btn primary" data-act="lateOk" data-dids="${dids.join(',')}">この内容で発注済みにする</button></div></div>`;
   document.body.appendChild(el);
 }
+const placing = new Set();
 async function markPlaced(did, quiet) {
   if (S.readOnly) return;
+  /* 連打・同時押しで同じ発注が2回できないように */
+  const pk = draftKey(did); if (placing.has(pk)) return; placing.add(pk);
+  try { await markPlaced0(did, quiet); } finally { setTimeout(() => placing.delete(pk), 1500); }
+}
+async function markPlaced0(did, quiet) {
   const active = linesFor(did).filter(r => r.qty > 0), xt = extraLines(did).join('\n'); if (!active.length && !xt) return;
   const d = dealerOf(did);
   if (did === XFER) for (const r of active) if (r.qty > tonariFree(r.it.id)) { toast(r.it.name + ' はTONARIの在庫が足りません'); return; }
