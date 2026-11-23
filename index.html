@@ -1281,13 +1281,13 @@ const noteView = o => o.gotoNote && o.gotoNote.text ? `<div class="gnote">💬 $
 /* 届け先：後藤さんがワンタップで設定。依頼した店と違う店に届くなら「取りに行く」ことが分かるように */
 const SHIP_SHORT = { hair: 'アチーブ', liss: 'リス', till: 'ティル' };
 const lineShip = (o, l) => (l && l.ship) || (o.gotoShip && o.gotoShip.store) || '';
-const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp) return ''; const other = sp !== o.store; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く</span>`; };
+const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp || sp === o.store) return ''; const other = true; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く</span>`; };
 /* 後藤さんだけ：商品ごとの届け先と数量（依頼一覧・入荷待ちの両方で使う） */
 function ownerLineTools(o, i) {
   if (!WHO.isOwner() || !isGotoOrder(o) || o.status !== 'ordered') return '';
   const l = o.lines[i]; if (!l) return '';
   const sp = l.ship || '', k = String(i), ed = S.gqEdit && S.gqEdit.id === o.id && S.gqEdit.k === k ? S.gqEdit : null;
-  const sel = `<select class="field lship-sel" data-chg="lShip" data-id="${o.id}" data-i="${i}" aria-label="${esc(l.name)}の届け先"><option value="">届け先：未設定</option>${['hair', 'liss', 'till'].map(st => `<option value="${st}"${sp === st ? ' selected' : ''}>${SHIP_SHORT[st]}に届く</option>`).join('')}</select>`;
+  const sel = `<select class="field lship-sel" data-chg="lShip" data-id="${o.id}" data-i="${i}" aria-label="${esc(l.name)}の届け先">${['hair', 'liss', 'till'].map(st => `<option value="${st === o.store ? '' : st}"${(sp || o.store) === st ? ' selected' : ''}>${SHIP_SHORT[st]}に届く${st === o.store ? '（いつも通り）' : ''}</option>`).join('')}</select>`;
   const qty = ed ? `<span class="gq-st"><button type="button" class="btn small" data-act="gqStep" data-d="-1" aria-label="1減らす">−</button><b>×${ed.v}${esc(uTxt(l.unit))}</b><button type="button" class="btn small" data-act="gqStep" data-d="1" aria-label="1増やす">＋</button></span>` : `<button type="button" class="btn small" data-act="gqEdit" data-id="${o.id}" data-k="${k}">数を変える</button>`;
   const ask = ed ? `<div class="gq-ask"><span>${ed.v === num(l.qty) ? '＋／−で数を変えてから押してください' : `<b>${esc(l.name)}</b> を ${num(l.qty)} → <b>${ed.v}</b> に変更します。よろしいですか？`}</span><button type="button" class="btn small primary" data-act="gotoQty" data-id="${o.id}" data-k="${k}" ${ed.v === num(l.qty) ? 'disabled' : ''}>変更する</button><button type="button" class="btn small" data-act="gqCancel">やめる</button></div>` : '';
   return `<div class="otools">${sel}${qty}</div>${ask}`;
@@ -1300,8 +1300,7 @@ function shipPick(o) {
 }
 function gotoNoteBox(o, isDone) {
   if (!WHO.isOwner() || isDone) return noteView(o);
-  if (S.gnEdit !== o.id) return shipPick(o) + gotoNoteBox0(o);
-  return shipPick(o) + gotoNoteBox0(o);
+  return gotoNoteBox0(o);
 }
 function gotoNoteBox0(o) {
   if (S.gnEdit === o.id) return `<div class="gnote-ed"><textarea class="field" id="gn-${o.id}" rows="2" placeholder="例：2個はLiss分。hairにまとめて届きます">${esc((o.gotoNote || {}).text || '')}</textarea><div class="actions"><button type="button" class="btn small primary" data-act="gnSave" data-id="${o.id}">コメントを保存</button><button type="button" class="btn small" data-act="gnCancel">やめる</button>${o.gotoNote && o.gotoNote.text ? `<button type="button" class="lnk" data-act="gnDel" data-id="${o.id}">コメントを消す</button>` : ''}</div></div>`;
