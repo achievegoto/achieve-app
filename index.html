@@ -278,6 +278,7 @@ details.ocard[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; }
 .greq-l .gq { display: flex; align-items: center; gap: 10px; } .greq-l .gq-n { flex: 1; min-width: 0; display: flex; flex-direction: column; } .greq-l .gq.on .gq-t { color: var(--muted); text-decoration: line-through; } .gchk { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--accent); background: var(--surface); color: var(--accent-ink); font-weight: 800; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; } .gchk[aria-pressed=true], .gq.on .gchk { background: var(--accent); } .gchk.ro { cursor: default; opacity: .8; }
 .ai-cart { margin: 4px 0 10px; border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; } .ai-cart > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; } .ai-cart > summary::-webkit-details-marker { display: none; } .ai-cart[open] .sa-tog::after { content: ''; } .adj { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: #fff1d6; color: #8a5a00; font-size: 12px; font-weight: 700; } .gship-p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; } .gship { margin: 6px 0; padding: 6px 10px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; font-weight: 600; } .gship.other { background: #e6f0ff; color: #0b3d91; } .gship b { display: block; font-weight: 700; }
 .lship { display: inline-block; align-self: flex-start; margin: 2px 0 0 6px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); font-size: 12px; font-weight: 700; } .lship.other { background: #e6f0ff; color: #0b3d91; } .otools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; } .otools .lship-sel.field { width: auto; max-width: 100%; padding: 4px 8px; font-size: 12px; min-height: 0; height: auto; } .greq-l .gq { align-items: flex-start; } .greq-l .gchk { margin-top: 2px; }
+.inb { border: 2px solid #9cc1ff; } .inb-r { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px dashed var(--line); } .inb-r > div { display: flex; flex-direction: column; min-width: 0; }
 .gnote { margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: #fff7e0; color: #5a3d00; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 2px; } .gnote .sub { font-size: 11px; } .gnote-ed textarea { width: 100%; margin-top: 6px; }
 .gq-ask { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 8px 10px; margin: 2px 0 6px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; } .gq-st { display: inline-flex; align-items: center; gap: 6px; flex: none; } .gq-st .btn { min-width: 34px; padding: 4px 0; }
 .ai-st { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); } .ai-t { width: 100%; font-size: 13px; line-height: 1.5; margin-top: 6px; resize: vertical; }
@@ -1191,7 +1192,7 @@ function viewStock() {
   const ordering = S.orders.filter(o => o.store === S.store && o.status === 'ordered').length;
   return `<div class="summary">
     <span>要発注<b class="${shorts ? 'alert' : ''}">${shorts}</b> 点</span>
-    <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b> 件 ›</button>
+    <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b> 件 ›</button>${(() => { const n = S.store === 'tonari' ? 0 : inboundFor(S.store).filter(x => !x.l.arrived).length; return n ? `<button type="button" class="lnk inb-hint" data-act="pendOpen">📦 ほかの店の分 ${n}品もここに届きます</button>` : ''; })()}
     <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
     <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
   </div>
@@ -1521,6 +1522,19 @@ async function exportTana(scope) {
   toast('棚卸表を書き出しました');
 }
 /* ---- 入荷待ち一覧（まとめて入荷・商品ごと入荷・取り消し） ---- */
+/* ほかの店の依頼のうち、この店に届く商品（まとめて届く分） */
+function inboundFor(store) {
+  const out = [];
+  for (const o of S.orders) { if (o.status !== 'ordered' || o.store === store) continue;
+    (o.lines || []).forEach((l, i) => { if (leftOf(l) > 0 && lineShip(o, l) === store) out.push({ o, l, i }); }); }
+  return out;
+}
+function inboundCard(store) {
+  const L = inboundFor(store); if (!L.length) return '';
+  return `<section class="card inb"><div class="card-head"><h3>📦 ほかの店の分もここに届きます</h3><span class="sub">${L.length}品</span></div>
+    <div class="sub">まとめて注文した分です。届いたら「届いた」を押してください（依頼した店に知らせます。在庫はその店で「入荷」したときに増えます）。</div>
+    ${L.map(({ o, l, i }) => `<div class="inb-r"><div><b>${esc(l.name)}</b> × ${leftOf(l)}${esc(uTxt(l.unit))}<span class="sub">${esc(storeOf(o.store).short)}の分</span>${l.arrived ? `<span class="sub">✓ ${dtStr(l.arrived.at)} 届いた（${esc(l.arrived.by || '')}）</span>` : ''}</div>${l.arrived ? `<button type="button" class="lnk" data-act="inbUndo" data-id="${o.id}" data-i="${i}">戻す</button>` : `<button type="button" class="btn small primary" data-act="inbGot" data-id="${o.id}" data-i="${i}">届いた</button>`}</div>`).join('')}</section>`;
+}
 function viewPending() {
   const all = !!S.pendAll;
   const list = S.orders.filter(o => o.status === 'ordered' && (all || o.store === S.store)).sort((a, b) => num(a.orderedAt) - num(b.orderedAt));
@@ -1528,6 +1542,7 @@ function viewPending() {
   return `<section class="card"><div class="card-head"><h3>入荷待ち（${all ? '全店' : esc(storeOf(S.store).short)}）${list.length}件</h3><button type="button" class="btn small" id="pend-all" data-act="pendAll">${all ? 'この店舗だけ' : '全店舗'}</button></div>
     <div class="sub">古い順。届いたら「まとめて入荷」か、商品ごとに数を入れて「入荷」。7日以上たっているものは赤字です。</div>
     <div class="actions"><button type="button" class="btn small" id="pend-close" data-act="pendClose">‹ 在庫にもどる</button></div></section>
+    ${all ? '' : inboundCard(S.store)}
     ${list.length ? `<div class="list">${list.map(pendCard).join('')}</div>` : '<div class="card"><div class="empty">入荷待ちの発注はありません</div></div>'}
     ${recent.length ? `<div class="group"><h2>最近の入荷（取り消しできます）</h2><div class="list">${recent.map(pendCard).join('')}</div></div>` : ''}`;
 }
@@ -1539,7 +1554,7 @@ function pendCard(o) {
   const rows = lines.map((l, i) => {
     const left = open ? leftOf(l) : 0, k = o.id + ':' + i, v = S.pq && S.pq[k] !== undefined ? S.pq[k] : left;
     const got = open ? num(l.got) : num(l.qty);
-    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${isGotoOrder(o) ? shipBadge(o, l) : ''}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div>${left ? ownerLineTools(o, i) : ''}</div>
+    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${isGotoOrder(o) ? shipBadge(o, l) : ''}${l.arrived && left ? `<span class="lship other">✓ ${SHIP_SHORT[lineShip(o, l)] || ''}に届いています（${dtStr(l.arrived.at)}）</span>` : ''}${left ? (() => { const ex = inboundFor(o.store).filter(x => x.l.itemId && x.l.itemId === l.itemId); return ex.length ? `<span class="adj">＋${ex.map(x => storeOf(x.o.store).short + '分 ' + leftOf(x.l)).join('・')}も一緒に届きます</span>` : ''; })() : ''}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div>${left ? ownerLineTools(o, i) : ''}</div>
       ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
       <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : l.cut ? '取消' : '✓'}</span>`}
       ${left && !ro ? (S.confirm === 'lc-' + k ? `<div class="lc-ask"><span class="sub">${esc(l.name)} の残り${left}を発注から取り消しますか？（在庫は変わりません）</span><button type="button" class="btn small danger" data-act="lineCancel" data-id="${o.id}" data-i="${i}">取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button></div>` : `<div class="lc-row"><button type="button" class="lnk" id="lc-${o.id}-${i}" data-act="confirm" data-id="lc-${k}">この商品の発注を取り消す</button></div>`) : ''}</div>`;
@@ -1914,6 +1929,10 @@ document.addEventListener('click', async ev => {
       lines.forEach(l => { if (off) delete l.ship; else l.ship = st; });
       o.lines = lines; delete o.gotoShip; render();
       S.db.doc('orders/' + id).update({ lines, gotoShip: firebase.firestore.FieldValue.delete() }).then(() => toast(off ? '届け先を外しました' : '全部 ' + (SHIP_SHORT[st] || st) + 'に届く、にしました')).catch(fail); break; }
+    case 'inbGot': case 'inbUndo': { const o = S.orders.find(x => x.id === id), i = Number(b.dataset.i), me = WHO.me || {}; if (!o) break; const lines = (o.lines || []).map(l => ({ ...l })); if (!lines[i]) break;
+      if (act === 'inbGot') lines[i].arrived = { at: Date.now(), by: me.name || '', store: S.store }; else delete lines[i].arrived;
+      o.lines = lines; render(); S.db.doc('orders/' + id).update({ lines }).then(() => toast(act === 'inbGot' ? storeOf(o.store).short + 'に「届いた」と知らせました' : '戻しました')).catch(fail);
+      logChange('order', o.store, lines[i].itemId || '', null, null, { name: act === 'inbGot' ? storeOf(S.store).short + 'に届いた（' + storeOf(o.store).short + '分）' : '届いたを取り消し', text: lines[i].name + '×' + leftOf(lines[i]) }); break; }
     case 'gnEdit': S.gnEdit = id; render(); { const t = $('gn-' + id); if (t) t.focus(); } break;
     case 'gnCancel': S.gnEdit = null; render(); break;
     case 'gnSave': case 'gnDel': { if (!WHO.isOwner()) break; const t = $('gn-' + id), v = act === 'gnDel' ? '' : (t ? t.value.trim() : ''), me = WHO.me || {}, o = S.orders.find(x => x.id === id);
