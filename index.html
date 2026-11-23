@@ -1281,7 +1281,7 @@ const noteView = o => o.gotoNote && o.gotoNote.text ? `<div class="gnote">💬 $
 /* 届け先：後藤さんがワンタップで設定。依頼した店と違う店に届くなら「取りに行く」ことが分かるように */
 const SHIP_SHORT = { hair: 'アチーブ', liss: 'リス', till: 'ティル' };
 const lineShip = (o, l) => (l && l.ship) || (o.gotoShip && o.gotoShip.store) || '';
-const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp) return ''; const other = sp !== o.store; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く${other ? '（取りに行く）' : ''}</span>`; };
+const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp) return ''; const other = sp !== o.store; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く</span>`; };
 /* 後藤さんだけ：商品ごとの届け先と数量（依頼一覧・入荷待ちの両方で使う） */
 function ownerLineTools(o, i) {
   if (!WHO.isOwner() || !isGotoOrder(o) || o.status !== 'ordered') return '';
@@ -1293,7 +1293,7 @@ function ownerLineTools(o, i) {
   return `<div class="otools">${sel}${qty}</div>${ask}`;
 }
 const SHIP_NAME = { hair: 'achieve（hair design）', liss: 'Liss', till: 'till' };
-const shipView = o => { const sp = o.gotoShip && o.gotoShip.store; if (!sp) return ''; const other = sp !== o.store; return `<div class="gship${other ? ' other' : ''}">📦 ${esc(SHIP_NAME[sp] || sp)}に届きます${other ? `<b>（${esc(storeOf(o.store).short)}の分。届いたら取りに行ってください）</b>` : ''}</div>`; };
+const shipView = o => { const sp = o.gotoShip && o.gotoShip.store; if (!sp) return ''; const other = sp !== o.store; return `<div class="gship${other ? ' other' : ''}">📦 ${esc(SHIP_NAME[sp] || sp)}に届きます</div>`; };
 function shipPick(o) {
   const ss = [...new Set((o.lines || []).map(l => lineShip(o, l)))], sp = ss.length === 1 ? ss[0] : '';
   return `<div class="gship-p"><span class="sub">届け先を全部まとめて</span>${['hair', 'liss', 'till'].map(st => `<button type="button" class="chip" data-act="gShip" data-id="${o.id}" data-st="${st}" aria-pressed="${sp === st}">${st === 'hair' ? 'アチーブ' : st === 'liss' ? 'リス' : 'ティル'}に届く</button>`).join('')}</div>`;
