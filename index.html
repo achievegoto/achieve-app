@@ -372,14 +372,15 @@ const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 ||
 function statusOf(it, store) {
   if (isUnset(it, store)) return 'unset';
   const q = qtyOf(store, it.id), oo = onOrder(store, it.id), min = num(it.min?.[store]);
-  if (q + oo <= min) return 'short';
+  if (q + oo <= min && !(oo > 0 && q + oo >= num(it.par?.[store]))) return 'short'; /* 発注点＝適正のとき、適正まで発注済みならもう足りている */
   if (q <= min && oo > 0) return 'ordering';
   return 'ok';
 }
 function needOf(it, store) {
   if (it.ended) return 0;
   if (!carried(it, store) || statusOf(it, store) !== 'short') return 0;
-  return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - onOrder(store, it.id), 1);
+  const oo = onOrder(store, it.id);
+  return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - oo, oo > 0 ? 0 : 1);
 }
 const shortItems = store => S.items.filter(it => carried(it, store) && needOf(it, store) > 0);
 /* ---- TONARI（過剰在庫）からの店舗間移動 ----
