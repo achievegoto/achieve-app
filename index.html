@@ -712,14 +712,16 @@ const SA_WD = ['日', '月', '火', '水', '木', '金', '土'];
 const saTs = t => { const d = new Date(num(t)); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 /* この店・期間のデータを取り込んだ日時（最新） */
 function saGotAt(store, from, to) { let t = 0; (S.saSDays || []).forEach(d => { if (d.store === store && d.date >= from && d.date <= to && num(d.asOf) > t) t = num(d.asOf); }); (S.saDays || []).forEach(d => { if (d.date >= from && d.date <= to && !(S.saSDays || []).some(x => x.date === d.date) && num(d.asOf || d.at) > t) t = num(d.asOf || d.at); }); return t; }
+/* 月曜12:00を過ぎたら、前の週（日曜まで）の分は表示しない */
+function saCut() { const d = new Date(); const back = (d.getDay() + 6) % 7; d.setDate(d.getDate() - back); d.setHours(12, 0, 0, 0); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 7); return saYmd(d); }
 /* この店の販売行（反映済みも含む） */
 function saRows(store) {
-  const out = [];
+  const out = [], cut = saCut();
   /* 店舗別データ（mr_rsday）がある日はそれを使う。無い日は担当者の所属店で判断（mr_rday） */
   const sdays = new Set((S.saSDays || []).map(d => d.date));
   const src = (S.saSDays || []).filter(d => d.store === store).map(d => ({ ...d, byStore: true })).concat((S.saDays || []).filter(d => !sdays.has(d.date)));
   for (const d of src) for (const r of d.rows || []) {
-    if (r.m === 'EC連携' || !(num(r.q) > 0) || d.date < SA_START) continue;
+    if (r.m === 'EC連携' || !(num(r.q) > 0) || d.date < SA_START || d.date < cut) continue;
     const row = { date: d.date, p: d.byStore ? 'st:' + store + ':' + r.p : r.p, c: String(r.c), n: r.n, q: num(r.q) };
     const st = d.byStore ? store : saStoreOf(r.p); if (st && st !== store) continue;
     const m = saMapOf(row.c); if (m === '__skip') continue;
@@ -786,7 +788,7 @@ function saCard() {
   const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーからの最終取り込み：${saTs(gotAt)}</span>` : '';
   const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
   return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sa-tog">${open ? '▴ 閉じる' : '▾ 開く'}</span></summary>
-    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。反映した分は記録されるので、何度開いても二重には引きません。</div>
+    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。前の週の分は月曜12:00に消えます。反映した分は記録されるので、何度開いても二重には引きません。</div>
     <div class="chips sa-chips">${wkChips}</div>
     <div class="chips sa-chips"><button type="button" class="chip" data-act="saDay" data-id="" aria-pressed="${!S.saDay}">${wk === thisWk ? '今週' : 'この週'}まとめ</button>${dayChips}</div>
     ${gotTxt ? `<div class="sub">${gotTxt}</div>` : ''}
