@@ -110,6 +110,12 @@ main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16
 body.is-dragging { user-select: none; -webkit-user-select: none; }
 .name { font-weight: 500; overflow-wrap: anywhere; }
 .sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.holds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+.hold { display: inline-flex; align-items: center; gap: 6px; background: var(--warn-soft); color: var(--warn); font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.hold small { font-weight: 400; } .hold .lnk { font-size: 12px; }
+.hold-sum { color: var(--warn); font-weight: 700; }
+.hold-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.hold-btn { font-size: 12px; padding: 2px 10px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
 .pill.short { background: var(--bad-soft); color: var(--bad); }
 .pill.ordering { background: var(--warn-soft); color: var(--warn); }
@@ -362,6 +368,12 @@ function toastUndo(m, id) { const t = $('toast'); t.innerHTML = esc(m) + `<butto
 
 /* ---- 計算 ---- */
 const qtyOf = (store, id) => S.stock[store + '_' + id] ?? 0;
+/* ---- 店販の取り置き：在庫には残っているが売れない数。発注の計算では在庫から引く。お渡しの会計は店販取り込みで在庫から引かれるので、お渡し済みは取り置きを消すだけ ---- */
+const RETAIL_CATS = ['Aujua SP', 'Aujua TR', 'アウトバス', 'サッシェSP', 'サッシェTR', 'スタイリング剤', 'インプレア', 'im', 'その他SP・TR', 'オッジィオット', 'イーラル', 'その他化粧品', 'Refa'];
+const isRetail = it => RETAIL_CATS.includes(it.category) || Object.values(S.saMap || {}).includes(it.id);
+const holdsOf = (store, id) => (S.holds || []).filter(h => h.store === store && h.itemId === id);
+const heldOf = (store, id) => holdsOf(store, id).reduce((a, h) => a + num(h.qty), 0);
+const availOf = (store, id) => Math.max(0, qtyOf(store, id) - heldOf(store, id));
 const stockValue = store => S.items.reduce((a, it) => a + qtyOf(store, it.id) * num(it.price), 0);
 /* 一部入荷に対応：l.got = 入荷済みの数。残り = 発注数 − 入荷済み */
 const leftOf = l => Math.max(0, num(l.qty) - num(l.got));
@@ -377,7 +389,7 @@ const isZeroIdle = (it, store) => !it.ended && !isUnset(it, store) && num(it.min
 const carried = (it, store) => isUnset(it, store) || num(it.min?.[store]) > 0 || num(it.par?.[store]) > 0;
 function statusOf(it, store) {
   if (isUnset(it, store)) return 'unset';
-  const q = qtyOf(store, it.id), oo = onOrder(store, it.id), min = num(it.min?.[store]);
+  const q = availOf(store, it.id), oo = onOrder(store, it.id), min = num(it.min?.[store]);
   if (q + oo <= min && !(oo > 0 && q + oo >= num(it.par?.[store]))) return 'short'; /* 発注点＝適正のとき、適正まで発注済みならもう足りている */
   if (q <= min && oo > 0) return 'ordering';
   return 'ok';
@@ -386,7 +398,7 @@ function needOf(it, store) {
   if (it.ended) return 0;
   if (!carried(it, store) || statusOf(it, store) !== 'short') return 0;
   const oo = onOrder(store, it.id);
-  return Math.max(num(it.par?.[store]) - qtyOf(store, it.id) - oo, oo > 0 ? 0 : 1);
+  return Math.max(num(it.par?.[store]) - availOf(store, it.id) - oo, oo > 0 ? 0 : 1);
 }
 const shortItems = store => S.items.filter(it => carried(it, store) && needOf(it, store) > 0);
 /* ---- TONARI（過剰在庫）からの店舗間移動 ----
@@ -1215,6 +1227,7 @@ function viewStock() {
   return `<div class="summary">
     <span>要発注<b class="${shorts ? 'alert' : ''}">${shorts}</b> 点</span>
     <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b> 件 ›</button>${(() => { const n = S.store === 'tonari' ? 0 : inboundFor(S.store).filter(x => !x.l.arrived).length; return n ? `<button type="button" class="lnk inb-hint" data-act="pendOpen">📦 ほかの店の分 ${n}品もここに届きます</button>` : ''; })()}
+    ${(() => { const n = new Set((S.holds || []).filter(h => h.store === S.store).map(h => h.itemId)).size; return n ? `<button type="button" class="sum-btn" data-act="onlyHold" aria-pressed="${!!S.onlyHold}">取り置き<b>${n}</b> 品 ${S.onlyHold ? '✕' : '›'}</button>` : ''; })()}
     <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
     <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
   </div>
@@ -1238,7 +1251,8 @@ function stockList() {
   const all = S.items.filter(it => (carried(it, S.store) || qtyOf(S.store, it.id) > 0)
     && (!q || it.name.toLowerCase().includes(q))
     && catMatch(it)
-    && (!S.onlyShort || needOf(it, S.store) > 0));
+    && (!S.onlyShort || needOf(it, S.store) > 0)
+    && (!S.onlyHold || heldOf(S.store, it.id) > 0));
   /* 発注点・適正が0（未設定）で在庫も0の商品は、下にまとめて「発注しなくて大丈夫？」と確認する */
   /* 発注点・適正を0にした商品（在庫0・入荷待ちなし）は表示しない。未記入の商品は枠にまとめて確認する */
   const shown = all.filter(it => !isZeroIdle(it, S.store));
@@ -1257,10 +1271,21 @@ function pillOf(it) {
   if (s === 'unset') return '<span class="pill sample">発注点未設定</span>';
   return s === 'short' ? '<span class="pill short">要発注</span>' : s === 'ordering' ? `<span class="pill ordering">入荷待ち ${onOrder(S.store, it.id)}</span>` : '<span class="pill ok">適正</span>';
 }
+function holdTools(it) {
+  if (S.store === 'tonari' || !isRetail(it)) return '';
+  const hs = holdsOf(S.store, it.id), n = hs.reduce((a, h) => a + num(h.qty), 0), ro = S.readOnly || !S.unlocked, ed = S.holdEdit && S.holdEdit.id === it.id ? S.holdEdit : null;
+  const list = hs.map(h => S.holdDone === h.id
+    ? `<span class="hold-ask">${num(h.qty)}${esc(uTxt(it.unit))} をお渡し済みにしますか？<button type="button" class="btn small primary" data-act="holdDone" data-id="${h.id}">お渡し済み</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`
+    : `<span class="hold">取り置き ${num(h.qty)}<small>（${saTs(h.at).split(' ')[0]}${h.by ? '・' + esc(h.by) : ''}）</small>${ro ? '' : `<button type="button" class="lnk" data-act="holdAsk" data-id="${h.id}">お渡し済み</button>`}</span>`).join('');
+  const add = ro ? '' : ed
+    ? `<span class="hold-ask">取り置き<span class="gq-st"><button type="button" class="btn small" data-act="holdStep" data-d="-1" aria-label="1減らす">−</button><b>${ed.v}${esc(uTxt(it.unit))}</b><button type="button" class="btn small" data-act="holdStep" data-d="1" aria-label="1増やす">＋</button></span><button type="button" class="btn small primary" data-act="holdAdd" data-id="${it.id}">登録</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`
+    : `<button type="button" class="btn small hold-btn" data-act="holdEdit" data-id="${it.id}">＋取り置き</button>`;
+  return `<div class="holds">${n ? `<span class="hold-sum">うち取り置き ${n}・売れるのは ${availOf(S.store, it.id)}</span>` : ''}${list}${add}</div>`;
+}
 function stockRow(it) {
   const q = qtyOf(S.store, it.id), dis = S.readOnly || !S.unlocked ? 'disabled' : '';
   return `<div class="row${it.ended ? ' is-ended' : ''}"><div><div class="name">${esc(it.name)}</div>
-    <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(uTxt(it.unit))}</span>`}</div></div>
+    <div class="sub">${pillOf(it)}${isUnset(it, S.store) ? '' : `<span>発注点 ${num(it.min?.[S.store])}${esc(uTxt(it.unit))}</span>`}</div>${holdTools(it)}</div>
     <div class="stepper${S.unlocked ? '' : ' locked'}">
       <button type="button" id="m-${it.id}" data-act="dec" data-id="${it.id}" aria-label="${esc(it.name)}を1減らす" ${dis}>−</button>
       <input id="q-${it.id}" type="number" min="0" inputmode="numeric" value="${q}" data-chg="qty" data-id="${it.id}" aria-label="${esc(it.name)}の在庫数" ${dis}>
@@ -1966,6 +1991,15 @@ document.addEventListener('click', async ev => {
     case 'gqEdit': { const o = S.orders.find(x => x.id === id); if (!o) break; const l = o.lines[Number(b.dataset.k)]; S.gqEdit = { id, k: b.dataset.k, v: num(l.qty), min: num(l.got) }; render(); break; }
     case 'gqStep': if (S.gqEdit) { S.gqEdit.v = Math.max(S.gqEdit.min, S.gqEdit.v + Number(b.dataset.d)); render(); } break;
     case 'gqCancel': S.gqEdit = null; render(); break;
+    case 'holdEdit': S.holdEdit = { id, v: 1 }; S.holdDone = null; render(); break;
+    case 'holdStep': if (S.holdEdit) { S.holdEdit.v = Math.max(1, S.holdEdit.v + Number(b.dataset.d)); render(); } break;
+    case 'holdNo': S.holdEdit = null; S.holdDone = null; render(); break;
+    case 'holdAsk': S.holdDone = id; S.holdEdit = null; render(); break;
+    case 'holdAdd': { if (!S.holdEdit || S.holdEdit.id !== id || b.disabled) break; b.disabled = true; const v = S.holdEdit.v, me = WHO.me || {};
+      try { await S.db.collection('holds').add({ store: S.store, itemId: id, qty: v, status: 'open', at: Date.now(), by: me.name || '' }); S.holdEdit = null; toast(`取り置き ${v} を登録しました`); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
+    case 'holdDone': { if (b.disabled) break; b.disabled = true; const me = WHO.me || {};
+      try { await S.db.doc('holds/' + id).update({ status: 'done', doneAt: Date.now(), doneBy: me.name || '' }); S.holdDone = null; toast('お渡し済みにしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
+    case 'onlyHold': S.onlyHold = !S.onlyHold; render(); break;
     case 'gotoQty': { if (!WHO.isOwner() || !S.gqEdit || S.gqEdit.id !== id) break; const o = S.orders.find(x => x.id === id); if (!o || o.status !== 'ordered') break; const i = Number(b.dataset.k), me = WHO.me || {};
       const lines = (o.lines || []).map(l => ({ ...l })), l = lines[i]; if (!l) break;
       const nq = Math.max(num(l.got), S.gqEdit.v), dd = nq - num(l.qty); S.gqEdit = null; if (!dd) { render(); break; }
@@ -2393,6 +2427,7 @@ function listen(fs) {
   fs.doc('settings/dueSkip').onSnapshot(x => { S.dueSkip = (x.data() || {}).map || {}; scheduleRender(); }, () => {});
   fs.doc('settings/dealerOrder').onSnapshot(x => { S.dOrder = (x.data() || {}).ids || []; scheduleRender(); }, () => {});
   fs.collection('orders').orderBy('orderedAt', 'desc').limit(300).onSnapshot(s => { S.orders = docs(s); arrive('orders', s.metadata.fromCache); }, onErr);
+  fs.collection('holds').where('status', '==', 'open').onSnapshot(x => { S.holds = docs(x); scheduleRender(); }, () => {});
   fs.collection('stock').onSnapshot(s => {
     const next = {};
     s.docs.forEach(d => { next[d.id] = num(d.data().qty); });
