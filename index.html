@@ -1293,6 +1293,8 @@ function viewOrder() {
 /* 発注タブ：発注点・適正0で在庫0の商品をまとめて確認（必要ならここから発注に追加） */
 /* ---- 後藤さん宛ての依頼一覧（全員が見られる。手配済みにできるのはオーナーだけ）：店から「依頼」された分を全店まとめて表示 ---- */
 const isGotoOrder = o => o.store !== 'tonari' && (o.dealerId === XFER || isGoto(dealerOf(o.dealerId) || { name: o.dealerName || '' }));
+/* 届け先・数の変更ができる発注（後藤さん管理＋インプレア） */
+const ownerEditable = o => isGotoOrder(o) || (o.store !== 'tonari' && /インプレア/.test((dealerOf(o.dealerId) || {}).name || o.dealerName || ''));
 const gotoReqs = () => S.orders.filter(o => o.status === 'ordered' && !o.gotoDone && isGotoOrder(o));
 function gotoReqButton() {
   const n = gotoReqs().length;
@@ -1307,7 +1309,7 @@ const lineShip = (o, l) => (l && l.ship) || (o.gotoShip && o.gotoShip.store) || 
 const shipBadge = (o, l) => { const sp = lineShip(o, l); if (!sp || sp === o.store) return ''; const other = true; return `<span class="lship${other ? ' other' : ''}">📦 ${SHIP_SHORT[sp] || sp}に届く</span>`; };
 /* 後藤さんだけ：商品ごとの届け先と数量（依頼一覧・入荷待ちの両方で使う） */
 function ownerLineTools(o, i) {
-  if (!WHO.isOwner() || !isGotoOrder(o) || o.status !== 'ordered') return '';
+  if (!WHO.isOwner() || !ownerEditable(o) || o.status !== 'ordered') return '';
   const l = o.lines[i]; if (!l) return '';
   const sp = l.ship || '', k = String(i), ed = S.gqEdit && S.gqEdit.id === o.id && S.gqEdit.k === k ? S.gqEdit : null;
   const sel = `<select class="field lship-sel" data-chg="lShip" data-id="${o.id}" data-i="${i}" aria-label="${esc(l.name)}の届け先">${['hair', 'liss', 'till'].map(st => `<option value="${st === o.store ? '' : st}"${(sp || o.store) === st ? ' selected' : ''}>${SHIP_SHORT[st]}に届く${st === o.store ? '（いつも通り）' : ''}</option>`).join('')}</select>`;
@@ -1576,7 +1578,7 @@ function pendCard(o) {
   const rows = lines.map((l, i) => {
     const left = open ? leftOf(l) : 0, k = o.id + ':' + i, v = S.pq && S.pq[k] !== undefined ? S.pq[k] : left;
     const got = open ? num(l.got) : num(l.qty);
-    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${isGotoOrder(o) ? shipBadge(o, l) : ''}${l.arrived && left ? `<span class="lship other">✓ ${SHIP_SHORT[lineShip(o, l)] || ''}に届いています（${dtStr(l.arrived.at)}）</span>` : ''}${left ? (() => { const ex = inboundFor(o.store).filter(x => x.l.itemId && x.l.itemId === l.itemId); return ex.length ? `<span class="adj">＋${ex.map(x => storeOf(x.o.store).short + '分 ' + leftOf(x.l)).join('・')}も一緒に届きます</span>` : ''; })() : ''}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div>${left ? ownerLineTools(o, i) : ''}</div>
+    return `<div class="pend-line${left ? '' : ' done'}"><div><div class="name">${esc(l.name)}</div><div class="sub"><span>発注 ${num(l.qty)}${esc(uTxt(l.unit))}</span>${adjTag(l)}${ownerEditable(o) ? shipBadge(o, l) : ''}${l.arrived && left ? `<span class="lship other">✓ ${SHIP_SHORT[lineShip(o, l)] || ''}に届いています（${dtStr(l.arrived.at)}）</span>` : ''}${left ? (() => { const ex = inboundFor(o.store).filter(x => x.l.itemId && x.l.itemId === l.itemId); return ex.length ? `<span class="adj">＋${ex.map(x => storeOf(x.o.store).short + '分 ' + leftOf(x.l)).join('・')}も一緒に届きます</span>` : ''; })() : ''}${got ? `<span>入荷済み ${got}</span>` : ''}${left ? `<span>残り ${left}</span>` : ''}</div>${left ? ownerLineTools(o, i) : ''}</div>
       ${left && !ro ? `<input class="field" id="pq-${o.id}-${i}" type="number" min="0" max="${left}" inputmode="numeric" value="${num(v)}" data-chg="pq" data-id="${k}" aria-label="${esc(l.name)}の入荷数">
       <button type="button" class="btn small" id="pr-${o.id}-${i}" data-act="recvLine" data-id="${o.id}" data-i="${i}">入荷</button>` : `<span></span><span class="sub">${left ? '' : l.cut ? '取消' : '✓'}</span>`}
       ${left && !ro ? (S.confirm === 'lc-' + k ? `<div class="lc-ask"><span class="sub">${esc(l.name)} の残り${left}を発注から取り消しますか？（在庫は変わりません）</span><button type="button" class="btn small danger" data-act="lineCancel" data-id="${o.id}" data-i="${i}">取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button></div>` : `<div class="lc-row"><button type="button" class="lnk" id="lc-${o.id}-${i}" data-act="confirm" data-id="lc-${k}">この商品の発注を取り消す</button></div>`) : ''}</div>`;
