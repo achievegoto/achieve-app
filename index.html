@@ -112,7 +112,7 @@ body.is-dragging { user-select: none; -webkit-user-select: none; }
 .sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .holds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
 .hold { display: inline-flex; align-items: center; gap: 6px; background: var(--warn-soft); color: var(--warn); font-weight: 700; padding: 2px 8px; border-radius: 99px; }
-.hold small { font-weight: 400; } .hold .lnk { font-size: 12px; }
+.hold small { font-weight: 400; } .hold .lnk { font-size: 12px; } .hold .sub-lnk { color: var(--muted); }
 .hold-sum { color: var(--warn); font-weight: 700; }
 .hold-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hold-btn { font-size: 12px; padding: 2px 10px; }
@@ -1274,9 +1274,12 @@ function pillOf(it) {
 function holdTools(it) {
   if (S.store === 'tonari' || !isRetail(it)) return '';
   const hs = holdsOf(S.store, it.id), n = hs.reduce((a, h) => a + num(h.qty), 0), ro = S.readOnly || !S.unlocked, ed = S.holdEdit && S.holdEdit.id === it.id ? S.holdEdit : null;
-  const list = hs.map(h => S.holdDone === h.id
-    ? `<span class="hold-ask">${num(h.qty)}${esc(uTxt(it.unit))} をお渡し済みにしますか？<button type="button" class="btn small primary" data-act="holdDone" data-id="${h.id}">お渡し済み</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`
-    : `<span class="hold">取り置き ${num(h.qty)}<small>（${saTs(h.at).split(' ')[0]}${h.by ? '・' + esc(h.by) : ''}）</small>${ro ? '' : `<button type="button" class="lnk" data-act="holdAsk" data-id="${h.id}">お渡し済み</button>`}</span>`).join('');
+  const u = esc(uTxt(it.unit)), hd = S.holdDone && hs.some(h => h.id === S.holdDone.id) ? S.holdDone : null;
+  const list = hs.map(h => hd && hd.id === h.id
+    ? (hd.cancel
+      ? `<span class="hold-ask">取り置き ${num(h.qty)}${u} を取り消しますか？<button type="button" class="btn small primary" data-act="holdCancel" data-id="${h.id}">取り消す</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`
+      : `<span class="hold-ask">お渡しした数${num(h.qty) > 1 ? `<span class="gq-st"><button type="button" class="btn small" data-act="holdDStep" data-d="-1" aria-label="1減らす">−</button><b>${hd.v}${u}</b><button type="button" class="btn small" data-act="holdDStep" data-d="1" aria-label="1増やす">＋</button></span>` : ` <b>${hd.v}${u}</b>`}${hd.v < num(h.qty) ? `<small>（残り${num(h.qty) - hd.v}${u}は取り置きのまま）</small>` : ''}<button type="button" class="btn small primary" data-act="holdDone" data-id="${h.id}">お渡し済み</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`)
+    : `<span class="hold">取り置き ${num(h.qty)}<small>（${saTs(h.at).split(' ')[0]}${h.by ? '・' + esc(h.by) : ''}）</small>${ro ? '' : `<button type="button" class="lnk" data-act="holdAsk" data-id="${h.id}">お渡し済み</button><button type="button" class="lnk sub-lnk" data-act="holdCAsk" data-id="${h.id}">取り消し</button>`}</span>`).join('');
   const add = ro ? '' : ed
     ? `<span class="hold-ask">取り置き<span class="gq-st"><button type="button" class="btn small" data-act="holdStep" data-d="-1" aria-label="1減らす">−</button><b>${ed.v}${esc(uTxt(it.unit))}</b><button type="button" class="btn small" data-act="holdStep" data-d="1" aria-label="1増やす">＋</button></span><button type="button" class="btn small primary" data-act="holdAdd" data-id="${it.id}">登録</button><button type="button" class="btn small" data-act="holdNo">やめる</button></span>`
     : `<button type="button" class="btn small hold-btn" data-act="holdEdit" data-id="${it.id}">＋取り置き</button>`;
@@ -1994,11 +1997,19 @@ document.addEventListener('click', async ev => {
     case 'holdEdit': S.holdEdit = { id, v: 1 }; S.holdDone = null; render(); break;
     case 'holdStep': if (S.holdEdit) { S.holdEdit.v = Math.max(1, S.holdEdit.v + Number(b.dataset.d)); render(); } break;
     case 'holdNo': S.holdEdit = null; S.holdDone = null; render(); break;
-    case 'holdAsk': S.holdDone = id; S.holdEdit = null; render(); break;
+    case 'holdAsk': S.holdDone = { id, v: 1 }; S.holdEdit = null; render(); break;
+    case 'holdCAsk': S.holdDone = { id, cancel: true }; S.holdEdit = null; render(); break;
+    case 'holdDStep': { const h = (S.holds || []).find(x => S.holdDone && x.id === S.holdDone.id); if (h) { S.holdDone.v = Math.min(num(h.qty), Math.max(1, S.holdDone.v + Number(b.dataset.d))); render(); } break; }
+    case 'holdCancel': { if (b.disabled) break; b.disabled = true; const me = WHO.me || {};
+      try { await S.db.doc('holds/' + id).update({ status: 'cancelled', doneAt: Date.now(), doneBy: me.name || '' }); S.holdDone = null; toast('取り置きを取り消しました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
     case 'holdAdd': { if (!S.holdEdit || S.holdEdit.id !== id || b.disabled) break; b.disabled = true; const v = S.holdEdit.v, me = WHO.me || {};
       try { await S.db.collection('holds').add({ store: S.store, itemId: id, qty: v, status: 'open', at: Date.now(), by: me.name || '' }); S.holdEdit = null; toast(`取り置き ${v} を登録しました`); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
     case 'holdDone': { if (b.disabled) break; b.disabled = true; const me = WHO.me || {};
-      try { await S.db.doc('holds/' + id).update({ status: 'done', doneAt: Date.now(), doneBy: me.name || '' }); S.holdDone = null; toast('お渡し済みにしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
+      const h = (S.holds || []).find(x => x.id === id), n = Math.min(num(h && h.qty), num(S.holdDone && S.holdDone.v) || 1), rest = num(h && h.qty) - n;
+      if (!h) break;
+      try { const ev = firebase.firestore.FieldValue.arrayUnion({ n, at: Date.now(), by: me.name || '' });
+        await S.db.doc('holds/' + id).update(rest > 0 ? { qty: rest, handed: ev } : { status: 'done', doneAt: Date.now(), doneBy: me.name || '', handed: ev });
+        S.holdDone = null; toast(rest > 0 ? `${n} をお渡し済みにしました（残り${rest}）` : 'お渡し済みにしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
     case 'onlyHold': S.onlyHold = !S.onlyHold; render(); break;
     case 'gotoQty': { if (!WHO.isOwner() || !S.gqEdit || S.gqEdit.id !== id) break; const o = S.orders.find(x => x.id === id); if (!o || o.status !== 'ordered') break; const i = Number(b.dataset.k), me = WHO.me || {};
       const lines = (o.lines || []).map(l => ({ ...l })), l = lines[i]; if (!l) break;
