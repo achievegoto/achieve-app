@@ -653,7 +653,7 @@ function pendingIds(store) {
   finally { S.store = prev; }
 }
 function pendingOf(store) { return pendingIds(store).map(did => dealerOf(did).name); }
-/* 締めのあとも発注されていないディーラー：締めの3日前（木曜18:30）以降にその店・ディーラーの発注が無く、今も発注する商品があるもの。「今週は発注しない」にしたものは除く */
+/* 締めのあとも発注されていないディーラー：締めの3日前（木曜18:30）以降にその店・ディーラーの発注が無く、今も発注する商品があるもの。「今回は発注しない」にしたものは除く */
 let dueCache = null;
 function dueList() {
   if (S.store === 'tonari' && !WHO.isOwner()) return [];
@@ -671,9 +671,9 @@ function dueBanner() {
   const L = dueList(); if (!L.length) return '';
   const row = (st, x) => { const k = st + '|' + x.did, sm = dueSum(st, x.did), goto = isGotoDid(x.did);
     const ask = S.confirm === 'dueP-' + k ? `<div class="due-ask"><span>${esc(x.name)}（${sm.n}品${sm.yen ? ' ' + yen(sm.yen) : ''}）を${goto ? '後藤さんに依頼済み' : '発注済み'}にします。よろしいですか？</span><button type="button" class="btn small primary" data-act="duePlaced" data-id="${k}">はい</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : '';
-    const askS = S.confirm === 'dueS-' + k ? `<div class="due-ask"><span>${esc(x.name)}は今週は発注しない、でよろしいですか？</span><button type="button" class="btn small primary" data-act="dueSkip" data-id="${k}">はい</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : '';
+    const askS = S.confirm === 'dueS-' + k ? `<div class="due-ask"><span>${esc(x.name)}は今回は発注しない、でよろしいですか？</span><button type="button" class="btn small primary" data-act="dueSkip" data-id="${k}">はい</button><button type="button" class="btn small" data-act="confirmNo">やめる</button></div>` : '';
     return `<div class="due-r"><div class="due-n"><b>${esc(x.name)}</b><span>${sm.n}品${sm.yen ? '・' + yen(sm.yen) : ''}</span></div>
-      <div class="due-bs"><button type="button" class="btn small" data-act="dueOpen" data-id="${k}">まだ → 開いて${goto ? '依頼' : '発注'}する</button><button type="button" class="btn small" data-act="dueAskP" data-id="${k}">${goto ? '依頼' : '発注'}したのに押し忘れた</button><button type="button" class="lnk" data-act="dueAskS" data-id="${k}">今週は発注しない</button></div>${ask}${askS}</div>`; };
+      <div class="due-bs"><button type="button" class="btn small" data-act="dueOpen" data-id="${k}">まだ → 開いて${goto ? '依頼' : '発注'}する</button><button type="button" class="btn small" data-act="dueAskP" data-id="${k}">${goto ? '依頼' : '発注'}したのに押し忘れた</button><button type="button" class="lnk" data-act="dueAskS" data-id="${k}">今回は発注しない</button></div>${ask}${askS}</div>`; };
   const late = Date.now() - lastDeadline();
   const html = `<section class="due"><div class="due-h">⚠️ 日曜18:30の発注締めのあと、まだ発注されていません</div>
     <div class="due-b">ディーラーごとに、どれか1つを押してください。押すまでこの表示は消えません（${Math.floor(late / 86400e3) ? Math.floor(late / 86400e3) + '日' : Math.floor(late / 3600e3) + '時間'}経過）。</div>
@@ -684,7 +684,7 @@ function dueBanner() {
   if (!shown && !document.getElementById('due-pop')) {
     try { localStorage.setItem(key, '1'); } catch (e) {}
     setTimeout(() => { const d = document.createElement('div'); d.id = 'due-pop'; d.className = 'due-pop';
-      d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true"><div class="due in"><div class="due-h">⚠️ 日曜18:30の発注締めのあと、まだ発注されていません</div><div class="due-s">${L.map(x => `<b>${esc(storeOf(x.st).short)}</b>${x.items.map(i => `<span>${esc(i.name)}</span>`).join('')}`).join('')}</div><div class="due-b">在庫タブの上の赤い枠で、ディーラーごとに「まだ」「押し忘れ」「今週は発注しない」を選んでください。</div></div><div class="due-acts"><button type="button" class="btn primary" data-act="closeDue">確認する</button></div></div>`;
+      d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true"><div class="due in"><div class="due-h">⚠️ 日曜18:30の発注締めのあと、まだ発注されていません</div><div class="due-s">${L.map(x => `<b>${esc(storeOf(x.st).short)}</b>${x.items.map(i => `<span>${esc(i.name)}</span>`).join('')}`).join('')}</div><div class="due-b">在庫タブの上の赤い枠で、ディーラーごとに「まだ」「押し忘れ」「今回は発注しない」を選んでください。</div></div><div class="due-acts"><button type="button" class="btn primary" data-act="closeDue">確認する</button></div></div>`;
       document.body.appendChild(d); }, 300);
   }
   return html;
@@ -1897,7 +1897,7 @@ document.addEventListener('click', async ev => {
     case 'dueAskP': S.confirm = 'dueP-' + id; render(); break;
     case 'dueAskS': S.confirm = 'dueS-' + id; render(); break;
     case 'duePlaced': { const [st, d1] = id.split('|'), prev = S.store; S.confirm = ''; S.store = st; try { await markPlaced(d1, true); } finally { S.store = prev; } toast(isGotoDid(d1) ? '依頼済みにしました' : '発注済みにしました'); render(); break; }
-    case 'dueSkip': { const [st, d1] = id.split('|'), me = WHO.me || {}; S.confirm = ''; (S.dueSkip ||= {})[st + ':' + d1] = dueWeek(); await S.db.doc('settings/dueSkip').set({ map: { [st + ':' + d1]: dueWeek() }, log: { [st + ':' + d1 + ':' + dueWeek()]: { at: Date.now(), by: me.name || '' } } }, { merge: true }).catch(fail); logChange('order', st, '', null, null, { name: dealerOf(d1).name + ' を今週は発注しない', text: dueWeek() + ' 週' }); toast('今週は発注しないにしました'); render(); break; }
+    case 'dueSkip': { const [st, d1] = id.split('|'), me = WHO.me || {}; S.confirm = ''; (S.dueSkip ||= {})[st + ':' + d1] = dueWeek(); await S.db.doc('settings/dueSkip').set({ map: { [st + ':' + d1]: dueWeek() }, log: { [st + ':' + d1 + ':' + dueWeek()]: { at: Date.now(), by: me.name || '' } } }, { merge: true }).catch(fail); logChange('order', st, '', null, null, { name: dealerOf(d1).name + ' を今回は発注しない', text: dueWeek() + ' 週' }); toast('今回は発注しないにしました'); render(); break; }
     case 'oreset': resetDraft(did, id); render(); break;
     case 'oinc': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) + 1); render(); break;
     case 'odec': if (!S.unlocked) { lockHint(); break; } armLock(); bumpDraft(did, id, draftValue(did, id) - 1); render(); break;
