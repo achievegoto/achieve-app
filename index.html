@@ -556,6 +556,8 @@ async function applyLv(rows) {
   rows.forEach(r => { const u = by[r.id] ||= {}; if (r.min === '' && r.par === '') { u['min.' + r.store] = FV.delete(); u['par.' + r.store] = FV.delete(); } else { u['min.' + r.store] = num(r.min); u['par.' + r.store] = num(r.par); } });
   const ids = Object.keys(by);
   for (let i = 0; i < ids.length; i += 400) { const b = S.db.batch(); ids.slice(i, i + 400).forEach(id => b.update(S.db.doc('items/' + id), by[id])); await b.commit(); }
+  /* 発注点・適正の変更履歴（発注締めの時点の値を調べるため） */
+  S.db.collection('lv_log').add({ at: Date.now(), by: (WHO.me || {}).name || '', rows: rows.map(r => ({ id: r.id, store: r.store, oldMin: r.oldMin ?? '', oldPar: r.oldPar ?? '', min: r.min, par: r.par })) }).catch(() => {});
   return ids.length;
 }
 async function requestLv(rows) {
@@ -662,11 +664,21 @@ function dueList() {
   const v = dueList0(); dueCache = { k: ck, o: S.orders, s: S.dueSkip, st: S.stock, t: Date.now(), v }; return v;
 }
 /* 締め（日曜18:30）の時点で足りていなかったか：締めのあとの在庫の増減（入荷以外）を戻して判定。締めのあとに減って足りなくなった商品は次の締めで扱う */
+/* 締めの時点の発注点・適正：締めのあとの変更を新しい順に戻す */
+function lvAtDeadline(it, st) {
+  let mn = it.min?.[st], pr = it.par?.[st];
+  const ch = [];
+  for (const g of S.dueLv || []) for (const r of g.rows || []) if (r.id === it.id && r.store === st) ch.push({ t: g.t, mn: r.oldMin, pr: r.oldPar });
+  ch.sort((a, b) => b.t - a.t).forEach(c => { mn = c.mn === '' || c.mn == null ? undefined : num(c.mn); pr = c.pr === '' || c.pr == null ? undefined : num(c.pr); });
+  return { mn, pr };
+}
 function shortAtDeadline(it, st) {
+  const lv = lvAtDeadline(it, st); if (lv.mn === undefined && lv.pr === undefined) return false;
+  if (!(num(lv.mn) > 0 || num(lv.pr) > 0)) return false;
   let q = qtyOf(st, it.id);
   for (const l of S.dueLogs || []) if (l.store === st && l.itemId === it.id && l.kind !== 'receive' && l.kind !== 'unreceive' && l.from != null && l.to != null) q -= num(l.to) - num(l.from);
-  q = Math.max(0, q); const oo = onOrder(st, it.id), min = num(it.min?.[st]);
-  return !isUnset(it, st) && carried(it, st) && q + oo <= min && !(oo > 0 && q + oo >= num(it.par?.[st]));
+  q = Math.max(0, q); const oo = onOrder(st, it.id), min = num(lv.mn);
+  return q + oo <= min && !(oo > 0 && q + oo >= num(lv.pr));
 }
 function dueRows(st, did) { const prev = S.store; S.store = st; try { return linesFor(did).filter(r => r.qty > 0 && shortAtDeadline(r.it, st)); } finally { S.store = prev; } }
 function dueList0() {
@@ -2362,7 +2374,11 @@ function listen(fs) {
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
   /* 締めのあとの在庫の増減（締め時点の不足判定用）。週が変わったら取り直す */
   const subDue = () => { const f = lastDeadline(); if (S.dueFrom === f) return; S.dueFrom = f; if (S.dueUnsub) S.dueUnsub(); S.dueUnsub = fs.collection('stock_log').where('at', '>=', f).onSnapshot(x => { S.dueLogs = docs(x); dueCache = null; scheduleRender(); }, () => {}); };
-  subDue(); setInterval(subDue, 600000);
+  const subDue2 = () => { const f = lastDeadline(); if (S.dueFrom2 === f) return; S.dueFrom2 = f; (S.dueUnsub2 || []).forEach(u => u()); S.dueLvA = []; S.dueLvB = [];
+    const set = () => { S.dueLv = S.dueLvA.concat(S.dueLvB); dueCache = null; scheduleRender(); };
+    S.dueUnsub2 = [fs.collection('lv_log').where('at', '>=', f).onSnapshot(x => { S.dueLvA = docs(x).map(g => ({ t: num(g.at), rows: g.rows })); set(); }, () => {}),
+      fs.collection('item_req').where('decidedAt', '>=', f).onSnapshot(x => { S.dueLvB = docs(x).filter(g => g.status === 'approved').map(g => ({ t: num(g.decidedAt), rows: g.rows })); set(); }, () => {})]; };
+  subDue(); subDue2(); setInterval(() => { subDue(); subDue2(); }, 600000);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
   fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}, cp = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; if (v.copiedAt) cp[v.store + ':' + v.did] = { at: v.copiedAt, by: v.copiedBy || '' }; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; S.copied = cp; scheduleRender(); }, () => {});
   fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
