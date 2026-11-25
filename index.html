@@ -116,6 +116,9 @@ body.is-dragging { user-select: none; -webkit-user-select: none; }
 .hold-sum { color: var(--warn); font-weight: 700; }
 .hold-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .hold-btn { font-size: 12px; padding: 2px 10px; }
+.hold-q { border: 2px solid var(--warn); } .hold-q h3 { margin: 0 0 4px; font-size: 15px; }
+.hq-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px dashed var(--line); margin-top: 8px; }
+.hq-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
 .pill.short { background: var(--bad-soft); color: var(--bad); }
 .pill.ordering { background: var(--warn-soft); color: var(--warn); }
@@ -835,6 +838,7 @@ async function saApply(list) {
     if (!x.item || !(v >= 0)) continue;
     const key = S.store + '_' + x.item.id, prev = S.stock[key] ?? 0, next = Math.max(0, prev - v);
     const ds = [...new Set(x.rows.map(r => r.date))].sort();
+    if (v > 0 && heldOf(S.store, x.item.id) > 0) { (S.holdAsk ||= []).push({ store: S.store, itemId: x.item.id, sold: v }); }
     if (v > 0) { S.stock[key] = next; await S.db.doc('stock/' + key).set({ store: S.store, itemId: x.item.id, qty: next, at });
       logChange('sale', S.store, x.item.id, prev, next, { text: `サロンアンサー店販 ${saMD(ds[0])}${ds.length > 1 ? '〜' + saMD(ds[ds.length - 1]) : ''} ${x.n}×${v}${v !== x.left ? `（売れた残り${x.left}）` : ''}` }); }
     let rest = v;
@@ -1231,6 +1235,7 @@ function viewStock() {
     <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
     <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
   </div>
+  ${holdAskBox()}
   ${saCard()}
   ${scanCard()}
   <div class="tools">
@@ -1270,6 +1275,13 @@ function pillOf(it) {
   const s = statusOf(it, S.store);
   if (s === 'unset') return '<span class="pill sample">発注点未設定</span>';
   return s === 'short' ? '<span class="pill short">要発注</span>' : s === 'ordering' ? `<span class="pill ordering">入荷待ち ${onOrder(S.store, it.id)}</span>` : '<span class="pill ok">適正</span>';
+}
+/* 店販を反映した商品に取り置きがあるとき：取り置き分のお渡しか確認する */
+function holdAskBox() {
+  const L = (S.holdAsk || []).filter(a => a.store === S.store && heldOf(a.store, a.itemId) > 0);
+  if (!L.length) return '';
+  return `<section class="card hold-q"><h3>🎁 取り置きがある商品が売れました</h3><div class="sub">取り置きのお客様にお渡しした分ですか？お渡しした分は「お渡し済み」にします。</div>${L.map(a => { const it = S.items.find(i => i.id === a.itemId) || { name: '?' }, h = heldOf(a.store, a.itemId), u = esc(uTxt(it.unit)), k = a.v ?? Math.min(a.sold, h);
+    return `<div class="hq-row"><div><b>${esc(it.name)}</b><div class="sub">売れた ${a.sold}${u}・取り置き ${h}${u}</div></div><div class="hq-btns">${h > 1 ? `<span class="gq-st"><button type="button" class="btn small" data-act="hqStep" data-id="${a.itemId}" data-d="-1" aria-label="1減らす">−</button><b>${k}${u}</b><button type="button" class="btn small" data-act="hqStep" data-id="${a.itemId}" data-d="1" aria-label="1増やす">＋</button></span>` : ''}<button type="button" class="btn small primary" data-act="hqYes" data-id="${a.itemId}">はい、${k}${u} お渡し済み</button><button type="button" class="btn small" data-act="hqNo" data-id="${a.itemId}">いいえ（ほかのお客様）</button></div></div>`; }).join('')}</section>`;
 }
 function holdTools(it) {
   if (S.store === 'tonari' || !isRetail(it)) return '';
@@ -2011,6 +2023,14 @@ document.addEventListener('click', async ev => {
         await S.db.doc('holds/' + id).update(rest > 0 ? { qty: rest, handed: ev } : { status: 'done', doneAt: Date.now(), doneBy: me.name || '', handed: ev });
         S.holdDone = null; toast(rest > 0 ? `${n} をお渡し済みにしました（残り${rest}）` : 'お渡し済みにしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
     case 'onlyHold': S.onlyHold = !S.onlyHold; render(); break;
+    case 'hqStep': { const a = (S.holdAsk || []).find(x => x.store === S.store && x.itemId === id); if (a) { const h = heldOf(S.store, id); a.v = Math.min(h, Math.max(1, (a.v ?? Math.min(a.sold, h)) + Number(b.dataset.d))); render(); } break; }
+    case 'hqNo': S.holdAsk = (S.holdAsk || []).filter(x => !(x.store === S.store && x.itemId === id)); render(); break;
+    case 'hqYes': { if (b.disabled) break; const a = (S.holdAsk || []).find(x => x.store === S.store && x.itemId === id); if (!a) break; b.disabled = true;
+      const me = WHO.me || {}, now = Date.now(); let k = a.v ?? Math.min(a.sold, heldOf(S.store, id));
+      try { for (const h of holdsOf(S.store, id).sort((p, q) => num(p.at) - num(q.at))) { if (k <= 0) break; const n = Math.min(k, num(h.qty)), rest = num(h.qty) - n; k -= n;
+          const ev = firebase.firestore.FieldValue.arrayUnion({ n, at: now, by: me.name || '', via: 'sale' });
+          await S.db.doc('holds/' + h.id).update(rest > 0 ? { qty: rest, handed: ev } : { status: 'done', doneAt: now, doneBy: me.name || '', handed: ev }); }
+        S.holdAsk = S.holdAsk.filter(x => x !== a); toast('お渡し済みにしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
     case 'gotoQty': { if (!WHO.isOwner() || !S.gqEdit || S.gqEdit.id !== id) break; const o = S.orders.find(x => x.id === id); if (!o || o.status !== 'ordered') break; const i = Number(b.dataset.k), me = WHO.me || {};
       const lines = (o.lines || []).map(l => ({ ...l })), l = lines[i]; if (!l) break;
       const nq = Math.max(num(l.got), S.gqEdit.v), dd = nq - num(l.qty); S.gqEdit = null; if (!dd) { render(); break; }
