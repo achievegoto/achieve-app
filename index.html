@@ -661,12 +661,20 @@ function dueList() {
   if (dueCache && dueCache.k === ck && dueCache.o === S.orders && dueCache.s === S.dueSkip && dueCache.st === S.stock && Date.now() - dueCache.t < 5000) return dueCache.v;
   const v = dueList0(); dueCache = { k: ck, o: S.orders, s: S.dueSkip, st: S.stock, t: Date.now(), v }; return v;
 }
+/* 締め（日曜18:30）の時点で足りていなかったか：締めのあとの在庫の増減（入荷以外）を戻して判定。締めのあとに減って足りなくなった商品は次の締めで扱う */
+function shortAtDeadline(it, st) {
+  let q = qtyOf(st, it.id);
+  for (const l of S.dueLogs || []) if (l.store === st && l.itemId === it.id && l.kind !== 'receive' && l.kind !== 'unreceive' && l.from != null && l.to != null) q -= num(l.to) - num(l.from);
+  q = Math.max(0, q); const oo = onOrder(st, it.id), min = num(it.min?.[st]);
+  return !isUnset(it, st) && carried(it, st) && q + oo <= min && !(oo > 0 && q + oo >= num(it.par?.[st]));
+}
+function dueRows(st, did) { const prev = S.store; S.store = st; try { return linesFor(did).filter(r => r.qty > 0 && shortAtDeadline(r.it, st)); } finally { S.store = prev; } }
 function dueList0() {
   const from = lastDeadline() - 3 * 86400e3, wk = dueWeek(), skip = S.dueSkip || {};
   const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
-  return stores.map(st => ({ st, items: pendingIds(st).filter(did => skip[st + ':' + did] !== wk && !S.orders.some(o => o.store === st && o.dealerId === did && num(o.orderedAt) >= from)).map(did => ({ did, name: dealerOf(did).name })) })).filter(x => x.items.length);
+  return stores.map(st => ({ st, items: pendingIds(st).filter(did => skip[st + ':' + did] !== wk && !S.orders.some(o => o.store === st && o.dealerId === did && num(o.orderedAt) >= from) && dueRows(st, did).length).map(did => ({ did, name: dealerOf(did).name })) })).filter(x => x.items.length);
 }
-function dueSum(st, did) { const prev = S.store; S.store = st; try { const rs = linesFor(did).filter(r => r.qty > 0); return { n: rs.length + extraLines(did).length, yen: rs.reduce((a, r) => a + r.qty * num(r.it.price), 0) }; } finally { S.store = prev; } }
+function dueSum(st, did) { const rs = dueRows(st, did); return { n: rs.length, yen: rs.reduce((a, r) => a + r.qty * num(r.it.price), 0) }; }
 function dueBanner() {
   const L = dueList(); if (!L.length) return '';
   const row = (st, x) => { const k = st + '|' + x.did, sm = dueSum(st, x.did), goto = isGotoDid(x.did);
@@ -2352,6 +2360,9 @@ function listen(fs) {
   WHO.init(fs, scheduleRender);
   slowT = setTimeout(() => { S.slow = true; scheduleRender(); }, 10000);
   fs.collection('items').orderBy('createdAt').onSnapshot(s => { S.items = docs(s); if (!s.metadata.fromCache && !S.importing) S.needImport = !s.docs.length; arrive('items', s.metadata.fromCache); }, onErr);
+  /* 締めのあとの在庫の増減（締め時点の不足判定用）。週が変わったら取り直す */
+  const subDue = () => { const f = lastDeadline(); if (S.dueFrom === f) return; S.dueFrom = f; if (S.dueUnsub) S.dueUnsub(); S.dueUnsub = fs.collection('stock_log').where('at', '>=', f).onSnapshot(x => { S.dueLogs = docs(x); dueCache = null; scheduleRender(); }, () => {}); };
+  subDue(); setInterval(subDue, 600000);
   fs.collection('stock_log').orderBy('at', 'desc').limit(300).onSnapshot(s => { S.logs = docs(s); if (S.tab === 'history') scheduleRender(); }, () => {});
   fs.collection('order_drafts').onSnapshot(s => { const d = {}; const ex = {}; const hd = {}, cp = {}; s.docs.forEach(x => { const v = x.data(); if (v.store && v.did) { d[v.store + ':' + v.did] = v.lines || {}; ex[v.store + ':' + v.did] = v.extra || ''; if (v.hold) hd[v.store + ':' + v.did] = v.hold; if (v.copiedAt) cp[v.store + ':' + v.did] = { at: v.copiedAt, by: v.copiedBy || '' }; } }); S.draft = d; S.draftExtra = ex; S.hold = hd; S.copied = cp; scheduleRender(); }, () => {});
   fs.collection('item_req').where('status', '==', 'pending').onSnapshot(s => { S.lvReqs = docs(s); scheduleRender(); }, () => {});
