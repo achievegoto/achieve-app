@@ -743,8 +743,7 @@ function saDueBanner() {
   const key = 'saDueShown:' + new Date().toDateString() + ':' + L.map(x => x.st).join(',');
   let shown = false; try { shown = localStorage.getItem(key) === '1'; } catch (e) {}
   if (!shown && !document.getElementById('due-pop') && !document.getElementById('sa-pop')) {
-    try { localStorage.setItem(key, '1'); } catch (e) {}
-    setTimeout(() => { if (document.getElementById('due-pop')) return; const d = document.createElement('div'); d.id = 'sa-pop'; d.className = 'due-pop';
+    setTimeout(() => { if (document.getElementById('due-pop') || document.getElementById('sa-pop')) return; try { localStorage.setItem(key, '1'); } catch (e) {} const d = document.createElement('div'); d.id = 'sa-pop'; d.className = 'due-pop';
       d.innerHTML = `<div class="due-card" role="alertdialog" aria-modal="true"><div class="due sa-due in"><div class="due-h">🧾 店販の販売分が、まだ在庫に反映されていません</div><div class="due-s">${L.map(x => `<b>${esc(storeOf(x.st).short)}</b><span>${x.n}品（${rng(x)}）</span>`).join('')}</div><div class="due-b">在庫タブの「店販の販売分」で、商品ごとに「反映」か「今回は反映しない」を押してください。</div></div><div class="due-acts"><button type="button" class="btn primary" data-act="closeSaPop">確認する</button></div></div>`;
       document.body.appendChild(d); }, 600);
   }
@@ -1980,7 +1979,7 @@ document.addEventListener('click', async ev => {
     case 'cat': { const nb = b.dataset.big || ''; S.cat = S.big === nb && S.cat === id ? '' : id; S.big = nb; render(); break; }
     case 'big': S.big = S.big === id ? '' : id; S.cat = ''; render(); break;
     case 'goDue': { const p = $('due-pop'); if (p) p.remove(); if (id && id !== S.store) { S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} } S.tab = 'order'; S.oPick = ''; render(); window.scrollTo(0, 0); break; }
-    case 'closeDue': { const p = $('due-pop'); if (p) p.remove(); break; }
+    case 'closeDue': { const p = $('due-pop'); if (p) p.remove(); setTimeout(render, 100); break; }
     case 'closeSaPop': { const p = $('sa-pop'); if (p) p.remove(); break; }
     case 'saDueOpen': { S.allView = false; S.pend = false; if (id !== S.store) { S.store = id; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} } S.tab = 'stock'; S.saWk = saMon(b.dataset.d); S.saDay = ''; S.saOpen = true; render(); setTimeout(() => { const c = document.querySelector('.sa-card'); if (c) c.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 50); break; }
     case 'dueOpen': { const [st, d1] = id.split('|'); S.allView = false; S.pend = false; if (st !== S.store) { S.store = st; S.unlocked = false; try { localStorage.setItem('achieve-store', st); } catch (e) {} } S.tab = 'order'; S.oPick = d1; (S.oOpen ||= new Set()).add(d1); S.confirm = ''; render(); window.scrollTo(0, 0); break; }
