@@ -653,6 +653,7 @@ function render() {
   if (S.failed) { m.innerHTML = `<div class="empty">${esc(S.failed)}</div>`; return; }
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
   const a = document.activeElement, fid = a && a.id;
+  { const lk = saLockStore(); if (lk) { if (S.store !== lk || S.tab !== 'stock' || S.allView || S.pend || S.gotoView) { S.store = lk; S.tab = 'stock'; S.allView = false; S.pend = false; S.gotoView = false; shell(); } S.saOpen = true; m.innerHTML = saLockView(lk); S.dirty = false; return; } }
   m.innerHTML = notes() + copyBanner() + dueBanner() + saDueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock' && $('stock-list')) { $('stock-list').innerHTML = stockList(); fillScan(); }
@@ -732,6 +733,19 @@ function saDueList() {
   const stores = WHO.isOwner() ? DUE_STORES : [S.store].filter(x => DUE_STORES.includes(x));
   return stores.map(st => { const rs = saRows(st).filter(r => r.left > 0 && r.date < today); if (!rs.length) return null;
     const ds = rs.map(r => r.date).sort(); return { st, n: new Set(rs.map(r => r.c)).size, from: ds[0], to: ds[ds.length - 1], old: saMon(ds[0]) < saMon(today) }; }).filter(Boolean);
+}
+/* 日曜〜月曜12:00：前日までの販売分が残っていたら、オーナー以外は処理するまでほかの画面を使えない */
+function saLockStore() {
+  if (!window.WHO || !WHO.me || WHO.isOwner() || S.readOnly || !S.saDays) return '';
+  const d = new Date(), wd = d.getDay(); if (!(wd === 0 || (wd === 1 && d.getHours() < 12))) return '';
+  const L = saDueList0(); if (!L.length) return '';
+  const mine = myStore(); if (mine) return L.some(x => x.st === mine) ? mine : '';
+  return L.some(x => x.st === S.store) ? S.store : L[0].st;
+}
+function saDueList0() { const today = saYmd(new Date()); return DUE_STORES.map(st => { const rs = saRows(st).filter(r => r.left > 0 && r.date < today); return rs.length ? { st } : null; }).filter(Boolean); }
+function saLockView(st) {
+  { const today = saYmd(new Date()), pd = saRows(st).filter(r => r.left > 0 && r.date < today).map(r => r.date).sort(); if (pd.length && !pd.some(x => saMon(x) === S.saWk)) { S.saWk = saMon(pd[0]); S.saDay = ''; } }
+  return `<section class="due sa-due"><div class="due-h">🔒 店販の販売分を処理してください（${esc(storeOf(st).short)}）</div><div class="due-b">日曜になっても、今週の店販の販売分が在庫に反映されていません。下の「店販の販売分」で、商品ごとに「反映」か「今回は反映しない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b></div></section>${holdAskBox()}${saCard() || '<div class="card"><div class="empty">読み込んでいます</div></div>'}`;
 }
 function saDueBanner() {
   if (S.tab !== 'stock' && S.tab !== 'order') return '';
@@ -1969,9 +1983,9 @@ document.addEventListener('click', async ev => {
   if (await WHO.handle(act, b)) return;
   switch (act) {
     case 'allView': S.allView = true; S.tab = 'stock'; S.cat = ''; S.big = ''; render(); window.scrollTo(0, 0); break;
-    case 'store': S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
+    case 'store': if (saLockStore() && id !== saLockStore()) { toast('先に店販の販売分を処理してください'); break; } S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
-    case 'tab': S.tab = id; S.pend = false; S.gotoView = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
+    case 'tab': if (saLockStore() && id !== 'stock') { toast('先に店販の販売分を処理してください'); break; } S.tab = id; S.pend = false; S.gotoView = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
