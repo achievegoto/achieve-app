@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4a2340">
+<link rel="apple-touch-icon" href="iv-icon.png">
+<link rel="icon" href="iv-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="面接">
+<title>achieve 面接記録</title>
+<link rel="manifest" href="iv.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:wght@500;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f1; --surface: #ffffff; --line: #e4e1da; --ink: #1c1f26; --muted: #6b6a66;
+  --accent: #4a2340; --accent-ink: #ffffff; --accent-soft: #f2e9ef;
+  --good: #1f6b4a; --good-soft: #e3f2ea; --warn: #8a5a00; --warn-soft: #fbf0d9; --bad: #b3261e; --bad-soft: #fbe7e5;
+  --font-body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-brand: "Cormorant Garamond", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121419; --surface: #1b1e25; --line: #2e323c; --ink: #eceae5; --muted: #a3a19b;
+  --accent: #e0b3d3; --accent-ink: #24121f; --accent-soft: #33232f;
+  --good: #7fd3ab; --good-soft: #1b3429; --warn: #eec26e; --warn-soft: #3a2e16; --bad: #f0a095; --bad-soft: #3a1f1c;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121419; --surface: #1b1e25; --line: #2e323c; --ink: #eceae5; --muted: #a3a19b;
+  --accent: #e0b3d3; --accent-ink: #24121f; --accent-soft: #33232f;
+  --good: #7fd3ab; --good-soft: #1b3429; --warn: #eec26e; --warn-soft: #3a2e16; --bad: #f0a095; --bad-soft: #3a1f1c;
+  color-scheme: dark }
+* { box-sizing: border-box; min-width: 0 }
+html { padding: env(safe-area-inset-top, 0px) 0 0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 760px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 10px; }
+.brand { font-family: var(--font-brand); font-size: 24px; letter-spacing: .18em; color: var(--accent); display: flex; align-items: baseline; gap: 10px; }
+.brand small { font-family: var(--font-body); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+.who { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+.who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
+main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { margin: 0; font-size: 16px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sub { font-size: 12px; color: var(--muted); }
+.group h2 { font-size: 12px; color: var(--muted); margin: 6px 0; font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 8px 13px; border-radius: 99px; font-size: 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 16px; border-radius: 9px; font-weight: 500; min-height: 44px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 6px 12px; font-size: 13px; min-height: 36px; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: default; }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+.field { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-size: 16px; min-height: 44px; }
+textarea.field { min-height: 88px; resize: vertical; line-height: 1.6; }
+label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.err { color: var(--bad); font-size: 13px; }
+.login { max-width: 420px; margin: 24px auto; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.grid2 .full { grid-column: 1 / -1; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tools .field { flex: 1 1 200px; } .tools select.field { flex: 0 1 130px; }
+.sec { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 6px 0 -4px; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; padding: 12px 16px; width: 100%; text-align: left; border: 0; background: transparent; }
+.row + .row { border-top: 1px solid var(--line); }
+.day { line-height: 1.15; } .day b { display: block; font-family: var(--font-brand); font-size: 26px; font-weight: 600; color: var(--accent); } .day span { font-size: 12px; color: var(--muted); }
+.nm b { display: block; font-size: 16px; } .nm span { font-size: 13px; color: var(--muted); }
+.pill { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--bg); color: var(--muted); white-space: nowrap; }
+.pill.合格 { background: var(--good-soft); color: var(--good); } .pill.保留 { background: var(--warn-soft); color: var(--warn); } .pill.不採用 { background: var(--bad-soft); color: var(--bad); }
+.qa { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.qh { display: flex; gap: 6px; align-items: center; }
+.qh i { font-style: normal; font-family: var(--font-brand); font-size: 22px; color: var(--accent); min-width: 1.2em; text-align: center; }
+.qh .field { font-weight: 700; border-color: transparent; padding-left: 4px; }
+.qh .field:focus { border-color: var(--line); }
+.saved { font-size: 12px; color: var(--muted); min-height: 18px; }
+.tp { display: flex; gap: 6px; align-items: center; }
+.tp i { font-style: normal; color: var(--accent); min-width: 1.4em; text-align: center; font-weight: 700; }
+nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs { display: grid; grid-template-columns: repeat(2, 1fr); }
+.tabs button { border: 0; background: transparent; padding: 15px 0; font-size: 14px; color: var(--muted); }
+.tabs button[aria-current="page"] { color: var(--accent); font-weight: 700; box-shadow: inset 0 2px 0 var(--accent); }
+#toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
+.modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.4); display: grid; place-items: center; padding: 16px; }
+.modal .card { max-width: 360px; width: 100%; }
+@media (max-width: 560px) { .grid2 { grid-template-columns: minmax(0, 1fr); } .row { grid-template-columns: 62px minmax(0, 1fr); } .row .pill { grid-column: 2; justify-self: start; } .day b { font-size: 22px; } }
+</style>
+</head>
+<body>
+<header><div class="wrap head">
+  <div class="brand">achieve<small>面接記録</small></div>
+  <button type="button" class="who" id="who" data-act="whoSwitch" hidden></button>
+</div></header>
+<main class="wrap" id="main"><div class="empty">読み込んでいます</div></main>
+<nav id="nav" hidden><div class="wrap tabs" id="tabs"></div></nav>
+<div id="toast" hidden></div>
+<div id="modal" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="who.js?v=3"></script>
+<script>
+/* 面接記録：iv_rec（1人1件）、iv_settings/template（質問テンプレート）
+   応募者の個人情報なので、管理者とオーナーだけが見られる */
+const DEF_Q = ['志望動機を教えてください', '美容師を目指したきっかけは？', '学校で力を入れていること', '長所と短所', '理想の美容師像', '5年後どうなっていたいか', '通勤方法と時間', '他社の選考状況', '休日の過ごし方・趣味', '何か質問はありますか？'];
+const RESULTS = ['未定', '合格', '保留', '不採用', '辞退'];
+const SHOPS = ['', 'achieve hair design', 'achieve Liss', 'achieve till'];
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const S = { user: undefined, ready: false, err: '', tab: 'list', recs: [], tpl: null, open: null, cur: null, q: '', f: '', tDraft: null };
+let db, started = false, saveT = null, saving = false, again = false;
+
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2200); }
+function tplQs() { return S.tpl && S.tpl.length ? S.tpl : DEF_Q; }
+function when(at) {
+  if (!at) return { d: '—', t: '日時未定' };
+  const x = new Date(at); if (isNaN(x)) return { d: '—', t: '' };
+  return { d: `${x.getMonth() + 1}/${x.getDate()}`, t: `(${WD[x.getDay()]}) ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}` };
+}
+
+/* ---- 表示 ---- */
+function render() {
+  const m = $('main');
+  $('who').hidden = !S.user || !WHO.me;
+  if (S.user === undefined) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
+  if (!S.user) { $('nav').hidden = true; m.innerHTML = loginView(); return; }
+  if (S.err) { m.innerHTML = `<div class="card"><div class="err">${esc(S.err)}</div></div>`; return; }
+  const g = WHO.gate();
+  if (g) { $('nav').hidden = true; m.innerHTML = g; return; }
+  $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
+  if (!WHO.isAdmin()) { $('nav').hidden = true; m.innerHTML = '<div class="card"><h3>この画面は使えません</h3><div class="sub">面接記録は応募者の個人情報なので、管理者とオーナーだけが見られます。</div></div>'; return; }
+  if (!S.ready) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
+  if (S.open) { $('nav').hidden = true; m.innerHTML = editView(); return; }
+  $('nav').hidden = false;
+  $('tabs').innerHTML = [['list', '面接一覧'], ['tpl', '質問テンプレート']].map(([id, l]) => `<button type="button" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}</button>`).join('');
+  m.innerHTML = S.tab === 'tpl' ? tplView() : listView();
+}
+function loginView() {
+  return `<form class="card login" id="login-form"><h3>ログイン</h3><div class="sub">在庫アプリと同じアカウントでログインします。</div>
+    <label class="lbl">メールアドレス<input class="field" id="lg-email" type="email" autocomplete="username" required></label>
+    <label class="lbl">パスワード<input class="field" id="lg-pass" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lg-err"></div><button class="btn primary">ログイン</button></form>`;
+}
+function listView() {
+  return `<div class="card-head"><h3 style="margin:0;font-size:18px">面接一覧</h3><button type="button" class="btn primary" data-act="new">＋ 新規</button></div>
+    <div class="tools"><input class="field" id="q" type="search" placeholder="名前・学校名で検索" value="${esc(S.q)}" aria-label="検索">
+    <select class="field" id="f" aria-label="結果で絞り込み"><option value="">すべて</option>${RESULTS.map(r => `<option ${S.f === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
+    <div id="rows">${rowsHtml()}</div>`;
+}
+function rowsHtml() {
+  if (!S.recs.length) return '<div class="card empty">まだ記録がありません。「＋ 新規」から面接を登録できます。</div>';
+  const k = S.q.trim().toLowerCase();
+  const r = S.recs.filter(o => (!S.f || (o.result || '未定') === S.f) && (!k || [o.name, o.kana, o.school].join(' ').toLowerCase().includes(k)));
+  if (!r.length) return '<div class="card empty">該当する記録がありません。</div>';
+  const cut = Date.now() - 3 * 3600e3;
+  const isUp = o => o.at && new Date(o.at).getTime() >= cut;
+  const up = r.filter(isUp).sort((a, b) => a.at < b.at ? -1 : 1);
+  const past = r.filter(o => !isUp(o)).sort((a, b) => (b.at || '') < (a.at || '') ? -1 : 1);
+  const row = o => { const w = when(o.at), res = o.result || '未定';
+    return `<button type="button" class="row" data-act="open" data-id="${esc(o.id)}"><div class="day"><b>${esc(w.d)}</b><span>${esc(w.t)}</span></div><div class="nm"><b>${esc(o.name || '（名前未入力）')}</b><span>${esc(o.school || '学校名未入力')}${o.shop ? '・' + esc(o.shop.replace('achieve ', '')) : ''}</span></div><span class="pill ${esc(res)}">${esc(res)}</span></button>`; };
+  return (up.length ? `<div class="sec">これからの面接（${up.length}）</div><div class="list" style="margin-top:8px">${up.map(row).join('')}</div>` : '')
+    + (past.length ? `<div class="sec" style="margin-top:16px">終わった面接（${past.length}）</div><div class="list" style="margin-top:8px">${past.map(row).join('')}</div>` : '');
+}
+function editView() {
+  const c = S.cur;
+  return `<div class="card-head"><button type="button" class="btn ghost" data-act="back">← 一覧へ</button><span class="saved" id="saved"></span></div>
+    <section class="card"><div class="grid2">
+      <label class="lbl">日時<input class="field" type="datetime-local" data-k="at" value="${esc(c.at)}"></label>
+      <label class="lbl">結果<select class="field" data-k="result">${RESULTS.map(r => `<option ${(c.result || '未定') === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+      <label class="lbl">名前<input class="field" data-k="name" value="${esc(c.name)}" autocomplete="off"></label>
+      <label class="lbl">ふりがな<input class="field" data-k="kana" value="${esc(c.kana)}" autocomplete="off"></label>
+      <label class="lbl full">学校名<input class="field" data-k="school" value="${esc(c.school)}" autocomplete="off"></label>
+      <label class="lbl">面接担当<input class="field" data-k="by" value="${esc(c.by)}" autocomplete="off"></label>
+      <label class="lbl">希望店舗<select class="field" data-k="shop">${SHOPS.map(s => `<option value="${esc(s)}" ${(c.shop || '') === s ? 'selected' : ''}>${s || '未定'}</option>`).join('')}</select></label>
+    </div></section>
+    <section class="card"><h3>質問と回答</h3><div id="qs" style="display:flex;flex-direction:column;gap:12px">${qsHtml()}</div>
+      <button type="button" class="btn" data-act="addQ">＋ 質問を追加</button></section>
+    <section class="card"><h3>総合メモ・印象</h3><textarea class="field" data-k="memo" rows="4">${esc(c.memo)}</textarea></section>
+    <button type="button" class="btn danger" data-act="del" style="align-self:flex-start">この記録を削除</button>`;
+}
+function qsHtml() {
+  return S.cur.qs.map((x, i) => `<div class="qa"><div class="qh"><i>${i + 1}</i><input class="field" data-qi="${i}" data-qk="q" value="${esc(x.q)}" placeholder="質問" aria-label="質問${i + 1}"><button type="button" class="btn ghost small" data-act="rmQ" data-i="${i}" aria-label="質問${i + 1}を削除">✕</button></div>
+    <textarea class="field" data-qi="${i}" data-qk="a" placeholder="回答を記入" aria-label="回答${i + 1}">${esc(x.a)}</textarea></div>`).join('');
+}
+function tplView() {
+  if (!S.tDraft) S.tDraft = tplQs().slice();
+  return `<section class="card"><h3>質問テンプレート</h3><div class="sub">新規作成のとき、この質問が順番に入ります。作成済みの記録は変わりません。</div>
+    <div id="tpl" style="display:flex;flex-direction:column;gap:8px">${S.tDraft.map((q, i) => `<div class="tp"><i>${i + 1}</i><input class="field" data-ti="${i}" value="${esc(q)}" aria-label="質問${i + 1}"><button type="button" class="btn ghost small" data-act="tUp" data-i="${i}" aria-label="上へ" ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn ghost small" data-act="tRm" data-i="${i}" aria-label="削除">✕</button></div>`).join('')}</div>
+    <div class="tools"><button type="button" class="btn" data-act="tAdd">＋ 追加</button><button type="button" class="btn primary" data-act="tSave">保存</button></div></section>`;
+}
+function confirmBox(msg, fn) {
+  const el = $('modal'); el.hidden = false; el.className = 'modal';
+  el.innerHTML = `<div class="card"><div>${esc(msg)}</div><div class="tools" style="justify-content:flex-end"><button type="button" class="btn" data-act="mNo">やめる</button><button type="button" class="btn primary" data-act="mYes" style="background:var(--bad);border-color:var(--bad)">削除する</button></div></div>`;
+  confirmBox.fn = fn;
+}
+
+/* ---- 保存 ---- */
+function changed() { const s = $('saved'); if (s) s.textContent = '入力中…'; clearTimeout(saveT); saveT = setTimeout(save, 700); }
+async function save() {
+  if (!S.open || !S.cur) return;
+  if (saving) { again = true; return; }
+  saving = true; clearTimeout(saveT);
+  const id = S.open, body = Object.assign({}, S.cur, { qs: S.cur.qs.map(x => ({ q: x.q, a: x.a })), updated: Date.now(), updatedBy: WHO.me ? WHO.me.name : '' });
+  try { await db.doc('iv_rec/' + id).set(body); const s = $('saved'); if (s && S.open === id) s.textContent = '保存しました'; }
+  catch (e) { const s = $('saved'); if (s) s.textContent = '保存できませんでした：' + e.message; }
+  saving = false; if (again) { again = false; save(); }
+}
+async function closeEdit() {
+  if ($('saved') && $('saved').textContent === '入力中…') await save();
+  S.open = null; S.cur = null; render(); window.scrollTo(0, 0);
+}
+
+/* ---- 操作 ---- */
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, id = el.dataset.id, i = +el.dataset.i;
+  if (a === 'whoSwitch') { WHO.handle('whoOut', el); window.scrollTo(0, 0); return; }
+  if (await WHO.handle(a, el)) return;
+  if (a === 'tab') { S.tab = id; S.tDraft = null; render(); window.scrollTo(0, 0); }
+  if (a === 'open') { const o = S.recs.find(r => r.id === id); if (!o) return; S.open = id; S.cur = JSON.parse(JSON.stringify(o)); delete S.cur.id; S.cur.qs = Array.isArray(S.cur.qs) ? S.cur.qs : []; render(); window.scrollTo(0, 0); }
+  if (a === 'new') {
+    const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1);
+    const at = new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+    const ref = db.collection('iv_rec').doc();
+    S.cur = { at, name: '', kana: '', school: '', by: WHO.me ? WHO.me.name : '', shop: '', result: '未定', memo: '', qs: tplQs().map(q => ({ q, a: '' })), created: Date.now(), createdBy: WHO.me ? WHO.me.name : '' };
+    S.open = ref.id; render(); window.scrollTo(0, 0);
+    const n = document.querySelector('[data-k="name"]'); if (n) n.focus();
+    save();
+  }
+  if (a === 'back') closeEdit();
+  if (a === 'addQ') { S.cur.qs.push({ q: '', a: '' }); $('qs').innerHTML = qsHtml(); const ins = $('qs').querySelectorAll('input'); ins[ins.length - 1].focus(); changed(); }
+  if (a === 'rmQ') {
+    const go = () => { S.cur.qs.splice(i, 1); $('qs').innerHTML = qsHtml(); changed(); };
+    if (S.cur.qs[i] && String(S.cur.qs[i].a || '').trim()) { confirmBox('回答が入っている質問を削除しますか？', go); } else go();
+  }
+  if (a === 'del') confirmBox(`${S.cur.name || 'この記録'} の面接記録を削除します。元に戻せません。`, async () => {
+    const rid = S.open; clearTimeout(saveT); S.open = null; S.cur = null; render();
+    try { await db.doc('iv_rec/' + rid).delete(); toast('削除しました'); } catch (e) { toast('削除できませんでした'); }
+  });
+  if (a === 'mNo') $('modal').hidden = true;
+  if (a === 'mYes') { $('modal').hidden = true; confirmBox.fn && confirmBox.fn(); }
+  if (a === 'tAdd') { S.tDraft.push(''); render(); const ins = $('tpl').querySelectorAll('input'); ins[ins.length - 1].focus(); }
+  if (a === 'tRm') { S.tDraft.splice(i, 1); render(); }
+  if (a === 'tUp' && i > 0) { [S.tDraft[i - 1], S.tDraft[i]] = [S.tDraft[i], S.tDraft[i - 1]]; render(); }
+  if (a === 'tSave') {
+    const qs = S.tDraft.map(s => String(s).trim()).filter(Boolean);
+    try { await db.doc('iv_settings/template').set({ qs, updated: Date.now() }); S.tpl = qs; S.tDraft = qs.slice(); render(); toast('保存しました'); } catch (e) { toast('保存できませんでした：' + e.message); }
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.id === 'q') { S.q = t.value; $('rows').innerHTML = rowsHtml(); return; }
+  if (t.dataset.ti != null) { S.tDraft[+t.dataset.ti] = t.value; return; }
+  if (!S.cur) return;
+  if (t.dataset.k) { S.cur[t.dataset.k] = t.value; changed(); }
+  else if (t.dataset.qi != null) { S.cur.qs[+t.dataset.qi][t.dataset.qk] = t.value; changed(); }
+});
+document.addEventListener('change', ev => { if (ev.target.id === 'f') { S.f = ev.target.value; $('rows').innerHTML = rowsHtml(); } });
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'login-form') return; ev.preventDefault();
+  try { await firebase.auth().signInWithEmailAndPassword($('lg-email').value.trim(), $('lg-pass').value); } catch (e) { $('lg-err').textContent = 'メールアドレスかパスワードが違います'; }
+});
+window.addEventListener('pagehide', () => { if (S.open && $('saved') && $('saved').textContent === '入力中…') save(); });
+
+/* ---- 接続 ---- */
+function listen() {
+  const typing = () => { const a = document.activeElement; return a && a.matches('input,textarea,select'); };
+  const soft = () => { if (S.open) return; if (!typing()) render(); };
+  const fail = e => { S.err = '読み込めませんでした：' + e.message; render(); };
+  WHO.init(db, soft);
+  db.collection('iv_rec').onSnapshot(s => { S.recs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); S.ready = true; soft(); }, fail);
+  db.doc('iv_settings/template').onSnapshot(s => { const q = s.exists && s.data().qs; S.tpl = Array.isArray(q) ? q.map(String) : null; }, () => {});
+}
+(function init() {
+  if (typeof firebaseConfig === 'undefined' || !window.firebase) { $('main').innerHTML = '<div class="empty">設定ファイル（config.js）が読み込めません。</div>'; return; }
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  firebase.auth().onAuthStateChanged(u => { S.user = u || null; if (u && !started) { started = true; listen(); } render(); });
+})();
+</script>
+</body>
+</html>
