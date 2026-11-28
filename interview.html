@@ -87,6 +87,10 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .saved { font-size: 12px; color: var(--muted); min-height: 18px; }
 .tp { display: flex; gap: 6px; align-items: center; }
 .tp i { font-style: normal; color: var(--accent); min-width: 1.4em; text-align: center; font-weight: 700; }
+.grip { border: 0; background: transparent; color: var(--muted); font-size: 20px; width: 36px; min-height: 44px; cursor: grab; touch-action: none; flex: none; padding: 0; }
+.mv { display: flex; flex: none; } .mv .btn { padding: 4px 8px; min-height: 40px; }
+.sortable-ghost { opacity: .35; } .sortable-chosen { background: var(--accent-soft); border-radius: 10px; }
+.sortable-drag { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .tabs { display: grid; grid-template-columns: repeat(2, 1fr); }
 .tabs button { border: 0; background: transparent; padding: 15px 0; font-size: 14px; color: var(--muted); }
@@ -111,6 +115,7 @@ nav { position: fixed; inset: auto 0 0; z-index: 9; background: var(--surface); 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
 <script src="who.js?v=3"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script>
 /* 面接記録：iv_rec（1人1件）、iv_settings/template（質問テンプレート）
    応募者の個人情報なので、管理者とオーナーだけが見られる */
@@ -143,10 +148,11 @@ function render() {
   $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
   if (!WHO.isAdmin()) { $('nav').hidden = true; m.innerHTML = '<div class="card"><h3>この画面は使えません</h3><div class="sub">面接記録は応募者の個人情報なので、管理者とオーナーだけが見られます。</div></div>'; return; }
   if (!S.ready) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
-  if (S.open) { $('nav').hidden = true; m.innerHTML = editView(); return; }
+  if (S.open) { $('nav').hidden = true; m.innerHTML = editView(); sortable($('qs'), (a, b) => { move(S.cur.qs, a, b); redrawQs(); changed(); }); return; }
   $('nav').hidden = false;
   $('tabs').innerHTML = [['list', '面接一覧'], ['tpl', '質問テンプレート']].map(([id, l]) => `<button type="button" data-act="tab" data-id="${id}" ${S.tab === id ? 'aria-current="page"' : ''}>${l}</button>`).join('');
   m.innerHTML = S.tab === 'tpl' ? tplView() : listView();
+  if (S.tab === 'tpl') sortable($('tpl'), (a, b) => { move(S.tDraft, a, b); render(); tChanged(); });
 }
 function loginView() {
   return `<form class="card login" id="login-form"><h3>ログイン</h3><div class="sub">在庫アプリと同じアカウントでログインします。</div>
@@ -192,15 +198,24 @@ function editView() {
     <button type="button" class="btn danger" data-act="del" style="align-self:flex-start">この記録を削除</button>`;
 }
 function qsHtml() {
-  return S.cur.qs.map((x, i) => `<div class="qa"><div class="qh"><i>${i + 1}</i><input class="field" data-qi="${i}" data-qk="q" value="${esc(x.q)}" placeholder="質問" aria-label="質問${i + 1}"><button type="button" class="btn ghost small" data-act="rmQ" data-i="${i}" aria-label="質問${i + 1}を削除">✕</button></div>
+  return S.cur.qs.map((x, i) => `<div class="qa"><div class="qh"><button type="button" class="grip" aria-label="ドラッグで並べ替え">≡</button><i>${i + 1}</i><input class="field" data-qi="${i}" data-qk="q" value="${esc(x.q)}" placeholder="質問" aria-label="質問${i + 1}">${mvBtns('q', i, S.cur.qs.length)}<button type="button" class="btn ghost small" data-act="rmQ" data-i="${i}" aria-label="質問${i + 1}を削除">✕</button></div>
     <textarea class="field" data-qi="${i}" data-qk="a" placeholder="回答を記入" aria-label="回答${i + 1}">${esc(x.a)}</textarea></div>`).join('');
 }
 function tplView() {
   if (!S.tDraft) S.tDraft = tplQs().slice();
-  return `<section class="card"><h3>質問テンプレート</h3><div class="sub">新規作成のとき、この質問が順番に入ります。作成済みの記録は変わりません。</div>
-    <div id="tpl" style="display:flex;flex-direction:column;gap:8px">${S.tDraft.map((q, i) => `<div class="tp"><i>${i + 1}</i><input class="field" data-ti="${i}" value="${esc(q)}" aria-label="質問${i + 1}"><button type="button" class="btn ghost small" data-act="tUp" data-i="${i}" aria-label="上へ" ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn ghost small" data-act="tRm" data-i="${i}" aria-label="削除">✕</button></div>`).join('')}</div>
-    <div class="tools"><button type="button" class="btn" data-act="tAdd">＋ 追加</button><button type="button" class="btn primary" data-act="tSave">保存</button></div></section>`;
+  return `<section class="card"><h3>質問テンプレート</h3><div class="sub">新規作成のとき、この質問が順番に入ります。≡ を押したまま動かすか、↑↓で並べ替えられます。変更は自動で保存されます（作成済みの記録は変わりません）。</div><span class="saved" id="tsaved"></span>
+    <div id="tpl" style="display:flex;flex-direction:column;gap:8px">${S.tDraft.map((q, i) => `<div class="tp"><button type="button" class="grip" aria-label="ドラッグで並べ替え">≡</button><i>${i + 1}</i><input class="field" data-ti="${i}" value="${esc(q)}" aria-label="質問${i + 1}">${mvBtns('t', i, S.tDraft.length)}<button type="button" class="btn ghost small" data-act="tRm" data-i="${i}" aria-label="削除">✕</button></div>`).join('')}</div>
+    <div class="tools"><button type="button" class="btn" data-act="tAdd">＋ 追加</button></div></section>`;
 }
+function mvBtns(p, i, n) {
+  return `<span class="mv"><button type="button" class="btn ghost small" data-act="${p}Mv" data-i="${i}" data-d="-1" aria-label="上へ" ${i ? '' : 'disabled'}>↑</button><button type="button" class="btn ghost small" data-act="${p}Mv" data-i="${i}" data-d="1" aria-label="下へ" ${i < n - 1 ? '' : 'disabled'}>↓</button></span>`;
+}
+function move(arr, from, to) { if (to < 0 || to >= arr.length || from === to) return false; arr.splice(to, 0, arr.splice(from, 1)[0]); return true; }
+function sortable(el, onMove) {
+  if (!el || !window.Sortable) return;
+  Sortable.create(el, { handle: '.grip', animation: 150, delay: 0, onEnd: e => { if (e.oldIndex !== e.newIndex) onMove(e.oldIndex, e.newIndex); } });
+}
+function redrawQs() { $('qs').innerHTML = qsHtml(); }
 function confirmBox(msg, fn) {
   const el = $('modal'); el.hidden = false; el.className = 'modal';
   el.innerHTML = `<div class="card"><div>${esc(msg)}</div><div class="tools" style="justify-content:flex-end"><button type="button" class="btn" data-act="mNo">やめる</button><button type="button" class="btn primary" data-act="mYes" style="background:var(--bad);border-color:var(--bad)">削除する</button></div></div>`;
@@ -218,6 +233,16 @@ async function save() {
   catch (e) { const s = $('saved'); if (s) s.textContent = '保存できませんでした：' + e.message; }
   saving = false; if (again) { again = false; save(); }
 }
+let tT = null, tSaving = false, tAgain = false;
+function tChanged() { const s = $('tsaved'); if (s) s.textContent = '入力中…'; clearTimeout(tT); tT = setTimeout(tSave, 700); }
+async function tSave() {
+  if (tSaving) { tAgain = true; return; }
+  tSaving = true; clearTimeout(tT);
+  const qs = S.tDraft.map(x => String(x).trim()).filter(Boolean);
+  try { await db.doc('iv_settings/template').set({ qs, updated: Date.now() }); S.tpl = qs; const s = $('tsaved'); if (s) s.textContent = '保存しました'; }
+  catch (e) { const s = $('tsaved'); if (s) s.textContent = '保存できませんでした：' + e.message; }
+  tSaving = false; if (tAgain) { tAgain = false; tSave(); }
+}
 async function closeEdit() {
   if ($('saved') && $('saved').textContent === '入力中…') await save();
   S.open = null; S.cur = null; render(); window.scrollTo(0, 0);
@@ -229,7 +254,7 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act, id = el.dataset.id, i = +el.dataset.i;
   if (a === 'whoSwitch') { WHO.handle('whoOut', el); window.scrollTo(0, 0); return; }
   if (await WHO.handle(a, el)) return;
-  if (a === 'tab') { S.tab = id; S.tDraft = null; render(); window.scrollTo(0, 0); }
+  if (a === 'tab') { if (tT) { clearTimeout(tT); tT = null; await tSave(); } S.tab = id; S.tDraft = null; render(); window.scrollTo(0, 0); }
   if (a === 'open') { const o = S.recs.find(r => r.id === id); if (!o) return; S.open = id; S.cur = JSON.parse(JSON.stringify(o)); delete S.cur.id; S.cur.qs = Array.isArray(S.cur.qs) ? S.cur.qs : []; render(); window.scrollTo(0, 0); }
   if (a === 'new') {
     const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1);
@@ -241,9 +266,9 @@ document.addEventListener('click', async ev => {
     save();
   }
   if (a === 'back') closeEdit();
-  if (a === 'addQ') { S.cur.qs.push({ q: '', a: '' }); $('qs').innerHTML = qsHtml(); const ins = $('qs').querySelectorAll('input'); ins[ins.length - 1].focus(); changed(); }
+  if (a === 'addQ') { S.cur.qs.push({ q: '', a: '' }); redrawQs(); const ins = $('qs').querySelectorAll('input'); ins[ins.length - 1].focus(); changed(); }
   if (a === 'rmQ') {
-    const go = () => { S.cur.qs.splice(i, 1); $('qs').innerHTML = qsHtml(); changed(); };
+    const go = () => { S.cur.qs.splice(i, 1); redrawQs(); changed(); };
     if (S.cur.qs[i] && String(S.cur.qs[i].a || '').trim()) { confirmBox('回答が入っている質問を削除しますか？', go); } else go();
   }
   if (a === 'del') confirmBox(`${S.cur.name || 'この記録'} の面接記録を削除します。元に戻せません。`, async () => {
@@ -253,17 +278,15 @@ document.addEventListener('click', async ev => {
   if (a === 'mNo') $('modal').hidden = true;
   if (a === 'mYes') { $('modal').hidden = true; confirmBox.fn && confirmBox.fn(); }
   if (a === 'tAdd') { S.tDraft.push(''); render(); const ins = $('tpl').querySelectorAll('input'); ins[ins.length - 1].focus(); }
-  if (a === 'tRm') { S.tDraft.splice(i, 1); render(); }
-  if (a === 'tUp' && i > 0) { [S.tDraft[i - 1], S.tDraft[i]] = [S.tDraft[i], S.tDraft[i - 1]]; render(); }
-  if (a === 'tSave') {
-    const qs = S.tDraft.map(s => String(s).trim()).filter(Boolean);
-    try { await db.doc('iv_settings/template').set({ qs, updated: Date.now() }); S.tpl = qs; S.tDraft = qs.slice(); render(); toast('保存しました'); } catch (e) { toast('保存できませんでした：' + e.message); }
-  }
+  if (a === 'tRm') { S.tDraft.splice(i, 1); render(); tChanged(); }
+  if (a === 'tMv') { if (move(S.tDraft, i, i + +el.dataset.d)) { render(); tChanged(); const b = document.querySelector(`[data-act="tMv"][data-i="${i + +el.dataset.d}"][data-d="${el.dataset.d}"]`); if (b && !b.disabled) b.focus(); } }
+  if (a === 'qMv') { if (move(S.cur.qs, i, i + +el.dataset.d)) { redrawQs(); changed(); const b = document.querySelector(`[data-act="qMv"][data-i="${i + +el.dataset.d}"][data-d="${el.dataset.d}"]`); if (b && !b.disabled) b.focus(); } }
+
 });
 document.addEventListener('input', ev => {
   const t = ev.target;
   if (t.id === 'q') { S.q = t.value; $('rows').innerHTML = rowsHtml(); return; }
-  if (t.dataset.ti != null) { S.tDraft[+t.dataset.ti] = t.value; return; }
+  if (t.dataset.ti != null) { S.tDraft[+t.dataset.ti] = t.value; tChanged(); return; }
   if (!S.cur) return;
   if (t.dataset.k) { S.cur[t.dataset.k] = t.value; changed(); }
   else if (t.dataset.qi != null) { S.cur.qs[+t.dataset.qi][t.dataset.qk] = t.value; changed(); }
