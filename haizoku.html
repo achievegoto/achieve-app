@@ -83,6 +83,8 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .rl { flex: none; font: 600 11px/1 var(--font-num); border-radius: 6px; padding: 4px 5px; border: 1px solid var(--line); color: var(--muted); }
 .rl.S { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .rl.A { color: var(--ink); border-color: var(--ink); }
+.rl.K { background: var(--bg); color: var(--muted); border-color: var(--muted); }
+.tag.off .nm { color: var(--muted); }
 .rl.N { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
 .rl.P { border-style: dashed; color: var(--muted); }
 .rl.G { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
@@ -132,7 +134,7 @@ const STORES = [['a', 'achieve', 'var(--sa)'], ['l', 'Liss', 'var(--sl)'], ['t',
 const ZN = { a: 'achieve', l: 'Liss', t: 'till', p: '未配属・兼務' };
 const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['N', '新人'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
 const RL = { S: 'S', J: 'Jr', A: 'A', N: '新人', P: 'バイト', G: '委託' };
-const rc = l => ['S', 'J', 'A', 'N', 'P', 'G'].filter(k => 'SJA'.includes(k) || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・');
+const rc = l => ['S', 'J', 'A', 'N', 'P', 'G'].filter(k => 'SJA'.includes(k) || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・') + (l.some(s => s.ikukyu) ? '・育休' + l.filter(s => s.ikukyu).length : '');
 const SEED = ['後藤', 'maki', '丸山', 'みく', 'こはる', 'なな', 'さら', 'かれん', 'ゆり', 'みちる', 'みりあ', 'りな', 'あみ', 'HIROCO', 'たいせい', 'のどか'];
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -152,7 +154,7 @@ function members(p, z) {
   return ids.filter(id => zoneOf(p, id) === z).map(id => S.staff.find(s => s.id === id));
 }
 const cnt = l => `<b>${l.length}</b>名　${rc(l)}`;
-const tagHTML = s => `<div class="tag" data-id="${esc(s.id)}" tabindex="0"><span class="nm">${esc(s.name)}</span>${RL[s.role] ? `<span class="rl ${s.role}">${RL[s.role]}</span>` : ''}</div>`;
+const tagHTML = s => `<div class="tag${s.ikukyu ? ' off' : ''}" data-id="${esc(s.id)}" tabindex="0"><span class="nm">${esc(s.name)}</span>${s.ikukyu ? '<span class="rl K">育休</span>' : ''}${RL[s.role] ? `<span class="rl ${s.role}">${RL[s.role]}</span>` : ''}</div>`;
 
 /* ---- 保存（変更のたびに自動。0.6秒まとめて書く） ---- */
 let db, saveT;
@@ -221,6 +223,8 @@ function drawSheet() {
     <div class="seg">${['a', 'l', 't', 'p'].map(k => `<button type="button" data-act="mv" data-z="${k}" aria-pressed="${k === z}">${k === 'p' ? '未配属' : ZN[k]}</button>`).join('')}</div>
     <div class="sub">役割（全部の案で共通）</div>
     <div class="seg r">${ROLES.map(([k, l]) => `<button type="button" data-act="role" data-r="${k}" aria-pressed="${(s.role || '') === k}">${l}</button>`).join('')}</div>
+    <div class="sub">状態（役割と一緒に選べます）</div>
+    <div class="seg"><button type="button" data-act="ikukyu" aria-pressed="${!!s.ikukyu}">${s.ikukyu ? '育休中 ✓' : '育休'}</button></div>
     <label class="lbl">名前<input class="field" id="nmIn" value="${esc(s.name)}" maxlength="20"></label>
     <div class="row2"><button type="button" class="btn danger" data-act="delStaff">このスタッフを削除</button><button type="button" class="btn primary" data-act="close">閉じる</button></div>
   </div></div>`;
@@ -303,6 +307,7 @@ document.addEventListener('click', async ev => {
       case 'closeBg': if (ev.target === el) closeSheet(); break;
       case 'close': closeSheet(); break;
       case 'mv': moveTo(id, el.dataset.z, null); drawSheet(); break;
+      case 'ikukyu': change(() => { const s = S.staff.find(x => x.id === id); s.ikukyu = !s.ikukyu; }); drawSheet(); break;
       case 'role': change(() => { S.staff.find(x => x.id === id).role = el.dataset.r; }); drawSheet(); break;
       case 'delStaff':
         if (!el.dataset.sure) { el.dataset.sure = 1; el.textContent = 'もう一度押すと削除'; break; }
@@ -323,7 +328,7 @@ document.addEventListener('click', async ev => {
       case 'undo': { const h = hist.pop(); if (!h) break; Object.assign(S, JSON.parse(h)); queueSave(); render(); break; }
       case 'copy': {
         const p = plan();
-        const line = z => { const l = members(p, z); return `${ZN[z]}（${l.length}名${l.length ? `／${rc(l)}` : ''}）\n${l.map(s => s.name).join('、') || '—'}`; };
+        const line = z => { const l = members(p, z); return `${ZN[z]}（${l.length}名${l.length ? `／${rc(l)}` : ''}）\n${l.map(s => s.name + (s.ikukyu ? '（育休）' : '')).join('、') || '—'}`; };
         const txt = `【配属 ${p.name}】\n\n${['a', 'l', 't'].map(line).join('\n\n')}${members(p, 'p').length ? '\n\n' + line('p') : ''}${p.memo ? '\n\nメモ：' + p.memo : ''}`;
         try { await navigator.clipboard.writeText(txt); toast('コピーしました'); } catch (x) { toast('コピーできませんでした'); }
         break;
