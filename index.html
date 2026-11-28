@@ -152,6 +152,7 @@ body.is-dragging { user-select: none; -webkit-user-select: none; }
 a.btn { display: inline-block; text-decoration: none; color: var(--ink); text-align: center; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.danger { color: var(--bad); }
+.btn.warn { color: var(--warn); border-color: var(--warn); font-weight: 700; }
 .btn.small { padding: 6px 12px; font-size: 13px; }
 .btn:disabled { opacity: .45; cursor: default; }
 .empty { padding: 32px 16px; text-align: center; color: var(--muted); }
@@ -654,6 +655,7 @@ function render() {
   if (S.ready.size < 4) { m.innerHTML = notes() + '<div class="empty">在庫データを読み込んでいます</div>'; return; }
   const a = document.activeElement, fid = a && a.id;
   { const lk = saLockStore(); if (lk) { if (S.store !== lk || S.tab !== 'stock' || S.allView || S.pend || S.gotoView) { S.store = lk; S.tab = 'stock'; S.allView = false; S.pend = false; S.gotoView = false; shell(); } S.saOpen = true; m.innerHTML = saLockView(lk); S.dirty = false; return; } }
+  { const rk = recvLockStore(); if (rk) { if (S.store !== rk || S.tab !== 'stock' || S.allView || !S.pend || S.gotoView) { S.store = rk; S.tab = 'stock'; S.allView = false; S.pend = true; S.pendAll = false; S.gotoView = false; shell(); } m.innerHTML = recvLockView(rk); S.dirty = false; return; } }
   m.innerHTML = notes() + copyBanner() + dueBanner() + saDueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock' && $('stock-list')) { $('stock-list').innerHTML = stockList(); fillScan(); }
@@ -737,6 +739,21 @@ function saDueList() {
 /* 店販の処理期限：月〜土の分はその週の日曜0:00、日曜の分は次の水曜19:00。期限を過ぎて残っていたら、オーナー以外は処理するまでほかの画面を使えない */
 function saLockAt(date) { const d = saDate(date); if (d.getDay() === 0) { d.setDate(d.getDate() + 3); d.setHours(19, 0, 0, 0); } else { d.setDate(d.getDate() + 7 - d.getDay()); } return d.getTime(); }
 const saLockRows = st => saRows(st).filter(r => r.left > 0 && Date.now() >= saLockAt(r.date));
+/* ---- 日曜16:00の入荷待ち確認：それより前の発注がまだ入荷待ちなら、「入荷」か「まだ届いていない」を押すまでオーナー以外は使えない ---- */
+function recvLockStart() { const d = new Date(); d.setHours(16, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 7); return d.getTime(); }
+const recvKey = () => saYmd(new Date(recvLockStart()));
+const recvNeeds = o => o.status === 'ordered' && o.store !== 'tonari' && num(o.orderedAt) < recvLockStart() && !(o.notYet || {})[recvKey()] && (o.lines || []).some(l => leftOf(l) > 0);
+const recvLockOrders = st => S.orders.filter(o => o.store === st && recvNeeds(o));
+function recvLockStore() {
+  if (!window.WHO || !WHO.me || WHO.isOwner() || S.readOnly || S.ready.size < 4) return '';
+  const L = DUE_STORES.filter(st => recvLockOrders(st).length); if (!L.length) return '';
+  const mine = myStore(); if (mine) return L.includes(mine) ? mine : '';
+  return L.includes(S.store) ? S.store : L[0];
+}
+function recvLockView(st) {
+  const L = recvLockOrders(st).sort((a, b) => num(a.orderedAt) - num(b.orderedAt)); (S.pOpen ||= new Set()); L.forEach(o => S.pOpen.add(o.id));
+  return `<section class="due sa-due"><div class="due-h">🔒 入荷待ちを確認してください（${esc(storeOf(st).short)}）</div><div class="due-b">日曜16:00の時点で、まだ入荷待ちの発注があります。発注ごとに、届いたものは「入荷」（まとめて入荷）、届いていなければ「まだ届いていない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b>（残り${L.length}件）</div></section>${lockBar()}<div class="list">${L.map(pendCard).join('')}</div>`;
+}
 function saLockStore() {
   if (!window.WHO || !WHO.me || WHO.isOwner() || S.readOnly || !S.saDays) return '';
   const L = saDueList0(); if (!L.length) return '';
@@ -1671,6 +1688,7 @@ function pendCard(o) {
     if (S.confirm === uKey) ctl = `<span class="sub">直前の入荷を取り消して、在庫から引きますか？</span><button type="button" class="btn small danger" id="u2-${o.id}" data-act="undoRecv" data-id="${o.id}">入荷を取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button>`;
     else if (S.confirm === cKey) ctl = `<button type="button" class="btn small danger" id="c2-${o.id}" data-act="cancelYes" data-id="${o.id}">発注を取り消す</button><button type="button" class="btn small" data-act="confirmNo">戻る</button>`;
     else ctl = (open ? `<button type="button" class="btn small primary" id="rc-${o.id}" data-act="receive" data-id="${o.id}">まとめて入荷</button>` : '')
+      + (open && recvNeeds(o) ? `<button type="button" class="btn small warn" data-act="notYet" data-id="${o.id}">まだ届いていない</button>` : '')
       + (hasR ? `<button type="button" class="btn small" id="u1-${o.id}" data-act="confirm" data-id="${uKey}">入荷を取り消す</button>` : '')
       + (open && !hasR ? `<button type="button" class="btn small" id="c1-${o.id}" data-act="confirm" data-id="${cKey}">発注取消</button>` : '');
   }
@@ -1986,9 +2004,9 @@ document.addEventListener('click', async ev => {
   if (await WHO.handle(act, b)) return;
   switch (act) {
     case 'allView': S.allView = true; S.tab = 'stock'; S.cat = ''; S.big = ''; render(); window.scrollTo(0, 0); break;
-    case 'store': if (saLockStore() && id !== saLockStore()) { toast('先に店販の販売分を処理してください'); break; } S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
+    case 'store': if (saLockStore() && id !== saLockStore()) { toast('先に店販の販売分を処理してください'); break; } if (recvLockStore() && id !== recvLockStore()) { toast('先に入荷待ちを確認してください'); break; } S.allView = false; S.store = id; S.confirm = ''; S.unlocked = false; try { localStorage.setItem('achieve-store', id); } catch (e) {} render(); break;
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
-    case 'tab': if (saLockStore() && id !== 'stock') { toast('先に店販の販売分を処理してください'); break; } S.tab = id; S.pend = false; S.gotoView = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
+    case 'tab': if (saLockStore() && id !== 'stock') { toast('先に店販の販売分を処理してください'); break; } if (recvLockStore()) { toast('先に入荷待ちを確認してください'); break; } S.tab = id; S.pend = false; S.gotoView = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
     case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
@@ -2118,8 +2136,10 @@ document.addEventListener('click', async ev => {
     case 'recvLine': { const i = Number(b.dataset.i), el = $(`pq-${id}-${i}`), k = id + ':' + i; const v = S.pq && S.pq[k] !== undefined ? S.pq[k] : el ? num(el.value) : 0; receive(id, { [i]: v }); break; }
     case 'undoRecv': $('toast').hidden = true; undoReceive(id); break;
     case 'pendOpen': S.pend = true; S.confirm = ''; render(); window.scrollTo(0, 0); break;
-    case 'pendClose': S.pend = false; S.confirm = ''; render(); window.scrollTo(0, 0); break;
-    case 'pendAll': S.pendAll = !S.pendAll; render(); break;
+    case 'notYet': { if (b.disabled) break; b.disabled = true; const me = WHO.me || {};
+      try { await S.db.doc('orders/' + id).update({ ['notYet.' + recvKey()]: { at: Date.now(), by: me.name || '' } }); toast('「まだ届いていない」にしました'); } catch (e) { b.disabled = false; toast('保存できませんでした'); } render(); break; }
+    case 'pendClose': if (recvLockStore()) { toast('先に入荷待ちを確認してください'); break; } S.pend = false; S.confirm = ''; render(); window.scrollTo(0, 0); break;
+    case 'pendAll': if (recvLockStore()) break; S.pendAll = !S.pendAll; render(); break;
     case 'confirm': if (S.editing) readForm(); S.confirm = id; render(); break;
     case 'month': S.monthOff = Math.min(0, (S.monthOff || 0) + Number(id)); render(); break;
     case 'confirmNo': S.confirm = ''; render(); break;
