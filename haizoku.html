@@ -83,6 +83,9 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .rl { flex: none; font: 600 11px/1 var(--font-num); border-radius: 6px; padding: 4px 5px; border: 1px solid var(--line); color: var(--muted); }
 .rl.S { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .rl.A { color: var(--ink); border-color: var(--ink); }
+.rl.P { border-style: dashed; color: var(--muted); }
+.rl.G { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.seg.r { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rl.J { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .tag.lift { opacity: .25; }
 .ghost { position: fixed; z-index: 50; pointer-events: none; box-shadow: 0 10px 28px rgba(0,0,0,.25); transform: rotate(-2deg) scale(1.04); background: var(--surface); }
@@ -126,9 +129,9 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
    データは Firestore の haizoku/main に1つだけ。案（A・B…）ごとに配属先・並び・メモを持つ。 */
 const STORES = [['a', 'achieve', 'var(--sa)'], ['l', 'Liss', 'var(--sl)'], ['t', 'till', 'var(--st)']];
 const ZN = { a: 'achieve', l: 'Liss', t: 'till', p: '未配属・兼務' };
-const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['', '未設定']];
-const RL = { S: 'S', J: 'Jr', A: 'A' };
-const rc = l => ['S', 'J', 'A'].map(k => RL[k] + l.filter(s => s.role === k).length).join('・');
+const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
+const RL = { S: 'S', J: 'Jr', A: 'A', P: 'バイト', G: '委託' };
+const rc = l => ['S', 'J', 'A', 'P', 'G'].filter(k => k !== 'P' && k !== 'G' || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・');
 const SEED = ['後藤', 'maki', '丸山', 'みく', 'こはる', 'なな', 'さら', 'かれん', 'ゆり', 'みちる', 'みりあ', 'りな', 'あみ', 'HIROCO', 'たいせい', 'のどか'];
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -216,7 +219,7 @@ function drawSheet() {
     <div class="sub">配属先（${esc(plan().name)}）</div>
     <div class="seg">${['a', 'l', 't', 'p'].map(k => `<button type="button" data-act="mv" data-z="${k}" aria-pressed="${k === z}">${k === 'p' ? '未配属' : ZN[k]}</button>`).join('')}</div>
     <div class="sub">役割（全部の案で共通）</div>
-    <div class="seg">${ROLES.map(([k, l]) => `<button type="button" data-act="role" data-r="${k}" aria-pressed="${(s.role || '') === k}">${l}</button>`).join('')}</div>
+    <div class="seg r">${ROLES.map(([k, l]) => `<button type="button" data-act="role" data-r="${k}" aria-pressed="${(s.role || '') === k}">${l}</button>`).join('')}</div>
     <label class="lbl">名前<input class="field" id="nmIn" value="${esc(s.name)}" maxlength="20"></label>
     <div class="row2"><button type="button" class="btn danger" data-act="delStaff">このスタッフを削除</button><button type="button" class="btn primary" data-act="close">閉じる</button></div>
   </div></div>`;
