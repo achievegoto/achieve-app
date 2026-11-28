@@ -86,6 +86,7 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .rl.K { background: var(--bg); color: var(--muted); border-color: var(--muted); }
 .tag.off .nm { color: var(--muted); }
 .rl.N { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.rl.R { background: var(--accent-soft); color: var(--muted); border-color: var(--line); }
 .rl.P { border-style: dashed; color: var(--muted); }
 .rl.G { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 .seg.r { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -132,9 +133,9 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
    データは Firestore の haizoku/main に1つだけ。案（A・B…）ごとに配属先・並び・メモを持つ。 */
 const STORES = [['a', 'achieve', 'var(--sa)'], ['l', 'Liss', 'var(--sl)'], ['t', 'till', 'var(--st)']];
 const ZN = { a: 'achieve', l: 'Liss', t: 'till', p: '未配属・兼務' };
-const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['N', '新人'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
-const RL = { S: 'S', J: 'Jr', A: 'A', N: '新人', P: 'バイト', G: '委託' };
-const rc = l => ['S', 'J', 'A', 'N', 'P', 'G'].filter(k => 'SJA'.includes(k) || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・') + (l.some(s => s.ikukyu) ? '・育休' + l.filter(s => s.ikukyu).length : '');
+const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['N', '新人'], ['R', 'レセプション'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
+const RL = { S: 'S', J: 'Jr', A: 'A', N: '新人', R: 'レセ', P: 'バイト', G: '委託' };
+const rc = l => ['S', 'J', 'A', 'N', 'R', 'P', 'G'].filter(k => 'SJA'.includes(k) || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・') + (l.some(s => s.ikukyu) ? '・育休' + l.filter(s => s.ikukyu).length : '');
 const SEED = ['後藤', 'maki', '丸山', 'みく', 'こはる', 'なな', 'さら', 'かれん', 'ゆり', 'みちる', 'みりあ', 'りな', 'あみ', 'HIROCO', 'たいせい', 'のどか'];
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
