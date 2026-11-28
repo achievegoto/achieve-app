@@ -752,7 +752,7 @@ function recvLockStore() {
 }
 function recvLockView(st) {
   const L = recvLockOrders(st).sort((a, b) => num(a.orderedAt) - num(b.orderedAt)); (S.pOpen ||= new Set()); L.forEach(o => S.pOpen.add(o.id));
-  return `<section class="due sa-due"><div class="due-h">🔒 入荷待ちを確認してください（${esc(storeOf(st).short)}）</div><div class="due-b">日曜16:00の時点で、まだ入荷待ちの発注があります。発注ごとに、届いたものは「入荷」（まとめて入荷）、届いていなければ「まだ届いていない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b>（残り${L.length}件）</div></section>${lockBar()}<div class="list">${L.map(pendCard).join('')}</div>`;
+  return `<section class="due sa-due"><div class="due-h">🔒 入荷待ちを確認してください（${esc(storeOf(st).short)}）</div><div class="due-b">日曜16:00の時点で、まだ入荷待ちの発注があります。発注ごとに、届いたものは「入荷」（まとめて入荷）を押すと在庫に足されます。届いていなければ「まだ届いていない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b>（残り${L.length}件）</div></section>${lockBar()}<div class="list">${L.map(pendCard).join('')}</div>`;
 }
 function saLockStore() {
   if (!window.WHO || !WHO.me || WHO.isOwner() || S.readOnly || !S.saDays) return '';
@@ -1663,7 +1663,7 @@ function viewPending() {
   const list = S.orders.filter(o => o.status === 'ordered' && (all || o.store === S.store)).sort((a, b) => num(a.orderedAt) - num(b.orderedAt));
   const recent = S.orders.filter(o => o.status === 'received' && (o.receipts || []).length && (all || o.store === S.store)).sort((a, b) => lastRcpt(b).at - lastRcpt(a).at).slice(0, 5);
   return `<section class="card"><div class="card-head"><h3>入荷待ち（${all ? '全店' : esc(storeOf(S.store).short)}）${list.length}件</h3><button type="button" class="btn small" id="pend-all" data-act="pendAll">${all ? 'この店舗だけ' : '全店舗'}</button></div>
-    <div class="sub">古い順。届いたら「まとめて入荷」か、商品ごとに数を入れて「入荷」。7日以上たっているものは赤字です。</div>
+    <div class="sub">古い順。届いたら「まとめて入荷」か、商品ごとに数を入れて「入荷」。<b>「入荷」を押すと、その数がこの店の在庫に足されます</b>（在庫タブで数を足す必要はありません）。7日以上たっているものは赤字です。</div>
     <div class="actions"><button type="button" class="btn small" id="pend-close" data-act="pendClose">‹ 在庫にもどる</button></div></section>
     ${all ? '' : inboundCard(S.store)}
     ${list.length ? `<div class="list">${list.map(pendCard).join('')}</div>` : '<div class="card"><div class="empty">入荷待ちの発注はありません</div></div>'}
