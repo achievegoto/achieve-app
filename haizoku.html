@@ -83,6 +83,7 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
 .rl { flex: none; font: 600 11px/1 var(--font-num); border-radius: 6px; padding: 4px 5px; border: 1px solid var(--line); color: var(--muted); }
 .rl.S { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .rl.A { color: var(--ink); border-color: var(--ink); }
+.rl.N { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
 .rl.P { border-style: dashed; color: var(--muted); }
 .rl.G { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 .seg.r { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -129,9 +130,9 @@ label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; co
    データは Firestore の haizoku/main に1つだけ。案（A・B…）ごとに配属先・並び・メモを持つ。 */
 const STORES = [['a', 'achieve', 'var(--sa)'], ['l', 'Liss', 'var(--sl)'], ['t', 'till', 'var(--st)']];
 const ZN = { a: 'achieve', l: 'Liss', t: 'till', p: '未配属・兼務' };
-const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
-const RL = { S: 'S', J: 'Jr', A: 'A', P: 'バイト', G: '委託' };
-const rc = l => ['S', 'J', 'A', 'P', 'G'].filter(k => k !== 'P' && k !== 'G' || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・');
+const ROLES = [['S', 'スタイリスト'], ['J', 'Jr'], ['A', 'アシスタント'], ['N', '新人'], ['P', 'アルバイト'], ['G', '業務委託'], ['', '未設定']];
+const RL = { S: 'S', J: 'Jr', A: 'A', N: '新人', P: 'バイト', G: '委託' };
+const rc = l => ['S', 'J', 'A', 'N', 'P', 'G'].filter(k => 'SJA'.includes(k) || l.some(s => s.role === k)).map(k => RL[k] + l.filter(s => s.role === k).length).join('・');
 const SEED = ['後藤', 'maki', '丸山', 'みく', 'こはる', 'なな', 'さら', 'かれん', 'ゆり', 'みちる', 'みりあ', 'りな', 'あみ', 'HIROCO', 'たいせい', 'のどか'];
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
