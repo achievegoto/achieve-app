@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2e3d52">
+<link rel="apple-touch-icon" href="haizoku-icon.png?v=1">
+<link rel="icon" href="haizoku-icon.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="配属">
+<title>achieve 配属</title>
+<link rel="manifest" href="haizoku.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=Jost:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f4f4f7; --surface: #ffffff; --line: #e2e1e9; --ink: #1d1b26; --muted: #6a6778;
+  --accent: #2e3d52; --accent-ink: #ffffff; --accent-soft: #e6ebf2; --bad: #b3261e; --bad-soft: #fbe9e7; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --sa: #2a2a2a; --sl: #c0627a; --st: #4a6a8a; --sp: #9a958e;
+  --font-body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-num: "Jost", "IBM Plex Sans JP", "Hiragino Sans", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15141b; --surface: #1f1d28; --line: #33303f; --ink: #efedf5; --muted: #a29eb2;
+  --accent: #b9cbe2; --accent-ink: #141b25; --accent-soft: #26303d; --bad: #ff9b90; --bad-soft: #3f2220; --warn: #eec26e; --warn-soft: #3a2e16;
+  --sa: #d9d6d0; --sl: #e08ba0; --st: #86a9cc; --sp: #77736d; color-scheme: dark } }
+* { box-sizing: border-box; min-width: 0 }
+html { padding: env(safe-area-inset-top, 0px) 0 0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; -webkit-tap-highlight-color: transparent; overflow-x: clip; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1100px; margin-inline: auto; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 12px; }
+.brand { font-family: var(--font-num); font-size: 20px; letter-spacing: .08em; display: flex; align-items: baseline; gap: 10px; }
+.brand small { font-family: var(--font-body); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+.who { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+.who small { font-size: 10px; color: var(--muted); margin-left: 4px; } .who .sw { font-size: 11px; color: var(--accent); margin-left: 6px; }
+main { padding-block: 14px calc(60px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { margin: 0; font-size: 16px; }
+.field { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
+textarea.field { min-height: 72px; resize: vertical; }
+label.lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 99px; font-size: 13px; color: var(--muted); }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group h2 { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 0; }
+.sub { font-size: 12px; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 9px 14px; border-radius: 8px; font-weight: 500; min-height: 40px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 6px 12px; font-size: 13px; min-height: 36px; }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: default; }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+.note { padding: 10px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.err { color: var(--bad); font-size: 13px; }
+.login { max-width: 420px; margin: 24px auto; }
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; max-width: calc(100% - 32px); }
+
+/* 配属ボード */
+.bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bar .sp { flex: 1; }
+.sync { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.plans { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.plans button { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 6px 14px; font-size: 13px; min-height: 36px; }
+.plans button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.col { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 12px; padding: 10px 7px 12px; min-height: 260px; transition: background .15s; }
+.col h2 { font-family: var(--font-num); font-size: 17px; font-weight: 600; margin: 0 2px; color: var(--c); line-height: 1.2; }
+.cnt { font-size: 11px; color: var(--muted); margin: 2px 2px 8px; white-space: nowrap; }
+.cnt b { font-family: var(--font-num); font-size: 15px; color: var(--ink); font-weight: 500; margin-right: 1px; }
+.lst { display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+.over { background: color-mix(in srgb, var(--c) 10%, var(--surface)); }
+.tag { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; min-height: 44px; padding: 6px 8px; font-weight: 500;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; touch-action: manipulation; }
+.tag .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl { flex: none; font: 600 11px/1 var(--font-num); border-radius: 6px; padding: 4px 5px; border: 1px solid var(--line); color: var(--muted); }
+.rl.S { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.rl.A { color: var(--ink); border-color: var(--ink); }
+.tag.lift { opacity: .25; }
+.ghost { position: fixed; z-index: 50; pointer-events: none; box-shadow: 0 10px 28px rgba(0,0,0,.25); transform: rotate(-2deg) scale(1.04); background: var(--surface); }
+.mark { height: 3px; border-radius: 2px; background: var(--c); }
+.pool { --c: var(--sp); background: color-mix(in srgb, var(--line) 45%, var(--bg)); border: 1px dashed var(--line); border-radius: 12px; padding: 10px; transition: background .15s; }
+.pool .ph { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pool h2 { font-size: 15px; margin: 0; }
+.pool .lst { flex-direction: row; flex-wrap: wrap; }
+.pool .tag { background: var(--surface); }
+.pool .mark { width: 3px; height: 44px; }
+.hint { font-size: 12px; color: var(--muted); }
+.sheet-bg { position: fixed; inset: 0; z-index: 30; background: rgba(10, 8, 20, .45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.sheet h3 { margin: 0; font-size: 18px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; min-height: 44px; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.row2 { display: flex; gap: 8px; } .row2 .btn { flex: 1; min-height: 44px; }
+@media (max-width: 600px) {
+  .board { gap: 5px; } .col { padding: 8px 4px 10px; min-height: 220px; } .col h2 { font-size: 15px; }
+  .tag { font-size: 14px; padding: 6px 5px; gap: 3px; } .rl { font-size: 10px; padding: 3px 4px; } .cnt { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header><div class="wrap head">
+  <div class="brand">achieve<small>配属</small></div>
+  <button type="button" class="who" id="who" data-act="whoSwitch" hidden></button>
+</div></header>
+<main class="wrap" id="main"><div class="empty">読み込んでいます</div></main>
+<div id="sheet"></div>
+<div id="toast" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="who.js?v=3"></script>
+<script>
+/* achieve 配属：3店舗のスタッフ配属を、名札を動かしながら考える（管理者・オーナー用）
+   データは Firestore の haizoku/main に1つだけ。案（A・B…）ごとに配属先・並び・メモを持つ。 */
+const STORES = [['a', 'achieve', 'var(--sa)'], ['l', 'Liss', 'var(--sl)'], ['t', 'till', 'var(--st)']];
+const ZN = { a: 'achieve', l: 'Liss', t: 'till', p: '未配属・兼務' };
+const ROLES = [['S', 'スタイリスト'], ['A', 'アシスタント'], ['', '未設定']];
+const SEED = ['後藤', 'maki', '丸山', 'みく', 'こはる', 'なな', 'さら', 'かれん', 'ゆり', 'みちる', 'みりあ', 'りな', 'あみ', 'HIROCO', 'たいせい', 'のどか'];
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+let toastT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2200); }
+
+const S = { user: undefined, ready: false, err: '', staff: [], plans: [], cur: '', saving: false, pending: false, renaming: false, sheet: '' };
+try { S.cur = localStorage.getItem('achieve.haizoku.cur') || ''; } catch (x) {}
+let hist = [];
+const plan = () => S.plans.find(p => p.id === S.cur) || S.plans[0];
+const zoneOf = (p, id) => (ZN[p.assign[id]] ? p.assign[id] : 'p');
+function members(p, z) {
+  const ids = (p.order || []).filter(id => S.staff.some(s => s.id === id));
+  S.staff.forEach(s => { if (!ids.includes(s.id)) ids.push(s.id); });
+  p.order = ids;
+  return ids.filter(id => zoneOf(p, id) === z).map(id => S.staff.find(s => s.id === id));
+}
+const cnt = l => `<b>${l.length}</b>名　S${l.filter(s => s.role === 'S').length}・A${l.filter(s => s.role === 'A').length}`;
+const tagHTML = s => `<div class="tag" data-id="${esc(s.id)}" tabindex="0"><span class="nm">${esc(s.name)}</span>${s.role ? `<span class="rl ${s.role === 'S' ? 'S' : 'A'}">${s.role === 'S' ? 'S' : 'A'}</span>` : ''}</div>`;
+
+/* ---- 保存（変更のたびに自動。0.6秒まとめて書く） ---- */
+let db, saveT;
+function change(fn) {
+  hist.push(JSON.stringify({ staff: S.staff, plans: S.plans })); if (hist.length > 60) hist.shift();
+  fn(); queueSave(); render();
+}
+function queueSave() { S.pending = true; clearTimeout(saveT); saveT = setTimeout(save, 600); syncLabel(); }
+async function save() {
+  if (dr) { saveT = setTimeout(save, 400); return; }
+  S.saving = true; S.pending = false; syncLabel();
+  try { await db.doc('haizoku/main').set({ staff: S.staff, plans: S.plans, at: Date.now(), by: WHO.me ? WHO.me.name : '' }); }
+  catch (e) { toast('保存できませんでした：' + e.message); S.pending = true; }
+  S.saving = false; syncLabel();
+}
+function syncLabel() { const el = $('sync'); if (el) el.textContent = S.pending || S.saving ? '保存中…' : '保存済み'; }
+
+/* ---- 表示 ---- */
+function render() {
+  const m = $('main');
+  $('who').hidden = !S.user || !WHO.me;
+  if (S.user === undefined) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
+  if (!S.user) { m.innerHTML = loginView(); return; }
+  const g = WHO.gate(); if (g) { m.innerHTML = g; return; }
+  $('who').innerHTML = WHO.bar() + ' <span class="sw">切替</span>';
+  if (!WHO.isAdmin()) { m.innerHTML = '<div class="card"><h3>管理者専用です</h3><div class="sub">配属の検討は、管理者とオーナーだけが使えます。</div></div>'; return; }
+  if (S.err) { m.innerHTML = `<div class="card"><div class="err">${esc(S.err)}</div></div>`; return; }
+  if (!S.ready) { m.innerHTML = '<div class="empty">読み込んでいます</div>'; return; }
+  const p = plan(); S.cur = p.id;
+  const pool = members(p, 'p');
+  const keepMemo = document.activeElement && document.activeElement.id === 'memo' ? document.activeElement.value : null;
+  m.innerHTML = `
+    <div class="bar">
+      <button type="button" class="btn small" data-act="undo" ${hist.length ? '' : 'disabled'}>元に戻す</button>
+      <button type="button" class="btn small" data-act="copy">テキストでコピー</button>
+      <span class="sp"></span><span class="sync" id="sync"></span>
+    </div>
+    <div class="plans">${S.renaming
+      ? `<input class="field" id="pname" value="${esc(p.name)}" maxlength="20" style="max-width:200px;padding:6px 10px"><button type="button" data-act="renameOk" aria-pressed="true">決定</button>`
+      : S.plans.map(x => `<button type="button" data-act="plan" data-id="${esc(x.id)}" aria-pressed="${x.id === p.id}">${esc(x.name)}</button>`).join('')
+        + `<button type="button" data-act="dup">＋ 案を複製</button><button type="button" data-act="rename">名前変更</button>${S.plans.length > 1 ? '<button type="button" data-act="delPlan">この案を削除</button>' : ''}`}</div>
+    <div class="board">${STORES.map(([z, n, c]) => { const l = members(p, z); return `<section class="col" data-z="${z}" style="--c:${c}"><h2>${n}</h2><div class="cnt">${cnt(l)}</div><div class="lst">${l.map(tagHTML).join('')}</div></section>`; }).join('')}</div>
+    <section class="pool" data-z="p"><div class="ph"><div><h2>未配属・兼務</h2><div class="cnt" style="margin:0">${pool.length}名</div></div><button type="button" class="btn small" data-act="addStaff">＋ スタッフ</button></div>
+      <div class="lst">${pool.map(tagHTML).join('') || '<div class="sub" style="padding:6px">全員配属済み</div>'}</div></section>
+    <label class="lbl">この案のメモ<textarea class="field" id="memo" placeholder="例：till の土日が手薄。maki を週2で応援に回す案">${esc(keepMemo ?? p.memo ?? '')}</textarea></label>
+    <div class="hint">名札を長押し（PCはドラッグ）して別の店舗へ。タップで役割・配属先・名前を変えられます。変更は自動で保存され、管理者どうしで共有されます。</div>`;
+  if (keepMemo !== null) { const t = $('memo'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+  if (S.renaming) setTimeout(() => $('pname') && $('pname').focus(), 30);
+  syncLabel();
+}
+function loginView() {
+  return `<form class="card login" id="login-form"><h3>ログイン</h3><div class="sub">在庫アプリと同じスタッフ用アカウントでログインします。</div>
+    <label class="lbl">メールアドレス<input class="field" id="lg-email" type="email" autocomplete="username" required></label>
+    <label class="lbl">パスワード<input class="field" id="lg-pass" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lg-err"></div><button class="btn primary" id="lg-go">ログイン</button></form>`;
+}
+
+/* ---- シート（タップした人） ---- */
+function openSheet(id) { S.sheet = id; drawSheet(); }
+function drawSheet() {
+  const s = S.staff.find(x => x.id === S.sheet); if (!s) { closeSheet(); return; }
+  const z = zoneOf(plan(), s.id);
+  $('sheet').innerHTML = `<div class="sheet-bg" data-act="closeBg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">
+    <h3 id="shT">${esc(s.name)}</h3>
+    <div class="sub">配属先（${esc(plan().name)}）</div>
+    <div class="seg">${['a', 'l', 't', 'p'].map(k => `<button type="button" data-act="mv" data-z="${k}" aria-pressed="${k === z}">${k === 'p' ? '未配属' : ZN[k]}</button>`).join('')}</div>
+    <div class="sub">役割（全部の案で共通）</div>
+    <div class="seg">${ROLES.map(([k, l]) => `<button type="button" data-act="role" data-r="${k}" aria-pressed="${(s.role || '') === k}">${l}</button>`).join('')}</div>
+    <label class="lbl">名前<input class="field" id="nmIn" value="${esc(s.name)}" maxlength="20"></label>
+    <div class="row2"><button type="button" class="btn danger" data-act="delStaff">このスタッフを削除</button><button type="button" class="btn primary" data-act="close">閉じる</button></div>
+  </div></div>`;
+}
+function closeSheet() {
+  const s = S.staff.find(x => x.id === S.sheet), inp = $('nmIn');
+  if (s && inp && inp.value.trim() && inp.value.trim() !== s.name) { const v = inp.value.trim(); change(() => { s.name = v; }); }
+  S.sheet = ''; $('sheet').innerHTML = '';
+}
+
+/* ---- 名札を動かす ---- */
+let dr = null;
+function moveTo(id, z, beforeId) {
+  change(() => { const p = plan(); p.assign[id] = z; p.order = p.order.filter(x => x !== id); const i = beforeId ? p.order.indexOf(beforeId) : -1; i < 0 ? p.order.push(id) : p.order.splice(i, 0, id); });
+}
+const zoneAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('[data-z].col, [data-z].pool'); };
+function beforeAt(zEl, x, y) {
+  const row = zEl.classList.contains('pool');
+  for (const c of zEl.querySelectorAll('.tag:not(.lift)')) { const r = c.getBoundingClientRect(); if (row ? (y < r.bottom && x < r.left + r.width / 2) || y < r.top : y < r.top + r.height / 2) return c; }
+  return null;
+}
+function clearMarks() { document.querySelectorAll('.over').forEach(e => e.classList.remove('over')); document.querySelectorAll('.mark').forEach(e => e.remove()); }
+function startDrag() {
+  const r = dr.el.getBoundingClientRect(), g = dr.el.cloneNode(true);
+  g.classList.add('ghost'); g.style.width = r.width + 'px'; g.style.left = r.left + 'px'; g.style.top = r.top + 'px'; document.body.appendChild(g);
+  Object.assign(dr, { g, ox: dr.x - r.left, oy: dr.y - r.top, on: true }); dr.el.classList.add('lift');
+  try { navigator.vibrate && navigator.vibrate(10); } catch (x) {}
+}
+document.addEventListener('pointerdown', e => {
+  const c = e.target.closest('.tag'); if (!c || e.button > 0) return;
+  dr = { el: c, id: c.dataset.id, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', on: false };
+  if (dr.touch) dr.t = setTimeout(() => { if (dr && !dr.on) startDrag(); }, 230);
+});
+document.addEventListener('pointermove', e => {
+  if (!dr) return;
+  if (!dr.on) {
+    if (Math.hypot(e.clientX - dr.x, e.clientY - dr.y) <= 8) return;
+    if (dr.touch) { clearTimeout(dr.t); dr = null; return; }
+    startDrag();
+  }
+  dr.g.style.left = (e.clientX - dr.ox) + 'px'; dr.g.style.top = (e.clientY - dr.oy) + 'px';
+  clearMarks();
+  const z = zoneAt(e.clientX, e.clientY);
+  if (z) { z.classList.add('over'); const b = beforeAt(z, e.clientX, e.clientY), mk = document.createElement('div'), l = z.querySelector('.lst'); mk.className = 'mark'; b ? l.insertBefore(mk, b) : l.appendChild(mk); }
+  if (e.clientY < 80) scrollBy(0, -12); else if (e.clientY > innerHeight - 70) scrollBy(0, 12);
+});
+function endDrag(e, cancel) {
+  if (!dr) return; clearTimeout(dr.t); const d = dr; dr = null;
+  if (!d.on) { if (!cancel) openSheet(d.id); return; }
+  d.g.remove(); clearMarks(); d.el.classList.remove('lift');
+  if (cancel) return;
+  const z = zoneAt(e.clientX, e.clientY); if (!z) return;
+  const b = beforeAt(z, e.clientX, e.clientY), nz = z.dataset.z, p = plan();
+  const bid = b ? b.dataset.id : null, inZone = p.order.filter(x => zoneOf(p, x) === nz), at = inZone.indexOf(d.id);
+  if (at >= 0 && (inZone[at + 1] || null) === bid) return;
+  moveTo(d.id, nz, bid);
+  if (nz !== 'p') toast(`${S.staff.find(s => s.id === d.id).name} → ${ZN[nz]}`);
+}
+document.addEventListener('pointerup', e => endDrag(e, false));
+document.addEventListener('pointercancel', e => endDrag(e, true));
+document.addEventListener('touchmove', e => { if (dr && dr.on) e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.tag')) e.preventDefault(); });
+document.addEventListener('keydown', e => {
+  const c = e.target.closest && e.target.closest('.tag');
+  if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSheet(c.dataset.id); }
+  if (e.key === 'Escape' && S.sheet) closeSheet();
+  if (e.key === 'Enter' && e.target.id === 'pname') { e.preventDefault(); renameOk(); }
+});
+function renameOk() { const v = ($('pname') || {}).value; S.renaming = false; v && v.trim() ? change(() => { plan().name = v.trim(); }) : render(); }
+
+/* ---- ボタン ---- */
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act;
+  try {
+    if (a === 'whoSwitch') { WHO.handle('whoOut', el); return; }
+    if (await WHO.handle(a, el)) return;
+    const id = S.sheet;
+    switch (a) {
+      case 'closeBg': if (ev.target === el) closeSheet(); break;
+      case 'close': closeSheet(); break;
+      case 'mv': moveTo(id, el.dataset.z, null); drawSheet(); break;
+      case 'role': change(() => { S.staff.find(x => x.id === id).role = el.dataset.r; }); drawSheet(); break;
+      case 'delStaff':
+        if (!el.dataset.sure) { el.dataset.sure = 1; el.textContent = 'もう一度押すと削除'; break; }
+        S.sheet = ''; $('sheet').innerHTML = '';
+        change(() => { S.staff = S.staff.filter(x => x.id !== id); S.plans.forEach(p => { delete p.assign[id]; p.order = p.order.filter(x => x !== id); }); });
+        break;
+      case 'plan': S.cur = el.dataset.id; try { localStorage.setItem('achieve.haizoku.cur', S.cur); } catch (x) {} render(); break;
+      case 'dup': change(() => { const n = JSON.parse(JSON.stringify(plan())); n.id = uid(); n.name = '案' + String.fromCharCode(65 + S.plans.length); S.plans.push(n); S.cur = n.id; }); break;
+      case 'rename': S.renaming = true; render(); break;
+      case 'renameOk': renameOk(); break;
+      case 'delPlan':
+        if (!el.dataset.sure) { el.dataset.sure = 1; el.textContent = 'もう一度押すと削除'; break; }
+        change(() => { S.plans = S.plans.filter(p => p.id !== S.cur); S.cur = S.plans[0].id; }); break;
+      case 'addStaff': {
+        const s = { id: uid(), name: '新しいスタッフ', role: '' };
+        change(() => { S.staff.push(s); plan().order.push(s.id); }); openSheet(s.id); setTimeout(() => { const i = $('nmIn'); i && i.select(); }, 50); break;
+      }
+      case 'undo': { const h = hist.pop(); if (!h) break; Object.assign(S, JSON.parse(h)); queueSave(); render(); break; }
+      case 'copy': {
+        const p = plan();
+        const line = z => { const l = members(p, z); return `${ZN[z]}（${l.length}名${l.length ? `／S${l.filter(s => s.role === 'S').length}・A${l.filter(s => s.role === 'A').length}` : ''}）\n${l.map(s => s.name).join('、') || '—'}`; };
+        const txt = `【配属 ${p.name}】\n\n${['a', 'l', 't'].map(line).join('\n\n')}${members(p, 'p').length ? '\n\n' + line('p') : ''}${p.memo ? '\n\nメモ：' + p.memo : ''}`;
+        try { await navigator.clipboard.writeText(txt); toast('コピーしました'); } catch (x) { toast('コピーできませんでした'); }
+        break;
+      }
+    }
+  } catch (e) { toast('エラー：' + e.message); }
+});
+let memoT;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'memo') return;
+  plan().memo = e.target.value; S.pending = true; syncLabel(); clearTimeout(memoT); memoT = setTimeout(queueSave, 500);
+});
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'login-form') return; ev.preventDefault();
+  try { await firebase.auth().signInWithEmailAndPassword($('lg-email').value.trim(), $('lg-pass').value); } catch (e) { $('lg-err').textContent = 'メールアドレスかパスワードが違います'; }
+});
+
+/* ---- 起動 ---- */
+let started = false;
+function listen() {
+  WHO.init(db, render);
+  db.doc('haizoku/main').onSnapshot(async d => {
+    if (d.metadata.hasPendingWrites || S.pending || dr) return;
+    if (!d.exists) {
+      S.staff = SEED.map(n => ({ id: uid(), name: n, role: '' }));
+      S.plans = [{ id: uid(), name: '案A', assign: {}, order: S.staff.map(s => s.id), memo: '' }];
+      S.ready = true; render(); if (WHO.me && WHO.isAdmin()) save(); return;
+    }
+    const v = d.data(); S.staff = v.staff || []; S.plans = (v.plans && v.plans.length) ? v.plans : [{ id: uid(), name: '案A', assign: {}, order: [], memo: '' }];
+    S.ready = true;
+    if (document.activeElement && (document.activeElement.id === 'memo' || document.activeElement.id === 'pname')) return;
+    render(); if (S.sheet) drawSheet();
+  }, e => { S.err = e.message; render(); });
+}
+(function init() {
+  if (typeof firebaseConfig === 'undefined' || !window.firebase) { $('main').innerHTML = '<div class="empty">設定ファイル（config.js）が読み込めません。</div>'; return; }
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  firebase.auth().onAuthStateChanged(u => { S.user = u || null; if (u && !started) { started = true; listen(); } render(); });
+})();
+</script>
+</body>
+</html>
