@@ -46,7 +46,15 @@ header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; backg
 .seg button { border: 0; background: transparent; padding: 8px 2px; border-radius: 8px; font-family: var(--font-num); font-size: 13px; line-height: 1.25; color: var(--muted); min-width: 0; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 main { padding-block: 16px 104px; display: flex; flex-direction: column; gap: 16px; }
-.summary { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--muted); }
+.summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 13px; color: var(--muted); }
+.sum-chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 4px 14px 4px 12px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; }
+.sum-chip b { font-family: var(--font-num); font-size: 20px; font-weight: 600; margin: 0 2px 0 6px; } .sum-chip.bad { border-color: var(--bad); color: var(--bad); } .sum-chip.bad b { color: var(--bad); }
+.sum-btn small { display: block; font-size: 10px; font-weight: 500; opacity: .85; margin-left: 8px; }
+.sum-stats { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 20px; } .sum-stats b { font-size: 16px !important; }
+.todo { display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; } .todo-h { font-weight: 800; font-size: 15px; }
+.todo .due { padding: 10px 12px; } .todo .due-st { margin-top: 4px; }
+.todo .due-r { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 10px; padding: 8px 10px; }
+.recv-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 8px 12px; font-size: 13px; } .recv-note span { font-size: 12px; flex-basis: 100%; }
 .summary b { font-family: var(--font-num); font-size: 22px; font-weight: 500; color: var(--ink); margin-left: 6px; font-variant-numeric: tabular-nums; }
 .summary b.alert { color: var(--bad); }
 .sum-btn { border: 0; background: var(--pend); color: var(--pend-ink); padding: 4px 14px 4px 12px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 2px 6px rgba(21,101,216,.35); display: inline-flex; align-items: center; }
@@ -656,7 +664,7 @@ function render() {
   const a = document.activeElement, fid = a && a.id;
   { const lk = saLockStore(); if (lk) { if (S.store !== lk || S.tab !== 'stock' || S.allView || S.pend || S.gotoView) { S.store = lk; S.tab = 'stock'; S.allView = false; S.pend = false; S.gotoView = false; shell(); } S.saOpen = true; m.innerHTML = saLockView(lk); S.dirty = false; return; } }
   { const rk = recvLockStore(); if (rk) { if (S.store !== rk || S.tab !== 'stock' || S.allView || !S.pend || S.gotoView) { S.store = rk; S.tab = 'stock'; S.allView = false; S.pend = true; S.pendAll = false; S.gotoView = false; shell(); } m.innerHTML = recvLockView(rk); S.dirty = false; return; } }
-  m.innerHTML = notes() + copyBanner() + dueBanner() + saDueBanner() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
+  m.innerHTML = notes() + copyBanner() + (() => { const t = dueBanner() + saDueBanner(); return t ? `<div class="todo"><div class="todo-h">📋 やること</div>${t}</div>` : ''; })() + ({ stock: viewStock, order: viewOrder, history: viewHistory, items: viewItems }[S.tab])();
   WHO.badge(shortItems(S.store).length);
   if (S.tab === 'stock' && $('stock-list')) { $('stock-list').innerHTML = stockList(); fillScan(); }
   if (fid && m.contains(document.getElementById(fid)) === true) document.getElementById(fid).focus();
@@ -882,7 +890,7 @@ function saCard() {
   const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーからの最終取り込み：${saTs(gotAt)}</span>` : '';
   const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
   return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sa-tog">${open ? '▴ 閉じる' : '▾ 開く'}</span></summary>
-    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。前の週の分は、処理済みなら水曜19:00に消えます（未処理の分は処理するまで残ります）。反映した分は記録されるので、何度開いても二重には引きません。</div>
+    <div class="sub">サロンアンサーで売れた店販です。商品ごとに「反映」で在庫から引きます（何度押しても二重には引きません）。在庫にない商品は「今回は反映しない」。</div>
     <div class="chips sa-chips">${wkChips}</div>
     <div class="chips sa-chips"><button type="button" class="chip" data-act="saDay" data-id="" aria-pressed="${!S.saDay}">${wk === thisWk ? '今週' : 'この週'}まとめ</button>${dayChips}</div>
     ${gotTxt ? `<div class="sub">${gotTxt}</div>` : ''}
@@ -988,7 +996,7 @@ function scanOptions() {
   scanOptsN = S.items.length; return scanOpts;
 }
 const MODE = {
-  receive: { sg: '＋', cls: 'plus', t: '入荷', d: '届いた分を在庫に足します' },
+  receive: { sg: '＋', cls: 'plus', t: '発注外を足す', d: '発注していない商品（サンプル・持ち込みなど）を在庫に足します' },
   use: { sg: '−', cls: 'minus', t: '使った分を引く', d: '使った・出した分を在庫から引きます' },
   count: { sg: '＝', cls: 'eq', t: '棚卸し', d: '数えた数で在庫を上書きします' },
   link: { sg: '▥', cls: 'link', t: 'バーコード登録だけ', d: '在庫の数は変わりません' },
@@ -1005,6 +1013,7 @@ function opsCard() {
   const b = m => `<button type="button" class="opb ${MODE[m].cls}" data-act="opPick" data-id="${m}" aria-pressed="${S.opOpen === m}"><span class="sg ${MODE[m].cls}">${MODE[m].sg}</span>${m === 'use' ? '使った' : MODE[m].t}</button>`;
   const o = S.opOpen, photo = { receive: '📷 納品書', use: '📷 写真', count: '📷 棚の写真' }[o];
   return `<div class="opsbar">${b('receive')}${b('use')}${b('count')}<button type="button" class="opb link" data-act="barStart" data-id="link" title="バーコードを商品に登録するだけ（在庫は変わりません）">▥ 登録</button></div>
+  ${o === 'receive' ? (() => { const n = S.orders.filter(x => x.store === S.store && x.status === 'ordered').length; return `<div class="recv-note"><b>発注した商品は、ここではなく「入荷待ち」から入荷してください。</b><span>ここで足すと入荷待ちが残ったままになり、在庫が二重に増えます。</span>${n ? `<button type="button" class="btn small primary" data-act="pendOpen">入荷待ちを開く（${n}件）</button>` : ''}</div>`; })() : ''}
   ${o ? `<div class="opsub"><span class="sub">${MODE[o].d}</span><div class="obtns"><button type="button" class="btn small" data-act="scanStart" data-id="${o}">${photo}</button><button type="button" class="btn small" data-act="barStart" data-id="${o}">▥ バーコード</button></div></div>` : ''}`;
 }
 function scanCard() {
@@ -1110,7 +1119,7 @@ function barCard() {
   const busy = sc.guessing ? '新しいバーコードの商品名を確認しています' : 'バーコードを読んでいます';
   return `<section class="card">
     ${modeHead(sc.mode, '（バーコード）', link ? '' : st)}
-    <div class="chips">${chip('receive', '＋ 入荷')}${chip('use', '− 使った')}${chip('count', '＝ 棚卸し')}${chip('link', '登録だけ')}</div>
+    <div class="chips">${chip('receive', '＋ 発注外を足す')}${chip('use', '− 使った')}${chip('count', '＝ 棚卸し')}${chip('link', '登録だけ')}</div>
     <div class="sub">${help}</div>
     <button type="button" class="btn primary" id="bar-live" data-act="liveStart" style="width:100%" ${live ? 'hidden' : ''}>📷 カメラをかざして連続で読む</button>
     <div class="scan-btns"><button type="button" class="btn" id="bar-one" data-act="barShot" data-id="one" ${sc.reading ? 'disabled' : ''}>📷 1個ずつ撮る</button><button type="button" class="btn" id="bar-many" data-act="barShot" data-id="many" ${sc.reading ? 'disabled' : ''}>📷 まとめて撮る</button></div>
@@ -1288,11 +1297,10 @@ function viewStock() {
   const shorts = shortItems(S.store).length;
   const ordering = S.orders.filter(o => o.store === S.store && o.status === 'ordered').length;
   return `<div class="summary">
-    <span>要発注<b class="${shorts ? 'alert' : ''}">${shorts}</b> 点</span>
-    <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b> 件 ›</button>${(() => { const n = S.store === 'tonari' ? 0 : inboundFor(S.store).filter(x => !x.l.arrived).length; return n ? `<button type="button" class="lnk inb-hint" data-act="pendOpen">📦 ほかの店の分 ${n}品もここに届きます</button>` : ''; })()}
+    <button type="button" class="sum-chip${shorts ? ' bad' : ''}" data-act="tab" data-id="order">要発注<b>${shorts}</b>点 ›</button>
+    <button type="button" class="sum-btn" id="pend-open" data-act="pendOpen">入荷待ち<b>${ordering}</b>件 ›<small>届いたらここから入荷</small></button>${(() => { const n = S.store === 'tonari' ? 0 : inboundFor(S.store).filter(x => !x.l.arrived).length; return n ? `<button type="button" class="lnk inb-hint" data-act="pendOpen">📦 ほかの店の分 ${n}品もここに届きます</button>` : ''; })()}
     ${(() => { const n = new Set((S.holds || []).filter(h => h.store === S.store).map(h => h.itemId)).size; return n ? `<button type="button" class="sum-btn" data-act="onlyHold" aria-pressed="${!!S.onlyHold}">取り置き<b>${n}</b> 品 ${S.onlyHold ? '✕' : '›'}</button>` : ''; })()}
-    <span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span>
-    <span>在庫金額<b>${yen(stockValue(S.store))}</b></span>
+    <div class="sum-stats"><span>今月の発注額<b>${yen(monthTotal(S.store))}</b></span><span>在庫金額<b>${yen(stockValue(S.store))}</b></span></div>
   </div>
   ${holdAskBox()}
   ${saCard()}
@@ -2008,7 +2016,7 @@ document.addEventListener('click', async ev => {
     case 'pickAdd': { const it = S.items.find(i => i.id === id); bumpDraft(b.dataset.did, id, 1); toast((it ? it.name : '商品') + 'を発注に追加しました'); render(); break; }
     case 'tab': if (saLockStore() && id !== 'stock') { toast('先に店販の販売分を処理してください'); break; } if (recvLockStore()) { toast('先に入荷待ちを確認してください'); break; } S.tab = id; S.pend = false; S.gotoView = false; if (id !== 'stock') S.allView = false; S.unlocked = false; S.editing = null; S.confirm = ''; S.formErr = ''; render(); window.scrollTo(0, 0); break;
     case 'lock': if (!S.unlocked && !confirmOther()) break; S.unlocked = !S.unlocked; armLock(); render(); break;
-    case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); render(); break;
+    case 'inc': armLock(); setQty(S.store, id, qtyOf(S.store, id) + 1); if (onOrder(S.store, id) > 0 && !(S.incHint ||= new Set()).has(id)) { S.incHint.add(id); toast('この商品は入荷待ちがあります。届いた分は「入荷待ち」から入荷してください'); } render(); break;
     case 'dec': armLock(); setQty(S.store, id, qtyOf(S.store, id) - 1); render(); break;
     case 'onlyShort': S.onlyShort = !S.onlyShort; render(); break;
     case 'cat': { const nb = b.dataset.big || ''; S.cat = S.big === nb && S.cat === id ? '' : id; S.big = nb; render(); break; }
