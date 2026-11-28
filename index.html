@@ -734,25 +734,26 @@ function saDueList() {
   return stores.map(st => { const rs = saRows(st).filter(r => r.left > 0 && r.date < today); if (!rs.length) return null;
     const ds = rs.map(r => r.date).sort(); return { st, n: new Set(rs.map(r => r.c)).size, from: ds[0], to: ds[ds.length - 1], old: saMon(ds[0]) < saMon(today) }; }).filter(Boolean);
 }
-/* 日曜：今週（月〜土）の分、月曜〜水曜19:00：前の週の分（主に日曜分）が残っていたら、オーナー以外は処理するまでほかの画面を使えない */
+/* 店販の処理期限：月〜土の分はその週の日曜0:00、日曜の分は次の水曜19:00。期限を過ぎて残っていたら、オーナー以外は処理するまでほかの画面を使えない */
+function saLockAt(date) { const d = saDate(date); if (d.getDay() === 0) { d.setDate(d.getDate() + 3); d.setHours(19, 0, 0, 0); } else { d.setDate(d.getDate() + 7 - d.getDay()); } return d.getTime(); }
+const saLockRows = st => saRows(st).filter(r => r.left > 0 && Date.now() >= saLockAt(r.date));
 function saLockStore() {
   if (!window.WHO || !WHO.me || WHO.isOwner() || S.readOnly || !S.saDays) return '';
-  const d = new Date(), wd = d.getDay(); if (!(wd === 0 || (wd >= 1 && wd <= 3 && Date.now() < saWedEnd()))) return '';
   const L = saDueList0(); if (!L.length) return '';
   const mine = myStore(); if (mine) return L.some(x => x.st === mine) ? mine : '';
   return L.some(x => x.st === S.store) ? S.store : L[0].st;
 }
-function saDueList0() { const today = saYmd(new Date()), sun = new Date().getDay() === 0; return DUE_STORES.map(st => { const rs = saRows(st).filter(r => r.left > 0 && r.date < today && (sun || saMon(r.date) < saMon(today))); return rs.length ? { st } : null; }).filter(Boolean); }
+function saDueList0() { return DUE_STORES.map(st => saLockRows(st).length ? { st } : null).filter(Boolean); }
 function saLockView(st) {
-  { const today = saYmd(new Date()), sun = new Date().getDay() === 0, pd = saRows(st).filter(r => r.left > 0 && r.date < today && (sun || saMon(r.date) < saMon(today))).map(r => r.date).sort(); if (pd.length && !pd.some(x => saMon(x) === S.saWk)) { S.saWk = saMon(pd[0]); S.saDay = ''; } }
-  return `<section class="due sa-due"><div class="due-h">🔒 店販の販売分を処理してください（${esc(storeOf(st).short)}）</div><div class="due-b">${new Date().getDay() === 0 ? '日曜になっても、今週の' : '前の週（日曜まで）の'}店販の販売分が在庫に反映されていません。下の「店販の販売分」で、商品ごとに「反映」か「今回は反映しない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b></div></section>${holdAskBox()}${saCard() || '<div class="card"><div class="empty">読み込んでいます</div></div>'}`;
+  { const pd = saLockRows(st).map(r => r.date).sort(); if (pd.length && !pd.some(x => saMon(x) === S.saWk)) { S.saWk = saMon(pd[0]); S.saDay = ''; } }
+  return `<section class="due sa-due"><div class="due-h">🔒 店販の販売分を処理してください（${esc(storeOf(st).short)}）</div><div class="due-b">処理の期限（月〜土の分は日曜、日曜の分は水曜19:00）を過ぎた店販の販売分が、まだ在庫に反映されていません（${(() => { const ds = [...new Set(saLockRows(st).map(r => r.date))].sort(); return ds.map(saMD).join('・'); })()}分）。下の「店販の販売分」で、商品ごとに「反映」か「今回は反映しない」を押してください。<b>全部終わるまで、ほかの画面は使えません。</b></div></section>${holdAskBox()}${saCard() || '<div class="card"><div class="empty">読み込んでいます</div></div>'}`;
 }
 function saDueBanner() {
   if (S.tab !== 'stock' && S.tab !== 'order') return '';
   const L = saDueList(); if (!L.length) return '';
   const rng = x => saMD(x.from) + (x.to !== x.from ? '〜' + saMD(x.to) : '') + '分';
   const html = `<section class="due sa-due"><div class="due-h">🧾 店販の販売分が、まだ在庫に反映されていません</div>
-    <div class="due-b">商品ごとに「反映」か「今回は反映しない」を押すまで、この表示は消えません。${L.some(x => x.old) ? '<b>前の週の分は水曜19:00に消えます。</b>' : ''}</div>
+    <div class="due-b">商品ごとに「反映」か「今回は反映しない」を押すまで、この表示は消えません。${L.some(x => x.old) ? '<b>前の週の分が残っています。</b>' : ''}</div>
     ${L.map(x => `<div class="due-r"><div class="due-n"><b>${esc(storeOf(x.st).short)}</b><span>${x.n}品（${rng(x)}）</span></div><div class="due-bs"><button type="button" class="btn small" data-act="saDueOpen" data-id="${x.st}" data-d="${x.from}">開いて反映する</button></div></div>`).join('')}</section>`;
   const key = 'saDueShown:' + new Date().toDateString() + ':' + L.map(x => x.st).join(',');
   let shown = false; try { shown = localStorage.getItem(key) === '1'; } catch (e) {}
@@ -786,7 +787,7 @@ const SA_WD = ['日', '月', '火', '水', '木', '金', '土'];
 const saTs = t => { const d = new Date(num(t)); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 /* この店・期間のデータを取り込んだ日時（最新） */
 function saGotAt(store, from, to) { let t = 0; (S.saSDays || []).forEach(d => { if (d.store === store && d.date >= from && d.date <= to && num(d.asOf) > t) t = num(d.asOf); }); (S.saDays || []).forEach(d => { if (d.date >= from && d.date <= to && !(S.saSDays || []).some(x => x.date === d.date) && num(d.asOf || d.at) > t) t = num(d.asOf || d.at); }); return t; }
-/* 水曜19:00を過ぎたら、前の週（日曜まで）の分は表示しない */
+/* 水曜19:00を過ぎたら、前の週（日曜まで）の処理済みの分は表示しない */
 const saWedEnd = () => { const d = new Date(); const back = (d.getDay() + 6) % 7; d.setDate(d.getDate() - back + 2); d.setHours(19, 0, 0, 0); return d.getTime(); };
 function saCut() { const d = new Date(); const back = (d.getDay() + 6) % 7; d.setDate(d.getDate() - back); d.setHours(12, 0, 0, 0); if (saWedEnd() > Date.now()) d.setDate(d.getDate() - 7); return saYmd(d); }
 /* この店の販売行（反映済みも含む） */
@@ -796,12 +797,13 @@ function saRows(store) {
   const sdays = new Set((S.saSDays || []).map(d => d.date));
   const src = (S.saSDays || []).filter(d => d.store === store).map(d => ({ ...d, byStore: true })).concat((S.saDays || []).filter(d => !sdays.has(d.date)));
   for (const d of src) for (const r of d.rows || []) {
-    if (r.m === 'EC連携' || !(num(r.q) > 0) || d.date < SA_START || d.date < cut) continue;
+    if (r.m === 'EC連携' || !(num(r.q) > 0) || d.date < SA_START) continue;
     const row = { date: d.date, p: d.byStore ? 'st:' + store + ':' + r.p : r.p, c: String(r.c), n: r.n, q: num(r.q) };
     const st = d.byStore ? store : saStoreOf(r.p); if (st && st !== store) continue;
     const m = saMapOf(row.c); if (m === '__skip') continue;
     const a = (S.saApplied || {})[saKey(row)];
     const done = a ? (a.skip ? row.q : Math.min(row.q, num(a.q))) : 0;
+    if (d.date < cut && row.q - done <= 0) continue; /* 前の週の分は、処理済みなら水曜19:00で消す。未処理は処理するまで残す */
     out.push({ ...row, done, left: row.q - done, a, unknownStore: !st, item: m && S.items.find(i => i.id === m) || null });
   }
   return out;
@@ -863,7 +865,7 @@ function saCard() {
   const gotAt = saGotAt(S.store, from, to), gotTxt = gotAt ? `<span class="sa-got">サロンアンサーからの最終取り込み：${saTs(gotAt)}</span>` : '';
   const scopeTxt = S.saDay ? `${saMD(S.saDay)}（${SA_WD[saDate(S.saDay).getDay()]}）` : `${saMD(wk)}〜${saMD(wkLast(wk))}`;
   return `<details class="card sa-card"${open ? ' open' : ''} data-sa="1"><summary class="card-head"><h3>🧾 店販の販売分 ${pend.length ? `<b>${new Set(pend.map(r => r.c)).size}</b>品` : '✓'}</h3><span class="sa-tog">${open ? '▴ 閉じる' : '▾ 開く'}</span></summary>
-    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。前の週の分は水曜19:00に消えます。反映した分は記録されるので、何度開いても二重には引きません。</div>
+    <div class="sub">サロンアンサーで売れた店販です。週（月〜日）ごと、または日ごとに在庫から引けます。前の週の分は、処理済みなら水曜19:00に消えます（未処理の分は処理するまで残ります）。反映した分は記録されるので、何度開いても二重には引きません。</div>
     <div class="chips sa-chips">${wkChips}</div>
     <div class="chips sa-chips"><button type="button" class="chip" data-act="saDay" data-id="" aria-pressed="${!S.saDay}">${wk === thisWk ? '今週' : 'この週'}まとめ</button>${dayChips}</div>
     ${gotTxt ? `<div class="sub">${gotTxt}</div>` : ''}
